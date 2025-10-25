@@ -19,61 +19,73 @@ const testMarkets: Market[] = [
   // Yankees vs Red Sox - Available on all 3 platforms
   {
     id: 'kalshi-yankees-1',
+    ticker: 'kalshi-yankees-1',
     platform: 'kalshi',
     marketType: 'prediction',
     title: 'Yankees to win vs Red Sox',
     yesPrice: 65,
     noPrice: 35,
     expiryDate: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours
+    volume: 0,
   },
   {
     id: 'poly-yankees-1',
+    ticker: 'poly-yankees-1',
     platform: 'polymarket',
     marketType: 'prediction',
     title: 'Will the Yankees beat the Red Sox?',
     yesPrice: 68,
     noPrice: 32,
     expiryDate: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    volume: 0,
   },
   {
     id: 'sx-yankees-1',
+    ticker: 'sx-yankees-1',
     platform: 'sxbet',
     marketType: 'sportsbook',
     title: 'New York Yankees vs Boston Red Sox (Moneyline)',
     yesPrice: 1.52, // Decimal odds
     noPrice: 2.75,
     expiryDate: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    volume: 0,
   },
 
   // Lakers vs Celtics - Available on Polymarket and SX.bet only
   {
     id: 'poly-lakers-1',
+    ticker: 'poly-lakers-1',
     platform: 'polymarket',
     marketType: 'prediction',
     title: 'Lakers to win tonight vs Celtics',
     yesPrice: 55,
     noPrice: 45,
     expiryDate: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(), // 1 hour
+    volume: 0,
   },
   {
     id: 'sx-lakers-1',
+    ticker: 'sx-lakers-1',
     platform: 'sxbet',
     marketType: 'sportsbook',
     title: 'Los Angeles Lakers vs Boston Celtics',
     yesPrice: 1.85,
     noPrice: 1.95,
     expiryDate: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
+    volume: 0,
   },
 
   // Bitcoin price - Only on Kalshi (not tracked)
   {
     id: 'kalshi-btc-1',
+    ticker: 'kalshi-btc-1',
     platform: 'kalshi',
     marketType: 'prediction',
     title: 'Bitcoin price above $50k at end of month',
     yesPrice: 70,
     noPrice: 30,
     expiryDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days
+    volume: 0,
   },
 ];
 
@@ -177,12 +189,14 @@ console.log('='.repeat(60));
 // Create expired market (past expiry date)
 const expiredMarket: Market = {
   id: 'expired-1',
+  ticker: 'expired-1',
   platform: 'kalshi',
   marketType: 'prediction',
   title: 'Test expired market',
   yesPrice: 50,
   noPrice: 50,
   expiryDate: new Date(Date.now() - 1000).toISOString(), // 1 second ago
+  volume: 0,
 };
 
 tracker.addMarkets([expiredMarket, ...updatedMarkets]);
