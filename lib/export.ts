@@ -30,13 +30,13 @@ export async function exportData(options: ExportOptions): Promise<{ data: string
   });
 
   // Calculate totals
-  const totalInvested = filteredGroups.reduce((sum, group) => sum + group.totalInvested, 0);
+  const totalInvested = filteredGroups.reduce((sum, group) => sum + (group.bet1.amount + group.bet2.amount), 0);
   const totalProfit = filteredGroups
     .filter((g) => g.status === 'resolved')
     .reduce((sum, group) => sum + (group.actualProfit || 0), 0);
   const roi = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
-  const exportData: ExportData = {
+  const exportData = {
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
     bets: filteredBets,
