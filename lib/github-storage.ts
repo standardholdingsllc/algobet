@@ -1,4 +1,4 @@
-import { Octokit } from 'octokit';
+import { Octokit } from '@octokit/rest';
 import { DataStore } from '@/types';
 
 const octokit = new Octokit({
