@@ -13,8 +13,13 @@ export default function ConfigPanel({ onUpdate }: ConfigPanelProps) {
     balanceThresholds: {
       kalshi: 100,
       polymarket: 100,
+      sxbet: 100,
     },
-    emailAlerts: true,
+    emailAlerts: {
+      enabled: true,
+      lowBalanceAlert: true,
+    },
+    simulationMode: false,
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -158,16 +163,78 @@ export default function ConfigPanel({ onUpdate }: ConfigPanelProps) {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              SXBet Balance Threshold ($)
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={config.balanceThresholds.sxbet}
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  balanceThresholds: {
+                    ...config.balanceThresholds,
+                    sxbet: parseFloat(e.target.value),
+                  },
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
           <div className="flex items-center">
             <input
               type="checkbox"
               id="emailAlerts"
-              checked={config.emailAlerts}
-              onChange={(e) => setConfig({ ...config, emailAlerts: e.target.checked })}
+              checked={config.emailAlerts.enabled}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                emailAlerts: {
+                  ...config.emailAlerts,
+                  enabled: e.target.checked
+                }
+              })}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <label htmlFor="emailAlerts" className="ml-2 block text-sm text-gray-700">
               Enable Email Alerts
+            </label>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="lowBalanceAlert"
+              checked={config.emailAlerts.lowBalanceAlert}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                emailAlerts: {
+                  ...config.emailAlerts,
+                  lowBalanceAlert: e.target.checked
+                }
+              })}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="lowBalanceAlert" className="ml-2 block text-sm text-gray-700">
+              Low Balance Alerts
+            </label>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="simulationMode"
+              checked={config.simulationMode}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                simulationMode: e.target.checked
+              })}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="simulationMode" className="ml-2 block text-sm text-gray-700">
+              Simulation Mode (Log Only)
             </label>
           </div>
         </div>
