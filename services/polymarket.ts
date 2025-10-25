@@ -46,7 +46,7 @@ export class PolymarketService {
     const now = new Date();
     const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
 
-    return allMarkets.filter(market => market.expiryDate <= maxDate);
+    return allMarkets.filter(market => new Date(market.expiryDate) <= maxDate);
   }
 
   async getMarketPrices(marketId: string): Promise<{ yes: number, no: number } | null> {
