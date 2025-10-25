@@ -106,14 +106,14 @@ export default function DashboardPage() {
   }
 
   // Calculate stats
-  const totalProfit = dailyStats.reduce((sum, stat) => sum + stat.profit, 0);
+  const totalProfit = dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0);
   const activeBetsCount = bets.filter((b) => b.status === 'filled' || b.status === 'pending').length;
   const resolvedBetsCount = bets.filter((b) => b.status === 'resolved').length;
   const kalshiBalance = balances.find((b) => b.platform === 'kalshi')?.balance || 0;
   const polymarketBalance = balances.find((b) => b.platform === 'polymarket')?.balance || 0;
 
   const avgDailyProfit = dailyStats.length > 0
-    ? dailyStats.reduce((sum, stat) => sum + stat.profit, 0) / dailyStats.length
+    ? dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0) / dailyStats.length
     : 0;
 
   return (
@@ -178,7 +178,14 @@ export default function DashboardPage() {
         </div>
 
         {/* Profit Chart */}
-        {dailyStats.length > 0 && <ProfitChart data={dailyStats} />}
+        {dailyStats.length > 0 && (
+          <ProfitChart 
+            data={dailyStats.map(stat => ({ 
+              date: stat.date, 
+              profit: stat.totalProfit 
+            }))} 
+          />
+        )}
 
         {/* Export Section */}
         <div className="bg-white p-6 rounded-lg shadow">
