@@ -145,7 +145,7 @@ export class KalshiAPI {
             yesPrice,
             noPrice,
             volume: market.volume,
-            expiryDate,
+            expiryDate: expiryDate.toISOString(),
             eventTicker: market.event_ticker,
             fee: feePercentage,
             marketType: 'prediction', // Kalshi is a prediction market

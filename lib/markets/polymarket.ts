@@ -68,7 +68,7 @@ export class PolymarketAPI {
               yesPrice,
               noPrice,
               volume: parseFloat(market.volume),
-              expiryDate,
+              expiryDate: expiryDate.toISOString(),
               eventTicker: market.condition_id,
               fee: 2.0,
               marketType: 'prediction', // Polymarket is a prediction market

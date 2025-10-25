@@ -187,7 +187,7 @@ export class SXBetAPI {
           yesPrice: outcomeOneOdds, // Decimal odds for outcome one (e.g., 1.78)
           noPrice: outcomeTwoOdds,  // Decimal odds for outcome two (e.g., 2.10)
           volume: 0, // sx.bet doesn't provide volume in market data
-          expiryDate,
+          expiryDate: expiryDate.toISOString(),
           eventTicker: market.sportXeventId,
           fee: 0, // 0% fees on sx.bet
           marketType: 'sportsbook', // sx.bet is a sportsbook, not prediction market
