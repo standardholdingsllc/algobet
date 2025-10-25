@@ -316,8 +316,8 @@ export class ArbitrageBotEngine {
 
     // Place both bets simultaneously (Fill or Kill)
     const [result1, result2] = await Promise.all([
-      this.placeBet(opportunity.market1, opportunity.market1Side, quantity1),
-      this.placeBet(opportunity.market2, opportunity.market2Side, quantity2),
+      this.placeBet(opportunity.market1, opportunity.side1, quantity1),
+      this.placeBet(opportunity.market2, opportunity.side2, quantity2),
     ]);
 
     // Check if both succeeded
@@ -327,36 +327,34 @@ export class ArbitrageBotEngine {
       // Create bet records
       const bet1: Bet = {
         id: result1.orderId!,
-        timestamp: new Date(),
+        placedAt: new Date(),
         platform: opportunity.market1.platform,
         marketId: opportunity.market1.id,
         ticker: opportunity.market1.ticker,
-        title: opportunity.market1.title,
-        side: opportunity.market1Side,
+        marketTitle: opportunity.market1.title,
+        side: opportunity.side1,
         price:
-          opportunity.market1Side === 'yes'
+          opportunity.side1 === 'yes'
             ? opportunity.market1.yesPrice
             : opportunity.market1.noPrice,
         amount: amount1,
-        quantity: quantity1,
         status: 'filled',
         arbitrageGroupId: opportunity.id,
       };
 
       const bet2: Bet = {
         id: result2.orderId!,
-        timestamp: new Date(),
+        placedAt: new Date(),
         platform: opportunity.market2.platform,
         marketId: opportunity.market2.id,
         ticker: opportunity.market2.ticker,
-        title: opportunity.market2.title,
-        side: opportunity.market2Side,
+        marketTitle: opportunity.market2.title,
+        side: opportunity.side2,
         price:
-          opportunity.market2Side === 'yes'
+          opportunity.side2 === 'yes'
             ? opportunity.market2.yesPrice
             : opportunity.market2.noPrice,
         amount: amount2,
-        quantity: quantity2,
         status: 'filled',
         arbitrageGroupId: opportunity.id,
       };
@@ -370,7 +368,7 @@ export class ArbitrageBotEngine {
         bet1,
         bet2,
         totalInvested: amount1 + amount2,
-        expectedProfit: opportunity.estimatedProfit,
+        expectedProfit: opportunity.expectedProfit,
         status: 'open',
       };
 

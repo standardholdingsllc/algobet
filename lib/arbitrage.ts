@@ -65,15 +65,20 @@ export function findArbitrageOpportunities(
 
     for (const combo of combinations) {
       if (combo.profitMargin >= minProfitMargin) {
+        const profit = combo.guaranteedReturn - combo.totalCost;
         opportunities.push({
           id: uuidv4(),
           market1: combo.market1,
           market2: combo.market2,
+          side1: combo.market1Side,
+          side2: combo.market2Side,
           profitMargin: combo.profitMargin,
+          profitPercentage: combo.profitMargin,
+          betSize1: combo.totalCost / 2, // Split evenly for now
+          betSize2: combo.totalCost / 2,
+          expectedProfit: profit,
+          netProfit: profit,
           timestamp: new Date(),
-          market1Side: combo.market1Side,
-          market2Side: combo.market2Side,
-          estimatedProfit: combo.guaranteedReturn - combo.totalCost,
         });
         
         // Log the opportunity
@@ -196,9 +201,9 @@ export function calculateBetSizes(
 
   // Get prices
   const price1 =
-    opportunity.market1Side === 'yes' ? opportunity.market1.yesPrice : opportunity.market1.noPrice;
+    opportunity.side1 === 'yes' ? opportunity.market1.yesPrice : opportunity.market1.noPrice;
   const price2 =
-    opportunity.market2Side === 'yes' ? opportunity.market2.yesPrice : opportunity.market2.noPrice;
+    opportunity.side2 === 'yes' ? opportunity.market2.yesPrice : opportunity.market2.noPrice;
 
   // Calculate actual cost per share including precise fees
   const cost1PerShare = calculateTotalCost(
@@ -270,9 +275,9 @@ export function validateOpportunity(
   minProfitMargin: number
 ): boolean {
   const price1 =
-    opportunity.market1Side === 'yes' ? opportunity.market1.yesPrice : opportunity.market1.noPrice;
+    opportunity.side1 === 'yes' ? opportunity.market1.yesPrice : opportunity.market1.noPrice;
   const price2 =
-    opportunity.market2Side === 'yes' ? opportunity.market2.yesPrice : opportunity.market2.noPrice;
+    opportunity.side2 === 'yes' ? opportunity.market2.yesPrice : opportunity.market2.noPrice;
 
   // Use precise fee calculations
   const cost1Result = calculateTotalCost(

@@ -2,6 +2,7 @@
 
 export interface Market {
   id: string;
+  ticker: string; // Alias for id, used in many places
   platform: 'kalshi' | 'polymarket' | 'sxbet';
   marketType: 'prediction' | 'sportsbook';
   title: string;
@@ -19,9 +20,11 @@ export interface ArbitrageOpportunity {
   side1: 'yes' | 'no';
   side2: 'yes' | 'no';
   profitMargin: number;
+  profitPercentage: number; // Alias for profitMargin
   betSize1: number;
   betSize2: number;
   expectedProfit: number;
+  netProfit: number; // Alias for expectedProfit
   timestamp: Date;
 }
 
@@ -31,6 +34,7 @@ export interface Bet {
   platform: 'kalshi' | 'polymarket' | 'sxbet';
   marketId: string;
   marketTitle: string;
+  ticker: string; // Market ticker/identifier
   side: 'yes' | 'no';
   price: number;
   amount: number;
