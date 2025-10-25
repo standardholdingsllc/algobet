@@ -81,12 +81,19 @@ export class GitHubStorage {
         balances: [],
         profits: [],
         config: {
-          minBalanceKalshi: parseFloat(process.env.MIN_BALANCE_KALSHI || '1000'),
-          minBalancePolymarket: parseFloat(process.env.MIN_BALANCE_POLYMARKET || '1000'),
           maxBetPercentage: parseFloat(process.env.MAX_BET_PERCENTAGE || '4'),
           maxDaysToExpiry: parseInt(process.env.MAX_DAYS_TO_EXPIRY || '5'),
-          alertEmail: process.env.ALERT_EMAIL_TO || '',
-          lastUpdated: new Date(),
+          minProfitMargin: parseFloat(process.env.MIN_PROFIT_MARGIN || '0.5'),
+          balanceThresholds: {
+            kalshi: parseFloat(process.env.MIN_BALANCE_KALSHI || '100'),
+            polymarket: parseFloat(process.env.MIN_BALANCE_POLYMARKET || '100'),
+            sxbet: parseFloat(process.env.MIN_BALANCE_SXBET || '100'),
+          },
+          emailAlerts: {
+            enabled: process.env.EMAIL_ALERTS_ENABLED === 'true',
+            lowBalanceAlert: process.env.LOW_BALANCE_ALERT === 'true',
+          },
+          simulationMode: process.env.SIMULATION_MODE === 'true',
         },
       };
       await this.writeData('data/store.json', initialStore, 'Initialize data store');
