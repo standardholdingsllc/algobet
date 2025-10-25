@@ -1,8 +1,8 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { DailyStats } from '@/types';
+import { ProfitData } from '@/types';
 
 interface ProfitChartProps {
-  data: DailyStats[];
+  data: ProfitData[];
 }
 
 export default function ProfitChart({ data }: ProfitChartProps) {
@@ -14,7 +14,6 @@ export default function ProfitChart({ data }: ProfitChartProps) {
       date: new Date(stat.date).toLocaleDateString(),
       profit: stat.profit,
       cumulativeProfit: cumulativeProfit,
-      roi: stat.roi,
     };
   });
 
