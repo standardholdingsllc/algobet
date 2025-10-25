@@ -64,14 +64,12 @@ export class PolymarketAPI {
               id: market.condition_id,
               platform: 'polymarket',
               ticker: market.condition_id,
+              marketType: 'prediction',
               title: market.question,
               yesPrice,
               noPrice,
-              volume: parseFloat(market.volume),
               expiryDate: expiryDate.toISOString(),
-              eventTicker: market.condition_id,
-              fee: 2.0,
-              marketType: 'prediction', // Polymarket is a prediction market
+              volume: parseFloat(market.volume),
             });
           }
         }

@@ -141,14 +141,12 @@ export class KalshiAPI {
             id: market.ticker,
             platform: 'kalshi',
             ticker: market.ticker,
+            marketType: 'prediction',
             title: market.title,
             yesPrice,
             noPrice,
-            volume: market.volume,
             expiryDate: expiryDate.toISOString(),
-            eventTicker: market.event_ticker,
-            fee: feePercentage,
-            marketType: 'prediction', // Kalshi is a prediction market
+            volume: market.volume,
           });
         }
       }
