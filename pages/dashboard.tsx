@@ -18,13 +18,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Load data on mount
-      fetchData();
-      
-      // Refresh data every 30 seconds
-      const interval = setInterval(fetchData, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [status]);
+    fetchData();
+    
+    // Refresh data every 30 seconds
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchData = async () => {
     try {
