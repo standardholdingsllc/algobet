@@ -55,13 +55,13 @@ export default function BetsTable({ bets }: BetsTableProps) {
               bets.slice(0, 20).map((bet) => (
                 <tr key={bet.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(bet.timestamp).toLocaleDateString()}
+                    {new Date(bet.placedAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className="uppercase font-medium">{bet.platform}</span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                    {bet.title}
+                    {bet.marketTitle}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span
