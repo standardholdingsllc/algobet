@@ -24,6 +24,7 @@
     "nodemailer": "^6.9.7",
     "papaparse": "^5.4.1",
     "lodash": "^4.17.21",
+    "lucide-react": "^0.263.1",
     "@octokit/rest": "^20.0.2",
     "uuid": "^9.0.1",
     "@types/node": "^20.10.5",
