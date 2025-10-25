@@ -5,6 +5,7 @@ import ProfitChart from '@/components/ProfitChart';
 import BetsTable from '@/components/BetsTable';
 import ConfigPanel from '@/components/ConfigPanel';
 import { Bet, DailyStats, AccountBalance } from '@/types';
+import { TrendingUp, Activity, Wallet } from 'lucide-react';
 
 export default function DashboardPage() {
   const [bets, setBets] = useState<Bet[]>([]);
@@ -151,28 +152,28 @@ export default function DashboardPage() {
           <StatsCard
             title="Total Profit"
             value={`$${totalProfit.toFixed(2)}`}
-            subtitle={`Avg daily: $${avgDailyProfit.toFixed(2)}`}
-            icon="💰"
+            change={`Avg daily: $${avgDailyProfit.toFixed(2)}`}
+            icon={TrendingUp}
             color="green"
             trend={totalProfit > 0 ? 'up' : totalProfit < 0 ? 'down' : 'neutral'}
           />
           <StatsCard
             title="Active Bets"
             value={activeBetsCount}
-            subtitle={`${resolvedBetsCount} resolved`}
-            icon="📊"
+            change={`${resolvedBetsCount} resolved`}
+            icon={Activity}
             color="blue"
           />
           <StatsCard
             title="Kalshi Balance"
             value={`$${kalshiBalance.toFixed(2)}`}
-            icon="💵"
+            icon={Wallet}
             color="purple"
           />
           <StatsCard
             title="Polymarket Balance"
             value={`$${polymarketBalance.toFixed(2)}`}
-            icon="💵"
+            icon={Wallet}
             color="yellow"
           />
         </div>
