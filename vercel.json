@@ -10,25 +10,5 @@
       "path": "/api/bot/cron",
       "schedule": "*/5 * * * *"
     }
-  ],
-  "env": {
-    "KALSHI_API_KEY": "@kalshi-api-key",
-    "KALSHI_PRIVATE_KEY": "@kalshi-private-key",
-    "KALSHI_EMAIL": "@kalshi-email",
-    "POLYMARKET_API_KEY": "@polymarket-api-key",
-    "POLYMARKET_PRIVATE_KEY": "@polymarket-private-key",
-    "POLYMARKET_WALLET_ADDRESS": "@polymarket-wallet-address",
-    "SXBET_API_KEY": "@sxbet-api-key",
-    "SXBET_WALLET_ADDRESS": "@sxbet-wallet-address",
-    "SXBET_PRIVATE_KEY": "@sxbet-private-key",
-    "GITHUB_TOKEN": "@github-token",
-    "GITHUB_OWNER": "@github-owner",
-    "GITHUB_REPO": "@github-repo",
-    "EMAIL_HOST": "@email-host",
-    "EMAIL_PORT": "@email-port",
-    "EMAIL_USER": "@email-user",
-    "EMAIL_PASS": "@email-pass",
-    "ALERT_EMAIL": "@alert-email",
-    "CRON_SECRET": "@cron-secret"
-  }
+  ]
 }
