@@ -84,10 +84,11 @@ const MONTH_ABBR = [
  */
 export function parseMarket(market: Market): ParsedMarket {
   const title = market.title.toLowerCase();
+  const expiryDate = new Date(market.expiryDate);
   
   return {
     entities: extractEntities(title),
-    dates: extractDates(title, market.expiryDate),
+    dates: extractDates(title, expiryDate),
     numbers: extractNumbers(title),
     metric: extractMetric(title),
     direction: extractDirection(title),
