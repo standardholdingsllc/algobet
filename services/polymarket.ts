@@ -126,17 +126,17 @@ export class PolymarketService {
   private transformMarket(polymarketMarket: PolymarketMarket): Market | null {
     try {
       // Only process binary markets (Yes/No)
-      if (!polymarketMarket.outcomes || polymarketMarket.outcomes.length !== 2) {
+      if (!polymarketMarket.tokens || polymarketMarket.tokens.length !== 2) {
         return null;
       }
 
-      const yesPrice = Math.round(parseFloat(polymarketMarket.outcomePrices?.[0] || '0') * 100);
-      const noPrice = Math.round(parseFloat(polymarketMarket.outcomePrices?.[1] || '0') * 100);
+      const yesPrice = Math.round(parseFloat(polymarketMarket.tokens[0]?.price || '0') * 100);
+      const noPrice = Math.round(parseFloat(polymarketMarket.tokens[1]?.price || '0') * 100);
 
       return {
-        id: polymarketMarket.id,
+        id: polymarketMarket.condition_id,
         platform: 'polymarket',
-        ticker: polymarketMarket.id,
+        ticker: polymarketMarket.condition_id,
         marketType: 'prediction',
         title: polymarketMarket.question,
         expiryDate: new Date(polymarketMarket.end_date_iso).toISOString(),
