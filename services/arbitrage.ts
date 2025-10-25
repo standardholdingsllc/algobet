@@ -37,7 +37,7 @@ export class ArbitrageService {
 
     // Check if titles are similar and expiry dates are close (within 1 day)
     const titleSimilar = this.calculateSimilarity(title1, title2) > 0.7;
-    const expiryClose = Math.abs(m1.expiryDate.getTime() - m2.expiryDate.getTime()) < 86400000;
+    const expiryClose = Math.abs(new Date(m1.expiryDate).getTime() - new Date(m2.expiryDate).getTime()) < 86400000;
 
     return titleSimilar && expiryClose;
   }
