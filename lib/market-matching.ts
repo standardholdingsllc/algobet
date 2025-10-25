@@ -279,13 +279,16 @@ function extractDirection(title: string): 'above' | 'below' | 'between' | 'equal
 /**
  * Basic title normalization (fallback)
  */
-function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+// Alias for backwards compatibility
+export const normalizeForMatching = normalizeTitle;
 
 /**
  * Calculate similarity score between two parsed markets (0-1)
