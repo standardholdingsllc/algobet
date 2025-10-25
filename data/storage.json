@@ -1,0 +1,17 @@
+{
+  "bets": [],
+  "arbitrageGroups": [],
+  "config": {
+    "maxBetPercentage": 4,
+    "maxDaysToExpiry": 5,
+    "minProfitMargin": 0.5,
+    "balanceThresholds": {
+      "kalshi": 100,
+      "polymarket": 100
+    },
+    "emailAlerts": true
+  },
+  "dailyStats": [],
+  "balances": []
+}
+

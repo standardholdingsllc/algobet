@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/bot/cron",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "env": {
+    "NEXTAUTH_SECRET": "@nextauth-secret",
+    "NEXTAUTH_URL": "@nextauth-url",
+    "ADMIN_USERNAME": "@admin-username",
+    "ADMIN_PASSWORD_HASH": "@admin-password-hash",
+    "KALSHI_API_KEY": "@kalshi-api-key",
+    "KALSHI_PRIVATE_KEY": "@kalshi-private-key",
+    "KALSHI_EMAIL": "@kalshi-email",
+    "POLYMARKET_API_KEY": "@polymarket-api-key",
+    "POLYMARKET_PRIVATE_KEY": "@polymarket-private-key",
+    "POLYMARKET_WALLET_ADDRESS": "@polymarket-wallet-address",
+    "GITHUB_TOKEN": "@github-token",
+    "GITHUB_OWNER": "@github-owner",
+    "GITHUB_REPO": "@github-repo",
+    "EMAIL_HOST": "@email-host",
+    "EMAIL_PORT": "@email-port",
+    "EMAIL_USER": "@email-user",
+    "EMAIL_PASS": "@email-pass",
+    "ALERT_EMAIL": "@alert-email"
+  }
+}
