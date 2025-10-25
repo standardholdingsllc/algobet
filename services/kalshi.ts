@@ -121,13 +121,12 @@ export class KalshiService {
       id: kalshiMarket.ticker,
       platform: 'kalshi',
       ticker: kalshiMarket.ticker,
+      marketType: 'prediction',
       title: kalshiMarket.title,
-      expiryDate: new Date(kalshiMarket.expiration_time),
+      expiryDate: new Date(kalshiMarket.expiration_time).toISOString(),
       yesPrice: kalshiMarket.yes_price || 0,
       noPrice: kalshiMarket.no_price || 0,
       volume: kalshiMarket.volume || 0,
-      category: kalshiMarket.category,
-      eventTicker: kalshiMarket.event_ticker,
     };
   }
 

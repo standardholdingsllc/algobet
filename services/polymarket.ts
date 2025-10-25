@@ -137,12 +137,12 @@ export class PolymarketService {
         id: polymarketMarket.id,
         platform: 'polymarket',
         ticker: polymarketMarket.id,
+        marketType: 'prediction',
         title: polymarketMarket.question,
-        expiryDate: new Date(polymarketMarket.end_date_iso),
+        expiryDate: new Date(polymarketMarket.end_date_iso).toISOString(),
         yesPrice,
         noPrice,
         volume: parseFloat(polymarketMarket.volume || '0'),
-        category: polymarketMarket.category || 'General',
       };
     } catch (error) {
       console.error('Error transforming Polymarket market:', error);
