@@ -123,7 +123,7 @@ export class KalshiService {
       ticker: kalshiMarket.ticker,
       marketType: 'prediction',
       title: kalshiMarket.title,
-      expiryDate: new Date(kalshiMarket.expiration_time).toISOString(),
+      expiryDate: new Date(kalshiMarket.close_time).toISOString(),
       yesPrice: kalshiMarket.yes_price || 0,
       noPrice: kalshiMarket.no_price || 0,
       volume: kalshiMarket.volume || 0,
