@@ -87,7 +87,7 @@ class MarketScanner {
         for (const opportunity of opportunities.slice(0, 5)) {
           // Check if we already tried this opportunity recently
           const recentAttempt = dataStore.opportunities.find(
-            o => o.id === opportunity.id && o.status !== 'detected'
+            o => o.id === opportunity.id
           );
 
           if (recentAttempt) {
