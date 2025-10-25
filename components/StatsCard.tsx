@@ -1,8 +1,11 @@
+import { LucideIcon } from 'lucide-react';
+
 interface StatsCardProps {
   title: string;
   value: string | number;
-  subtitle?: string;
-  icon?: string;
+  change?: string;
+  icon?: LucideIcon;
+  positive?: boolean;
   trend?: 'up' | 'down' | 'neutral';
   color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple';
 }
@@ -10,8 +13,9 @@ interface StatsCardProps {
 export default function StatsCard({
   title,
   value,
-  subtitle,
-  icon,
+  change,
+  icon: Icon,
+  positive,
   trend,
   color = 'blue',
 }: StatsCardProps) {
@@ -35,14 +39,14 @@ export default function StatsCard({
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
           <p className="text-3xl font-bold text-gray-900">{value}</p>
-          {subtitle && (
-            <p className="text-sm text-gray-500 mt-1">
+          {change && (
+            <p className={`text-sm mt-1 ${positive !== undefined ? (positive ? 'text-green-600' : 'text-red-600') : 'text-gray-500'}`}>
               {trend && <span className="mr-1">{trendIcons[trend]}</span>}
-              {subtitle}
+              {change}
             </p>
           )}
         </div>
-        {icon && <span className="text-3xl">{icon}</span>}
+        {Icon && <Icon className="w-8 h-8 text-gray-400" />}
       </div>
     </div>
   );
