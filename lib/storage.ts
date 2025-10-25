@@ -26,7 +26,10 @@ const DEFAULT_CONFIG: BotConfig = {
     polymarket: 100,
     sxbet: 100,
   },
-  emailAlerts: true,
+  emailAlerts: {
+    enabled: true,
+    lowBalanceAlert: true,
+  },
   simulationMode: false, // When true, logs opportunities without placing bets
 };
 
