@@ -77,13 +77,11 @@ class MarketScanner {
           todayProfit = {
             date: today,
             profit: 0,
-            betsPlaced: 0,
-            opportunitiesDetected: 0,
           };
           dataStore.profits.push(todayProfit);
         }
 
-        todayProfit.opportunitiesDetected += opportunities.length;
+        console.log(`Detected ${opportunities.length} opportunities today`);
 
         // Execute top opportunities
         for (const opportunity of opportunities.slice(0, 5)) {
@@ -121,16 +119,13 @@ class MarketScanner {
           );
 
           if (bets.length === 2) {
-            opportunity.status = 'placed';
             dataStore.bets.push(...bets);
-            todayProfit.betsPlaced += 2;
             
             // Estimate profit (actual profit determined at resolution)
             todayProfit.profit += opportunity.netProfit * maxBetAmount / 100;
 
-            console.log(`✅ Successfully placed bets for opportunity ${opportunity.id}`);
+            console.log(`✅ Successfully placed ${bets.length} bets for opportunity ${opportunity.id}`);
           } else {
-            opportunity.status = 'failed';
             console.log(`❌ Failed to place bets for opportunity ${opportunity.id}`);
           }
 
