@@ -140,3 +140,19 @@ export interface OpportunityLog {
   withinExecutionWindow: boolean; // Would this have been executed?
   skipReason?: string; // Why it was skipped (if applicable)
 }
+
+/**
+ * DataStore - Main data structure for the dashboard
+ */
+export interface DataStore {
+  opportunities: ArbitrageOpportunity[];
+  bets: Bet[];
+  balances: AccountBalance[];
+  profits: ProfitData[];
+  config: BotConfig;
+}
+
+export interface ProfitData {
+  date: string;
+  profit: number;
+}
