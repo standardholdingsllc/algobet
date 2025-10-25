@@ -1,16 +1,15 @@
 import { KalshiService } from '../services/kalshi';
 import { PolymarketService } from '../services/polymarket';
 import { ArbitrageService } from '../services/arbitrage';
-import { EmailService } from '../lib/email';
+import { sendBalanceAlert } from '../lib/email';
 import { GitHubStorage } from '../lib/github-storage';
-import { DataStore, ProfitRecord, AccountBalance } from '../types';
+import { DataStore, AccountBalance } from '../types';
 import { MARKET_SCAN_INTERVAL, BALANCE_CHECK_INTERVAL } from '../lib/constants';
 import { format } from 'date-fns';
 
 class MarketScanner {
   private kalshiService: KalshiService;
   private polymarketService: PolymarketService;
-  private emailService: EmailService;
   private isRunning: boolean = false;
   private lastBalanceCheck: number = 0;
   private lastDailySummary: string = '';
@@ -18,7 +17,6 @@ class MarketScanner {
   constructor() {
     this.kalshiService = new KalshiService();
     this.polymarketService = new PolymarketService();
-    this.emailService = new EmailService();
   }
 
   async start() {
@@ -170,20 +168,22 @@ class MarketScanner {
       ];
 
       // Check for low balance alerts
-      if (kalshiBalance < dataStore.config.minBalanceKalshi) {
-        await this.emailService.sendLowBalanceAlert(
-          'Kalshi',
-          kalshiBalance,
-          dataStore.config.minBalanceKalshi
-        );
-      }
+      if (dataStore.config.emailAlerts.lowBalanceAlert) {
+        if (kalshiBalance < dataStore.config.balanceThresholds.kalshi) {
+          await sendBalanceAlert(
+            'kalshi',
+            kalshiBalance,
+            dataStore.config.balanceThresholds.kalshi
+          );
+        }
 
-      if (polymarketBalance < dataStore.config.minBalancePolymarket) {
-        await this.emailService.sendLowBalanceAlert(
-          'Polymarket',
-          polymarketBalance,
-          dataStore.config.minBalancePolymarket
-        );
+        if (polymarketBalance < dataStore.config.balanceThresholds.polymarket) {
+          await sendBalanceAlert(
+            'polymarket',
+            polymarketBalance,
+            dataStore.config.balanceThresholds.polymarket
+          );
+        }
       }
 
       await GitHubStorage.updateDataStore(dataStore);
@@ -201,17 +201,8 @@ class MarketScanner {
       const yesterdayProfit = dataStore.profits.find(p => p.date === yesterday);
 
       if (yesterdayProfit) {
-        const balances = {
-          kalshi: dataStore.balances.find(b => b.platform === 'kalshi')?.balance || 0,
-          polymarket: dataStore.balances.find(b => b.platform === 'polymarket')?.balance || 0,
-        };
-
-        await this.emailService.sendDailySummary(
-          yesterdayProfit.opportunitiesDetected,
-          yesterdayProfit.betsPlaced,
-          yesterdayProfit.profit,
-          balances
-        );
+        // TODO: Implement daily summary email function
+        console.log(`Daily summary for ${yesterday}: Profit $${yesterdayProfit.profit}`);
       }
 
       this.lastDailySummary = today;
