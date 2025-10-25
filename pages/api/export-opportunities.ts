@@ -1,15 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { getOpportunityLogs } from '@/lib/storage';
 import Papa from 'papaparse';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // No auth required for exports
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });

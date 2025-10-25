@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/DashboardLayout';
 import StatsCard from '@/components/StatsCard';
 import ProfitChart from '@/components/ProfitChart';
@@ -9,8 +7,6 @@ import ConfigPanel from '@/components/ConfigPanel';
 import { Bet, DailyStats, AccountBalance } from '@/types';
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
   const [bets, setBets] = useState<Bet[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [balances, setBalances] = useState<AccountBalance[]>([]);
@@ -21,13 +17,7 @@ export default function DashboardPage() {
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (status === 'authenticated') {
+    // Load data on mount
       fetchData();
       
       // Refresh data every 30 seconds

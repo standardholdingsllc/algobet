@@ -1,15 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { getBotInstance } from '@/lib/bot';
 import { setBotStatus } from './status';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // No auth for now - secure with API key if needed
 
   if (req.method === 'POST') {
     const { action } = req.body;

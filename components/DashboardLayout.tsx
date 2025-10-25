@@ -1,4 +1,3 @@
-import { signOut } from 'next-auth/react';
 import { ReactNode } from 'react';
 
 interface DashboardLayoutProps {
@@ -15,12 +14,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <h1 className="text-2xl font-bold text-blue-600">AlgoBet</h1>
               <span className="ml-4 text-sm text-gray-500">Arbitrage Trading Bot</span>
             </div>
-            <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
-              className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              Sign Out
-            </button>
           </div>
         </div>
       </nav>

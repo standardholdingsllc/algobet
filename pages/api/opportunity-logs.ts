@@ -1,14 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { getOpportunityLogs, clearOpportunityLogs } from '@/lib/storage';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // No auth required for GET requests (read-only)
+  // Add auth here if you want to secure it
 
   try {
     if (req.method === 'GET') {
