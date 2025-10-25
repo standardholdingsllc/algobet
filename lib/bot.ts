@@ -367,9 +367,8 @@ export class ArbitrageBotEngine {
         createdAt: new Date(),
         bet1,
         bet2,
-        totalInvested: amount1 + amount2,
         expectedProfit: opportunity.expectedProfit,
-        status: 'open',
+        status: 'active',
       };
 
       await addArbitrageGroup(group);
