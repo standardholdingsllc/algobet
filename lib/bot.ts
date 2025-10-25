@@ -70,6 +70,14 @@ export class ArbitrageBotEngine {
     console.log('Arbitrage bot stopped');
   }
 
+  /**
+   * Perform a single scan cycle (for cron jobs)
+   * This method runs once and exits, perfect for serverless
+   */
+  async scanOnce(): Promise<void> {
+    await this.scanAndExecute();
+  }
+
   private async scanAndExecute(): Promise<void> {
     console.log(`[${new Date().toISOString()}] Scanning for arbitrage opportunities...`);
 

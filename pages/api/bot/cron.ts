@@ -1,10 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getBotInstance } from '@/lib/bot';
+import { ArbitrageBotEngine } from '@/lib/bot';
 import { getBotStatus } from './status';
 
 /**
- * Cron endpoint for keeping the bot running 24/7
- * This can be called by Vercel Cron or external cron services
+ * Cron endpoint that runs every minute to scan for arbitrage opportunities
+ * This is triggered by Vercel Cron and performs ONE scan per invocation
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verify this is a cron job (Vercel sets this header)
@@ -20,24 +20,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const botRunning = getBotStatus();
+    const botEnabled = getBotStatus();
     
-    if (!botRunning) {
-      // Bot was stopped, don't restart automatically
+    if (!botEnabled) {
+      // Bot is disabled, skip scanning
       return res.status(200).json({
-        message: 'Bot is stopped',
+        message: 'Bot is disabled - skipping scan',
         running: false,
+        timestamp: new Date().toISOString(),
       });
     }
 
-    // Bot is running, trigger a scan cycle
-    const bot = getBotInstance();
+    // Bot is enabled - perform a single scan
+    console.log(`[${new Date().toISOString()}] Cron scan starting...`);
     
-    // Log activity
-    console.log(`[${new Date().toISOString()}] Cron trigger - bot active`);
+    const bot = new ArbitrageBotEngine();
+    await bot.scanOnce();
+    
+    console.log(`[${new Date().toISOString()}] Cron scan completed`);
 
     return res.status(200).json({
-      message: 'Bot is active',
+      message: 'Scan completed successfully',
       running: true,
       timestamp: new Date().toISOString(),
     });
@@ -52,6 +55,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 // Prevent timeout on Vercel
 export const config = {
-  maxDuration: 300, // 5 minutes max
+  maxDuration: 60, // 60 seconds max (enough for one scan)
 };
 

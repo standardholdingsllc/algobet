@@ -1,7 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getBotInstance } from '@/lib/bot';
 import { setBotStatus } from './status';
 
+/**
+ * Bot control endpoint
+ * Note: With Vercel Cron, this endpoint only enables/disables the bot
+ * The actual scanning is done by /api/bot/cron which runs every minute
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // No auth for now - secure with API key if needed
 
@@ -9,15 +13,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { action } = req.body;
 
     if (action === 'start') {
-      const bot = getBotInstance();
-      bot.start();
+      // Enable bot - cron will handle the actual scanning
       setBotStatus(true);
-      return res.status(200).json({ message: 'Bot started', running: true });
+      console.log('Bot enabled - Vercel Cron will scan every minute');
+      return res.status(200).json({ 
+        message: 'Bot enabled - scanning every minute via cron', 
+        running: true 
+      });
     } else if (action === 'stop') {
-      const bot = getBotInstance();
-      bot.stop();
+      // Disable bot - cron will skip scanning
       setBotStatus(false);
-      return res.status(200).json({ message: 'Bot stopped', running: false });
+      console.log('Bot disabled - Vercel Cron will not scan');
+      return res.status(200).json({ 
+        message: 'Bot disabled', 
+        running: false 
+      });
     } else {
       return res.status(400).json({ error: 'Invalid action' });
     }
