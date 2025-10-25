@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT || '587'),
   secure: false,
@@ -84,13 +84,13 @@ An arbitrage opportunity has been executed:
 
 Bet 1:
 Platform: ${bet1.platform.toUpperCase()}
-Market: ${bet1.title}
+Market: ${bet1.marketTitle}
 Side: ${bet1.side.toUpperCase()}
 Amount: $${bet1.amount.toFixed(2)}
 
 Bet 2:
 Platform: ${bet2.platform.toUpperCase()}
-Market: ${bet2.title}
+Market: ${bet2.marketTitle}
 Side: ${bet2.side.toUpperCase()}
 Amount: $${bet2.amount.toFixed(2)}
 
@@ -111,7 +111,7 @@ Time: ${new Date().toLocaleString()}
       <div style="background-color: #f9fafb; padding: 16px; margin: 20px 0; border-radius: 8px;">
         <h3 style="margin-top: 0;">Bet 1</h3>
         <p style="margin: 4px 0;"><strong>Platform:</strong> ${bet1.platform.toUpperCase()}</p>
-        <p style="margin: 4px 0;"><strong>Market:</strong> ${bet1.title}</p>
+        <p style="margin: 4px 0;"><strong>Market:</strong> ${bet1.marketTitle}</p>
         <p style="margin: 4px 0;"><strong>Side:</strong> ${bet1.side.toUpperCase()}</p>
         <p style="margin: 4px 0;"><strong>Amount:</strong> $${bet1.amount.toFixed(2)}</p>
       </div>
@@ -119,7 +119,7 @@ Time: ${new Date().toLocaleString()}
       <div style="background-color: #f9fafb; padding: 16px; margin: 20px 0; border-radius: 8px;">
         <h3 style="margin-top: 0;">Bet 2</h3>
         <p style="margin: 4px 0;"><strong>Platform:</strong> ${bet2.platform.toUpperCase()}</p>
-        <p style="margin: 4px 0;"><strong>Market:</strong> ${bet2.title}</p>
+        <p style="margin: 4px 0;"><strong>Market:</strong> ${bet2.marketTitle}</p>
         <p style="margin: 4px 0;"><strong>Side:</strong> ${bet2.side.toUpperCase()}</p>
         <p style="margin: 4px 0;"><strong>Amount:</strong> $${bet2.amount.toFixed(2)}</p>
       </div>
