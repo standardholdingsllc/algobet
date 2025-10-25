@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { Bet, ArbitrageGroup, ExportData } from '@/types';
+import { Bet, ArbitrageGroup } from '@/types';
 import { getBets, getArbitrageGroups } from './storage';
 import { startOfDay, endOfDay, subDays, subWeeks, subMonths, subYears } from 'date-fns';
 
@@ -20,7 +20,7 @@ export async function exportData(options: ExportOptions): Promise<{ data: string
 
   // Filter by date range
   const filteredBets = allBets.filter((bet) => {
-    const betDate = new Date(bet.timestamp);
+    const betDate = new Date(bet.placedAt);
     return betDate >= startDate && betDate <= endDate;
   });
 
@@ -56,14 +56,13 @@ export async function exportData(options: ExportOptions): Promise<{ data: string
   } else {
     // CSV format - flatten the data
     const csvData = filteredBets.map((bet) => ({
-      Date: new Date(bet.timestamp).toISOString(),
+      Date: new Date(bet.placedAt).toISOString(),
       Platform: bet.platform,
       Ticker: bet.ticker,
-      Title: bet.title,
+      Title: bet.marketTitle,
       Side: bet.side,
       Price: bet.price,
       Amount: bet.amount,
-      Quantity: bet.quantity,
       Status: bet.status,
       Profit: bet.profit || 0,
       'Arbitrage Group ID': bet.arbitrageGroupId || '',
@@ -113,7 +112,7 @@ export async function generateDailyReport(): Promise<any> {
 
   const today = startOfDay(new Date());
   const todayBets = allBets.filter((bet) => {
-    const betDate = startOfDay(new Date(bet.timestamp));
+    const betDate = startOfDay(new Date(bet.placedAt));
     return betDate.getTime() === today.getTime();
   });
 
@@ -129,7 +128,7 @@ export async function generateDailyReport(): Promise<any> {
     .filter((g) => g.status === 'resolved')
     .reduce((sum, group) => sum + (group.actualProfit || 0), 0);
 
-  const todayInvested = todayGroups.reduce((sum, group) => sum + group.totalInvested, 0);
+  const todayInvested = todayGroups.reduce((sum, group) => sum + (group.bet1.amount + group.bet2.amount), 0);
   const todayROI = todayInvested > 0 ? (todayProfit / todayInvested) * 100 : 0;
 
   return {

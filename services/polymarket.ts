@@ -1,6 +1,18 @@
 import axios from 'axios';
-import { Market, PolymarketMarket } from '@/types';
+import { Market } from '@/types';
 import { POLYMARKET_DATA_API, POLYMARKET_FEE } from '@/lib/constants';
+
+interface PolymarketMarket {
+  condition_id: string;
+  question: string;
+  end_date_iso: string;
+  tokens: {
+    outcome: string;
+    price: string;
+    token_id: string;
+  }[];
+  volume: string;
+}
 
 export class PolymarketService {
   private apiKey: string;

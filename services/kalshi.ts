@@ -1,6 +1,17 @@
 import axios from 'axios';
-import { Market, KalshiMarket } from '@/types';
+import { Market } from '@/types';
 import { KALSHI_API_BASE, KALSHI_FEE } from '@/lib/constants';
+
+interface KalshiMarket {
+  ticker: string;
+  title: string;
+  yes_price: number;
+  no_price: number;
+  volume: number;
+  event_ticker: string;
+  close_time: string;
+  series_ticker?: string;
+}
 
 export class KalshiService {
   private apiKey: string;
