@@ -82,23 +82,24 @@ export default function OpportunitiesTable({ opportunities, compact }: Opportuni
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <div className="space-y-1">
-                    <div className="text-blue-600">{opp.market1.platform}: {opp.market1.ticker}</div>
-                    <div className="text-purple-600">{opp.market2.platform}: {opp.market2.ticker}</div>
+                    <div className="text-blue-600">{opp.market1.platform}: {opp.side1.toUpperCase()}</div>
+                    <div className="text-purple-600">{opp.market2.platform}: {opp.side2.toUpperCase()}</div>
+                    <div className="text-gray-500 text-xs truncate max-w-xs">{opp.market1.title}</div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                  {opp.profitPercentage.toFixed(2)}%
+                  {opp.profitMargin.toFixed(2)}%
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  ${opp.netProfit.toFixed(2)}
+                  ${opp.expectedProfit.toFixed(2)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(opp.status)}`}>
-                    {opp.status}
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                    detected
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {new Date(opp.expiryDate).toLocaleDateString()}
+                  {new Date(opp.market1.expiryDate).toLocaleDateString()}
                 </td>
               </tr>
             ))}
