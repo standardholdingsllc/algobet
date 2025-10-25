@@ -94,11 +94,15 @@ export class ArbitrageService {
             id: `${market1.id}-${market2.id}-${Date.now()}`,
             market1: { ...market1, yesPrice: scenario.m1Price, noPrice: scenario.m1Price },
             market2: { ...market2, yesPrice: scenario.m2Price, noPrice: scenario.m2Price },
+            side1: scenario.m1Side as 'yes' | 'no',
+            side2: scenario.m2Side as 'yes' | 'no',
+            profitMargin: profitPercentage,
             profitPercentage,
+            betSize1: totalCost / 2,
+            betSize2: totalCost / 2,
+            expectedProfit: netProfit,
             netProfit,
             timestamp: new Date(),
-            expiryDate: new Date(Math.min(market1.expiryDate.getTime(), market2.expiryDate.getTime())),
-            status: 'detected',
           };
         }
       }
@@ -139,28 +143,30 @@ export class ArbitrageService {
       if (order1 && order2) {
         bets.push({
           id: `${opportunity.id}-bet1`,
-          opportunityId: opportunity.id,
+          arbitrageGroupId: opportunity.id,
           platform: opportunity.market1.platform,
-          market: opportunity.market1,
+          marketId: opportunity.market1.id,
+          marketTitle: opportunity.market1.title,
+          ticker: opportunity.market1.ticker,
           side: m1Side,
           amount: betAmount,
           price: m1Price,
           placedAt: new Date(),
           status: 'filled',
-          orderId: order1,
         });
 
         bets.push({
           id: `${opportunity.id}-bet2`,
-          opportunityId: opportunity.id,
+          arbitrageGroupId: opportunity.id,
           platform: opportunity.market2.platform,
-          market: opportunity.market2,
+          marketId: opportunity.market2.id,
+          marketTitle: opportunity.market2.title,
+          ticker: opportunity.market2.ticker,
           side: m2Side,
           amount: betAmount,
           price: m2Price,
           placedAt: new Date(),
           status: 'filled',
-          orderId: order2,
         });
       }
     } catch (error) {
