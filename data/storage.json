@@ -9,7 +9,8 @@
       "kalshi": 100,
       "polymarket": 100
     },
-    "emailAlerts": true
+    "emailAlerts": true,
+    "simulationMode": true
   },
   "dailyStats": [],
   "balances": [
