@@ -1,8 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { GitHubStorage } from '@/lib/github-storage';
 
-const storage = new GitHubStorage();
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // No auth required for status check
 
@@ -16,13 +14,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 export async function setBotStatus(running: boolean): Promise<void> {
   try {
-    const data = await storage.readData('data/bot-status.json');
-    data.running = running;
-    data.lastUpdated = new Date().toISOString();
-    await storage.writeData('data/bot-status.json', data, `Update bot status: ${running ? 'enabled' : 'disabled'}`);
+    const data = await GitHubStorage.readData('data/bot-status.json');
+    if (data) {
+      data.running = running;
+      data.lastUpdated = new Date().toISOString();
+      await GitHubStorage.writeData('data/bot-status.json', data, `Update bot status: ${running ? 'enabled' : 'disabled'}`);
+    } else {
+      // File doesn't exist, create it
+      await GitHubStorage.writeData('data/bot-status.json', {
+        running,
+        lastUpdated: new Date().toISOString()
+      }, `Initialize bot status: ${running ? 'enabled' : 'disabled'}`);
+    }
   } catch (error) {
     // If file doesn't exist, create it
-    await storage.writeData('data/bot-status.json', {
+    await GitHubStorage.writeData('data/bot-status.json', {
       running,
       lastUpdated: new Date().toISOString()
     }, `Initialize bot status: ${running ? 'enabled' : 'disabled'}`);
@@ -31,8 +37,8 @@ export async function setBotStatus(running: boolean): Promise<void> {
 
 export async function getBotStatus(): Promise<boolean> {
   try {
-    const data = await storage.readData('data/bot-status.json');
-    return data.running || false;
+    const data = await GitHubStorage.readData('data/bot-status.json');
+    return data?.running || false;
   } catch (error) {
     // If file doesn't exist, default to false
     return false;
