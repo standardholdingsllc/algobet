@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (action === 'start') {
       // Enable bot - cron will handle the actual scanning
-      setBotStatus(true);
+      await setBotStatus(true);
       console.log('Bot enabled - Vercel Cron will scan every minute');
       return res.status(200).json({ 
         message: 'Bot enabled - scanning every minute via cron', 
@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     } else if (action === 'stop') {
       // Disable bot - cron will skip scanning
-      setBotStatus(false);
+      await setBotStatus(false);
       console.log('Bot disabled - Vercel Cron will not scan');
       return res.status(200).json({ 
         message: 'Bot disabled', 

@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const botEnabled = getBotStatus();
+    const botEnabled = await getBotStatus();
     
     if (!botEnabled) {
       // Bot is disabled, skip scanning
