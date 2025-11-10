@@ -112,6 +112,7 @@ export default function DashboardPage() {
   const resolvedBetsCount = bets.filter((b) => b.status === 'resolved').length;
   const kalshiBalance = balances.find((b) => b.platform === 'kalshi')?.balance || 0;
   const polymarketBalance = balances.find((b) => b.platform === 'polymarket')?.balance || 0;
+  const sxbetBalance = balances.find((b) => b.platform === 'sxbet')?.balance || 0;
 
   const avgDailyProfit = dailyStats.length > 0
     ? dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0) / dailyStats.length
@@ -175,6 +176,12 @@ export default function DashboardPage() {
             value={`$${polymarketBalance.toFixed(2)}`}
             icon={Wallet}
             color="yellow"
+          />
+          <StatsCard
+            title="SxBet Balance"
+            value={`$${sxbetBalance.toFixed(2)}`}
+            icon={Wallet}
+            color="green"
           />
         </div>
 
