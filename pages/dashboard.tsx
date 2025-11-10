@@ -113,6 +113,7 @@ export default function DashboardPage() {
   const kalshiBalance = balances.find((b) => b.platform === 'kalshi')?.balance || 0;
   const polymarketBalance = balances.find((b) => b.platform === 'polymarket')?.balance || 0;
   const sxbetBalance = balances.find((b) => b.platform === 'sxbet')?.balance || 0;
+  const totalBalance = kalshiBalance + polymarketBalance + sxbetBalance;
 
   const avgDailyProfit = dailyStats.length > 0
     ? dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0) / dailyStats.length
@@ -149,40 +150,51 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatsCard
-            title="Total Profit"
-            value={`$${totalProfit.toFixed(2)}`}
-            change={`Avg daily: $${avgDailyProfit.toFixed(2)}`}
-            icon={TrendingUp}
-            color="green"
-            trend={totalProfit > 0 ? 'up' : totalProfit < 0 ? 'down' : 'neutral'}
-          />
-          <StatsCard
-            title="Active Bets"
-            value={activeBetsCount}
-            change={`${resolvedBetsCount} resolved`}
-            icon={Activity}
-            color="blue"
-          />
-          <StatsCard
-            title="Kalshi Balance"
-            value={`$${kalshiBalance.toFixed(2)}`}
-            icon={Wallet}
-            color="purple"
-          />
-          <StatsCard
-            title="Polymarket Balance"
-            value={`$${polymarketBalance.toFixed(2)}`}
-            icon={Wallet}
-            color="yellow"
-          />
-          <StatsCard
-            title="SxBet Balance"
-            value={`$${sxbetBalance.toFixed(2)}`}
-            icon={Wallet}
-            color="green"
-          />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <StatsCard
+              title="Total Profit"
+              value={`$${totalProfit.toFixed(2)}`}
+              change={`Avg daily: $${avgDailyProfit.toFixed(2)}`}
+              icon={TrendingUp}
+              color="green"
+              trend={totalProfit > 0 ? 'up' : totalProfit < 0 ? 'down' : 'neutral'}
+            />
+            <StatsCard
+              title="Active Bets"
+              value={activeBetsCount}
+              change={`${resolvedBetsCount} resolved`}
+              icon={Activity}
+              color="blue"
+            />
+            <StatsCard
+              title="Total Balance"
+              value={`$${totalBalance.toFixed(2)}`}
+              change={`K: $${kalshiBalance.toFixed(0)} | P: $${polymarketBalance.toFixed(0)} | S: $${sxbetBalance.toFixed(0)}`}
+              icon={Wallet}
+              color="yellow"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <StatsCard
+              title="Kalshi Balance"
+              value={`$${kalshiBalance.toFixed(2)}`}
+              icon={Wallet}
+              color="purple"
+            />
+            <StatsCard
+              title="Polymarket Balance"
+              value={`$${polymarketBalance.toFixed(2)}`}
+              icon={Wallet}
+              color="blue"
+            />
+            <StatsCard
+              title="SxBet Balance"
+              value={`$${sxbetBalance.toFixed(2)}`}
+              icon={Wallet}
+              color="green"
+            />
+          </div>
         </div>
 
         {/* Profit Chart */}
