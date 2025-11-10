@@ -1,6 +1,6 @@
-2025-11-10 05:13:17.728 [info] [2025-11-10T05:13:17.728Z] Cron scan starting...
-2025-11-10 05:13:17.729 [info] [2025-11-10T05:13:17.728Z] Scanning for arbitrage opportunities...
-2025-11-10 05:13:17.875 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
+2025-11-10 05:23:32.340 [info] [2025-11-10T05:23:32.339Z] Cron scan starting...
+2025-11-10 05:23:32.341 [info] [2025-11-10T05:23:32.340Z] Scanning for arbitrage opportunities...
+2025-11-10 05:23:32.464 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
     at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
     at IncomingMessage.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
     at IncomingMessage.emit (node:events:530:35)
@@ -8,10 +8,10 @@
     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
     at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async c.getBalance (/var/task/.next/server/pages/api/bot/cron.js:28:10925)
+    at async d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:28:10952)
     at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2912)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
-    at async i (/var/task/.next/server/pages/api/bot/cron.js:28:21348)
+    at async i (/var/task/.next/server/pages/api/bot/cron.js:28:21402)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
     at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515)
@@ -37,8 +37,8 @@
       Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
       'KALSHI-ACCESS-KEY': 'bf7032cd-0348-4988-9396-a479ad7fdc2a',
-      'KALSHI-ACCESS-SIGNATURE': 'FQAeTow1BAVeLe5WDex5m5B184yo8o4ZNcWYNKBGSFA=',
-      'KALSHI-ACCESS-TIMESTAMP': '1762751597790',
+      'KALSHI-ACCESS-SIGNATURE': 'hP/39X3qwbr6QTWsdA09hSyDS7NiSuQS2+Wrs7dYYSs=',
+      'KALSHI-ACCESS-TIMESTAMP': '1762752212413',
       'User-Agent': 'axios/1.13.2',
       'Accept-Encoding': 'gzip, compress, deflate, br'
     },
@@ -84,11 +84,11 @@
       'Accept: application/json, text/plain, */*\r\n' +
       'Content-Type: application/json\r\n' +
       'KALSHI-ACCESS-KEY: bf7032cd-0348-4988-9396-a479ad7fdc2a\r\n' +
-      'KALSHI-ACCESS-SIGNATURE: FQAeTow1BAVeLe5WDex5m5B184yo8o4ZNcWYNKBGSFA=\r\n' +
-      'KALSHI-ACCESS-TIMESTAMP: 1762751597790\r\n' +
+      'KALSHI-ACCESS-SIGNATURE: hP/39X3qwbr6QTWsdA09hSyDS7NiSuQS2+Wrs7dYYSs=\r\n' +
+      'KALSHI-ACCESS-TIMESTAMP: 1762752212413\r\n' +
       'User-Agent: axios/1.13.2\r\n' +
       'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-      'x-vercel-id: iad1::jwdbf-1762751597299-20fba8d5abb4\r\n' +
+      'x-vercel-id: iad1::c6vf6-1762752212214-f7f04f04f3b8\r\n' +
       'Host: api.elections.kalshi.com\r\n' +
       'Connection: keep-alive\r\n' +
       '\r\n',
@@ -236,15 +236,15 @@
         _idleTimeout: 5000,
         _idlePrev: [TimersList],
         _idleNext: [TimersList],
-        _idleStart: 55554,
+        _idleStart: 410610,
         _onTimeout: [Function: bound ],
         _timerArgs: undefined,
         _repeat: null,
         _destroyed: false,
         [Symbol(refed)]: false,
         [Symbol(kHasPrimitive)]: false,
-        [Symbol(asyncId)]: 2590,
-        [Symbol(triggerId)]: 2588,
+        [Symbol(asyncId)]: 4233,
+        [Symbol(triggerId)]: 4231,
         [Symbol(kAsyncContextFrame)]: undefined,
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
@@ -287,14 +287,14 @@
       'content-type': 'application/json; charset=utf-8',
       'content-length': '155',
       connection: 'keep-alive',
-      date: 'Mon, 10 Nov 2025 05:13:17 GMT',
+      date: 'Mon, 10 Nov 2025 05:23:32 GMT',
       'x-content-type-options': 'nosniff',
       'content-security-policy': "default-src 'none';",
       'strict-transport-security': 'max-age=31536000; includeSubDomains',
       'x-cache': 'Error from cloudfront',
-      via: '1.1 4a9f56098c7d51e12b8d2ac77b6f1bcc.cloudfront.net (CloudFront)',
+      via: '1.1 61bbe72b71f7b857c695c31fdeb7b3a6.cloudfront.net (CloudFront)',
       'x-amz-cf-pop': 'IAD12-P1',
-      'x-amz-cf-id': 'IL0dXcA7BhZCOLZJ4k3in3ed8UcXAcHYPqQN6Dg_EVwhiJcblTss8g=='
+      'x-amz-cf-id': 'IbfJq_CS-iJrG88V90NWcpngHX3X6Vc5Dq9KPY-jrNcd5gGggcSTCw=='
     },
     config: {
       transitional: [Object],
@@ -343,11 +343,11 @@
         'Accept: application/json, text/plain, */*\r\n' +
         'Content-Type: application/json\r\n' +
         'KALSHI-ACCESS-KEY: bf7032cd-0348-4988-9396-a479ad7fdc2a\r\n' +
-        'KALSHI-ACCESS-SIGNATURE: FQAeTow1BAVeLe5WDex5m5B184yo8o4ZNcWYNKBGSFA=\r\n' +
-        'KALSHI-ACCESS-TIMESTAMP: 1762751597790\r\n' +
+        'KALSHI-ACCESS-SIGNATURE: hP/39X3qwbr6QTWsdA09hSyDS7NiSuQS2+Wrs7dYYSs=\r\n' +
+        'KALSHI-ACCESS-TIMESTAMP: 1762752212413\r\n' +
         'User-Agent: axios/1.13.2\r\n' +
         'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-        'x-vercel-id: iad1::jwdbf-1762751597299-20fba8d5abb4\r\n' +
+        'x-vercel-id: iad1::c6vf6-1762752212214-f7f04f04f3b8\r\n' +
         'Host: api.elections.kalshi.com\r\n' +
         'Connection: keep-alive\r\n' +
         '\r\n',
@@ -389,15 +389,15 @@
   },
   status: 401
 }
-2025-11-10 05:13:18.009 [warning] sx.bet balance check not implemented - requires Web3 integration
-2025-11-10 05:13:18.186 [error] Error in cron handler: RequestError [HttpError]: Not Found - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+2025-11-10 05:23:32.585 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-10 05:23:32.758 [error] Error in cron handler: RequestError [HttpError]: Not Found - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
     at /var/task/node_modules/@octokit/request/dist-node/index.js:125:21
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async c (/var/task/.next/server/pages/api/bot/cron.js:28:19502)
-    at async b (/var/task/.next/server/pages/api/bot/cron.js:28:20361)
+    at async c (/var/task/.next/server/pages/api/bot/cron.js:28:19556)
+    at async b (/var/task/.next/server/pages/api/bot/cron.js:28:20415)
     at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:3012)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
-    at async i (/var/task/.next/server/pages/api/bot/cron.js:28:21348)
+    at async i (/var/task/.next/server/pages/api/bot/cron.js:28:21402)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
     at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
@@ -411,7 +411,7 @@
       'content-encoding': 'gzip',
       'content-security-policy': "default-src 'none'",
       'content-type': 'application/json; charset=utf-8',
-      date: 'Mon, 10 Nov 2025 05:13:18 GMT',
+      date: 'Mon, 10 Nov 2025 05:23:32 GMT',
       'referrer-policy': 'origin-when-cross-origin, strict-origin-when-cross-origin',
       server: 'github.com',
       'strict-transport-security': 'max-age=31536000; includeSubdomains; preload',
@@ -422,13 +422,13 @@
       'x-frame-options': 'deny',
       'x-github-api-version-selected': '2022-11-28',
       'x-github-media-type': 'github.v3; format=json',
-      'x-github-request-id': 'DBE2:37BF17:42FACCA:134E5745:6911746E',
+      'x-github-request-id': 'C956:334BBB:E2D3674:4175CF36:691176D4',
       'x-oauth-scopes': 'repo',
       'x-ratelimit-limit': '5000',
-      'x-ratelimit-remaining': '4736',
+      'x-ratelimit-remaining': '4634',
       'x-ratelimit-reset': '1762753746',
       'x-ratelimit-resource': 'core',
-      'x-ratelimit-used': '264',
+      'x-ratelimit-used': '366',
       'x-xss-protection': '0'
     },
     data: {
@@ -445,9 +445,9 @@
       'user-agent': 'octokit-rest.js/20.1.2 octokit-core.js/5.2.2 Node.js/22',
       authorization: 'token [REDACTED]',
       'content-type': 'application/json; charset=utf-8',
-      'x-vercel-id': 'iad1::jwdbf-1762751597299-20fba8d5abb4'
+      'x-vercel-id': 'iad1::c6vf6-1762752212214-f7f04f04f3b8'
     },
-    body: '{"message":"Update account balances","content":"ewogICJiZXRzIjogW10sCiAgImFyYml0cmFnZUdyb3VwcyI6IFtdLAogICJjb25maWciOiB7CiAgICAibWF4QmV0UGVyY2VudGFnZSI6IDEwLAogICAgIm1heERheXNUb0V4cGlyeSI6IDEwLAogICAgIm1pblByb2ZpdE1hcmdpbiI6IDAuNSwKICAgICJiYWxhbmNlVGhyZXNob2xkcyI6IHsKICAgICAgImthbHNoaSI6IDEwMCwKICAgICAgInBvbHltYXJrZXQiOiAxMDAsCiAgICAgICJzeGJldCI6IDEwMAogICAgfSwKICAgICJlbWFpbEFsZXJ0cyI6IHsKICAgICAgImVuYWJsZWQiOiB0cnVlLAogICAgICAibG93QmFsYW5jZUFsZXJ0IjogdHJ1ZQogICAgfSwKICAgICJzaW11bGF0aW9uTW9kZSI6IGZhbHNlCiAgfSwKICAiZGFpbHlTdGF0cyI6IFtdLAogICJiYWxhbmNlcyI6IFsKICAgIHsKICAgICAgInBsYXRmb3JtIjogImthbHNoaSIsCiAgICAgICJiYWxhbmNlIjogMCwKICAgICAgImxhc3RVcGRhdGVkIjogIjIwMjUtMTEtMTBUMDU6MTM6MTguMDA4WiIKICAgIH0sCiAgICB7CiAgICAgICJwbGF0Zm9ybSI6ICJwb2x5bWFya2V0IiwKICAgICAgImJhbGFuY2UiOiAwLAogICAgICAibGFzdFVwZGF0ZWQiOiAiMjAyNS0xMS0xMFQwNToxMzoxOC4wMDhaIgogICAgfSwKICAgIHsKICAgICAgInBsYXRmb3JtIjogInN4YmV0IiwKICAgICAgImJhbGFuY2UiOiAwLAogICAgICAibGFzdFVwZGF0ZWQiOiAiMjAyNS0xMS0xMFQwNToxMzoxOC4wMDhaIgogICAgfQogIF0sCiAgIm9wcG9ydHVuaXR5TG9ncyI6IFtdCn0="}',
+    body: '{"message":"Update account balances","content":"ewogICJiZXRzIjogW10sCiAgImFyYml0cmFnZUdyb3VwcyI6IFtdLAogICJjb25maWciOiB7CiAgICAibWF4QmV0UGVyY2VudGFnZSI6IDEwLAogICAgIm1heERheXNUb0V4cGlyeSI6IDEwLAogICAgIm1pblByb2ZpdE1hcmdpbiI6IDAuNSwKICAgICJiYWxhbmNlVGhyZXNob2xkcyI6IHsKICAgICAgImthbHNoaSI6IDEwMCwKICAgICAgInBvbHltYXJrZXQiOiAxMDAsCiAgICAgICJzeGJldCI6IDEwMAogICAgfSwKICAgICJlbWFpbEFsZXJ0cyI6IHsKICAgICAgImVuYWJsZWQiOiB0cnVlLAogICAgICAibG93QmFsYW5jZUFsZXJ0IjogdHJ1ZQogICAgfSwKICAgICJzaW11bGF0aW9uTW9kZSI6IGZhbHNlCiAgfSwKICAiZGFpbHlTdGF0cyI6IFtdLAogICJiYWxhbmNlcyI6IFsKICAgIHsKICAgICAgInBsYXRmb3JtIjogImthbHNoaSIsCiAgICAgICJiYWxhbmNlIjogMCwKICAgICAgImxhc3RVcGRhdGVkIjogIjIwMjUtMTEtMTBUMDU6MjM6MzIuNTg1WiIKICAgIH0sCiAgICB7CiAgICAgICJwbGF0Zm9ybSI6ICJwb2x5bWFya2V0IiwKICAgICAgImJhbGFuY2UiOiAwLAogICAgICAibGFzdFVwZGF0ZWQiOiAiMjAyNS0xMS0xMFQwNToyMzozMi41ODVaIgogICAgfSwKICAgIHsKICAgICAgInBsYXRmb3JtIjogInN4YmV0IiwKICAgICAgImJhbGFuY2UiOiAwLAogICAgICAibGFzdFVwZGF0ZWQiOiAiMjAyNS0xMS0xMFQwNToyMzozMi41ODVaIgogICAgfQogIF0sCiAgIm9wcG9ydHVuaXR5TG9ncyI6IFtdCn0="}',
     request: { hook: [Function: bound bound register] }
   }
 }
