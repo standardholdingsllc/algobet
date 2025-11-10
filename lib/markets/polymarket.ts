@@ -3,6 +3,7 @@ import { Market } from '@/types';
 
 const BASE_URL = 'https://clob.polymarket.com';
 const GAMMA_URL = 'https://gamma-api.polymarket.com';
+const DATA_API_URL = 'https://data-api.polymarket.com';
 
 interface PolymarketMarket {
   condition_id: string;
@@ -102,20 +103,30 @@ export class PolymarketAPI {
   }
 
   async getBalance(): Promise<number> {
+    if (!this.walletAddress) {
+      console.warn('Polymarket wallet address not configured; returning 0 balance');
+      return 0;
+    }
+
     try {
-      // Polymarket uses USDC on Polygon
-      // This would require web3 integration to check wallet balance
-      // For now, return a placeholder
-      const response = await axios.get(`${GAMMA_URL}/balance`, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+      const response = await axios.get(`${DATA_API_URL}/value`, {
         params: {
-          address: this.walletAddress,
+          user: this.walletAddress,
         },
       });
 
-      return parseFloat(response.data.balance || '0');
+      // The /value endpoint returns an array of { user, value }
+      const balanceEntry = Array.isArray(response.data)
+        ? response.data.find((entry: any) => entry.user?.toLowerCase() === this.walletAddress.toLowerCase())
+        : null;
+
+      if (!balanceEntry) {
+        console.warn('Polymarket balance response did not include the requested wallet; defaulting to 0');
+        return 0;
+      }
+
+      const value = parseFloat(balanceEntry.value);
+      return Number.isFinite(value) ? value : 0;
     } catch (error) {
       console.error('Error fetching Polymarket balance:', error);
       return 0;
