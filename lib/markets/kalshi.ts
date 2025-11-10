@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { Market } from '@/types';
 
 const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
+const API_SIGNATURE_PREFIX = '/trade-api/v2';
 
 interface KalshiMarket {
   ticker: string;
@@ -176,7 +177,7 @@ export class KalshiAPI {
   async getBalance(): Promise<number> {
     try {
       const path = '/portfolio/balance';
-      const headers = await this.generateAuthHeaders('GET', path);
+      const headers = await this.generateAuthHeaders('GET', `${API_SIGNATURE_PREFIX}${path}`);
       
       const response = await axios.get(`${BASE_URL}${path}`, { headers });
       return response.data.balance / 100; // Convert cents to dollars
@@ -207,7 +208,7 @@ export class KalshiAPI {
         buy_max_cost: Math.ceil(price * quantity),
       };
 
-      const headers = await this.generateAuthHeaders('POST', path, body);
+      const headers = await this.generateAuthHeaders('POST', `${API_SIGNATURE_PREFIX}${path}`, body);
       
       const response = await axios.post(`${BASE_URL}${path}`, body, { headers });
       
@@ -225,7 +226,7 @@ export class KalshiAPI {
   async cancelOrder(orderId: string): Promise<boolean> {
     try {
       const path = `/orders/${orderId}`;
-      const headers = await this.generateAuthHeaders('DELETE', path);
+      const headers = await this.generateAuthHeaders('DELETE', `${API_SIGNATURE_PREFIX}${path}`);
       
       await axios.delete(`${BASE_URL}${path}`, { headers });
       return true;
@@ -238,7 +239,7 @@ export class KalshiAPI {
   async getPositions(): Promise<any[]> {
     try {
       const path = '/portfolio/positions';
-      const headers = await this.generateAuthHeaders('GET', path);
+      const headers = await this.generateAuthHeaders('GET', `${API_SIGNATURE_PREFIX}${path}`);
       
       const response = await axios.get(`${BASE_URL}${path}`, { headers });
       return response.data.positions || [];
