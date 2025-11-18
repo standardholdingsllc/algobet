@@ -1,19 +1,24 @@
-2025-11-18 21:52:35.971 [warning] sx.bet balance check not implemented - requires Web3 integration
-2025-11-18 21:52:35.719 [info] [2025-11-18T21:52:35.718Z] Cron scan starting...
-2025-11-18 21:52:35.720 [info] [2025-11-18T21:52:35.719Z] Scanning for arbitrage opportunities...
-2025-11-18 21:52:35.804 [error] Error fetching Kalshi balance: Error: error:1E08010C:DECODER routines::unsupported
+2025-11-18 22:15:48.093 [info] [2025-11-18T22:15:48.093Z] Cron scan starting...
+2025-11-18 22:15:48.103 [info] [2025-11-18T22:15:48.094Z] Scanning for arbitrage opportunities...
+2025-11-18 22:15:48.200 [error] Error fetching Kalshi balance: Error: error:1E08010C:DECODER routines::unsupported
     at Sign.sign (node:internal/crypto/sig:128:29)
-    at d.generateAuthHeaders (/var/task/.next/server/pages/api/bot/cron.js:28:9796)
-    at d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:28:10913)
+    at d.generateAuthHeaders (/var/task/.next/server/pages/api/bot/cron.js:30:448)
+    at d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:30:1565)
     at g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2930)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
-    at async i (/var/task/.next/server/pages/api/bot/cron.js:28:21388)
+    at async i (/var/task/.next/server/pages/api/bot/cron.js:30:12040)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
     at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
-  opensslErrorStack: [ 'error:1E08010C:DECODER routines::unsupported' ],
+  opensslErrorStack: [
+    'error:0688010A:asn1 encoding routines::nested asn1 error',
+    'error:0688010A:asn1 encoding routines::nested asn1 error',
+    'error:068000A8:asn1 encoding routines::wrong tag',
+    'error:1E08010C:DECODER routines::unsupported'
+  ],
   library: 'DECODER routines',
   reason: 'unsupported',
   code: 'ERR_OSSL_UNSUPPORTED'
 }
+2025-11-18 22:15:48.372 [warning] sx.bet balance check not implemented - requires Web3 integration

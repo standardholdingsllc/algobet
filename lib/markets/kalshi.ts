@@ -40,12 +40,28 @@ export class KalshiAPI {
   private formatPrivateKey(key: string): string {
     if (!key) return '';
     
-    // Handle escaped newlines (common in .env files)
-    let formattedKey = key.replace(/\\n/g, '\n');
+    let formattedKey = key;
+
+    // 1. Handle escaped newlines (common in .env files)
+    // Replaces literal "\n" with actual newline character
+    if (formattedKey.includes('\\n')) {
+      formattedKey = formattedKey.replace(/\\n/g, '\n');
+    }
     
-    // Ensure it has the correct headers if missing (assuming RSA key)
+    // 2. Handle if the key was flattened to a single line without escaped newlines
+    // e.g. "-----BEGIN PRIVATE KEY----- MII... -----END PRIVATE KEY-----"
+    if (formattedKey.includes('-----BEGIN') && !formattedKey.includes('\n')) {
+      formattedKey = formattedKey
+        .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, match => `${match}\n`)
+        .replace(/-----END (RSA )?PRIVATE KEY-----/, match => `\n${match}`)
+        .replace(/\s+/g, '\n'); // Be careful with this, it might break the body if there are spaces
+    }
+
+    // 3. Ensure it has headers if missing (raw base64)
     if (!formattedKey.includes('-----BEGIN')) {
-      formattedKey = `-----BEGIN PRIVATE KEY-----\n${formattedKey}\n-----END PRIVATE KEY-----`;
+      // If missing headers, it's likely a raw RSA key. 
+      // Use RSA PRIVATE KEY as standard wrapper for raw keys.
+      formattedKey = `-----BEGIN RSA PRIVATE KEY-----\n${formattedKey}\n-----END RSA PRIVATE KEY-----`;
     }
     
     return formattedKey;
@@ -114,7 +130,22 @@ export class KalshiAPI {
     const signer = crypto.createSign('SHA256');
     signer.update(message);
     signer.end();
-    const signature = signer.sign(this.privateKey, 'base64');
+    
+    let signature;
+    try {
+      signature = signer.sign(this.privateKey, 'base64');
+    } catch (error: any) {
+      console.error('Error signing Kalshi request:', error.message);
+      // Log key debug info (safe)
+      const keyLines = this.privateKey.split('\n');
+      console.error('Key format debug:', {
+        length: this.privateKey.length,
+        hasHeaders: this.privateKey.includes('-----BEGIN'),
+        headerType: keyLines[0],
+        lines: keyLines.length
+      });
+      throw error;
+    }
 
     return {
       'Content-Type': 'application/json',
