@@ -1,5 +1,5 @@
 // API URLs
-export const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
+export const KALSHI_API_BASE = 'https://trading-api.kalshi.com/trade-api/v2';
 export const POLYMARKET_API_BASE = 'https://clob.polymarket.com';
 export const POLYMARKET_DATA_API = 'https://gamma-api.polymarket.com';
 

@@ -2,7 +2,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { Market } from '@/types';
 
-const BASE_URL = 'https://api.kalshi.com/trade-api/v2';
+const BASE_URL = 'https://trading-api.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';
 
 interface KalshiMarket {
