@@ -1,24 +1,398 @@
-2025-11-18 22:15:48.093 [info] [2025-11-18T22:15:48.093Z] Cron scan starting...
-2025-11-18 22:15:48.103 [info] [2025-11-18T22:15:48.094Z] Scanning for arbitrage opportunities...
-2025-11-18 22:15:48.200 [error] Error fetching Kalshi balance: Error: error:1E08010C:DECODER routines::unsupported
-    at Sign.sign (node:internal/crypto/sig:128:29)
-    at d.generateAuthHeaders (/var/task/.next/server/pages/api/bot/cron.js:30:448)
-    at d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:30:1565)
-    at g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2930)
+2025-11-18 22:41:59.164 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
+}
+2025-11-18 22:42:27.230 [error] Vercel Runtime Timeout Error: Task timed out after 60 seconds
+2025-11-18 22:41:27.697 [info] [2025-11-18T22:41:27.697Z] Cron scan starting...
+2025-11-18 22:41:27.698 [info] [2025-11-18T22:41:27.698Z] Scanning for arbitrage opportunities...
+2025-11-18 22:41:27.882 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
+    at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:32:1876)
+    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2912)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
-    at async i (/var/task/.next/server/pages/api/bot/cron.js:30:12040)
+    at async i (/var/task/.next/server/pages/api/bot/cron.js:32:12306)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
-    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
-  opensslErrorStack: [
-    'error:0688010A:asn1 encoding routines::nested asn1 error',
-    'error:0688010A:asn1 encoding routines::nested asn1 error',
-    'error:068000A8:asn1 encoding routines::wrong tag',
-    'error:1E08010C:DECODER routines::unsupported'
-  ],
-  library: 'DECODER routines',
-  reason: 'unsupported',
-  code: 'ERR_OSSL_UNSUPPORTED'
+    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515)
+    at async r9.handleCatchallRenderRequest (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:38432) {
+  code: 'ERR_BAD_REQUEST',
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 0,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function [FormData]], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/json',
+      'KALSHI-ACCESS-KEY': 'bf7032cd-0348-4988-9396-a479ad7fdc2a',
+      'KALSHI-ACCESS-SIGNATURE': 'LLDBncYjcMlYn+ui4JoiyFKo3JmqwurdGrN3fxzYWCn62bB+lHijxnWAXbxfIN+o7vixA3Ph3Z+hghuzOnbRutMVRlfQ5SyL1kSNohYVTpamHYdAeOudlPngj6lscEVkFITSDxUSD7whaU2T960zUGFLmxvgIBO7bQ1A8sfh3bSt49lKTauEl0JMOq4ydzRlj/GhlLjA1lUzoDSD+78rnrS3tX3Vz0agtO4eVbz0w9Od/cds5usV9UB4TUtzXGhp55RBbdKE+cW9GcDyxJ9QifrsVtL2OpPmWGN8W7xYP9euSNRrOmjpm/BnKCVrnqGbWSLWQN6/ujyBFynA2cQwQw==',
+      'KALSHI-ACCESS-TIMESTAMP': '1763505687801',
+      'User-Agent': 'axios/1.13.2',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    method: 'get',
+    url: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> ClientRequest {
+    _events: [Object: null prototype] {
+      error: [Array],
+      abort: [Function (anonymous)],
+      aborted: [Function (anonymous)],
+      connect: [Function (anonymous)],
+      socket: [Function (anonymous)],
+      timeout: [Function (anonymous)],
+      finish: [Function: requestOnFinish]
+    },
+    _eventsCount: 7,
+    _maxListeners: undefined,
+    outputData: [],
+    outputSize: 0,
+    writable: true,
+    destroyed: true,
+    _last: true,
+    chunkedEncoding: false,
+    shouldKeepAlive: true,
+    maxRequestsOnConnectionReached: false,
+    _defaultKeepAlive: true,
+    useChunkedEncodingByDefault: false,
+    sendDate: false,
+    _removedConnection: false,
+    _removedContLen: false,
+    _removedTE: false,
+    strictContentLength: false,
+    _contentLength: 0,
+    _hasBody: true,
+    _trailer: '',
+    finished: true,
+    _headerSent: true,
+    _closed: true,
+    _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+      'Accept: application/json, text/plain, */*\r\n' +
+      'Content-Type: application/json\r\n' +
+      'KALSHI-ACCESS-KEY: bf7032cd-0348-4988-9396-a479ad7fdc2a\r\n' +
+      'KALSHI-ACCESS-SIGNATURE: LLDBncYjcMlYn+ui4JoiyFKo3JmqwurdGrN3fxzYWCn62bB+lHijxnWAXbxfIN+o7vixA3Ph3Z+hghuzOnbRutMVRlfQ5SyL1kSNohYVTpamHYdAeOudlPngj6lscEVkFITSDxUSD7whaU2T960zUGFLmxvgIBO7bQ1A8sfh3bSt49lKTauEl0JMOq4ydzRlj/GhlLjA1lUzoDSD+78rnrS3tX3Vz0agtO4eVbz0w9Od/cds5usV9UB4TUtzXGhp55RBbdKE+cW9GcDyxJ9QifrsVtL2OpPmWGN8W7xYP9euSNRrOmjpm/BnKCVrnqGbWSLWQN6/ujyBFynA2cQwQw==\r\n' +
+      'KALSHI-ACCESS-TIMESTAMP: 1763505687801\r\n' +
+      'User-Agent: axios/1.13.2\r\n' +
+      'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+      'x-vercel-id: iad1::pstjl-1763505687107-e467b4fe8c78\r\n' +
+      'Host: trading-api.kalshi.com\r\n' +
+      'Connection: keep-alive\r\n' +
+      '\r\n',
+    _keepAliveTimeout: 0,
+    _onPendingData: [Function: nop],
+    agent: Agent {
+      _events: [Object: null prototype],
+      _eventsCount: 2,
+      _maxListeners: undefined,
+      defaultPort: 443,
+      protocol: 'https:',
+      options: [Object: null prototype],
+      requests: [Object: null prototype] {},
+      sockets: [Object: null prototype] {},
+      freeSockets: [Object: null prototype],
+      keepAliveMsecs: 1000,
+      keepAlive: true,
+      maxSockets: Infinity,
+      maxFreeSockets: 256,
+      scheduling: 'lifo',
+      maxTotalSockets: Infinity,
+      totalSocketCount: 1,
+      agentKeepAliveTimeoutBuffer: 1000,
+      maxCachedSessions: 100,
+      _sessionCache: [Object],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false
+    },
+    socketPath: undefined,
+    method: 'GET',
+    maxHeaderSize: undefined,
+    insecureHTTPParser: undefined,
+    joinDuplicateHeaders: undefined,
+    path: '/trade-api/v2/portfolio/balance',
+    _ended: true,
+    res: IncomingMessage {
+      _events: [Object],
+      _readableState: [ReadableState],
+      _maxListeners: undefined,
+      socket: null,
+      httpVersionMajor: 1,
+      httpVersionMinor: 1,
+      httpVersion: '1.1',
+      complete: true,
+      rawHeaders: [Array],
+      rawTrailers: [],
+      joinDuplicateHeaders: undefined,
+      aborted: false,
+      upgrade: false,
+      url: '',
+      method: null,
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+      client: [TLSSocket],
+      _consuming: false,
+      _dumped: false,
+      req: [Circular *1],
+      _eventsCount: 4,
+      responseUrl: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+      redirects: [],
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kHeaders)]: [Object],
+      [Symbol(kHeadersCount)]: 10,
+      [Symbol(kTrailers)]: null,
+      [Symbol(kTrailersCount)]: 0
+    },
+    aborted: false,
+    timeoutCb: null,
+    upgradeOrConnect: false,
+    parser: null,
+    maxHeadersCount: null,
+    reusedSocket: false,
+    host: 'trading-api.kalshi.com',
+    protocol: 'https:',
+    _redirectable: Writable {
+      _events: [Object],
+      _writableState: [WritableState],
+      _maxListeners: undefined,
+      _options: [Object],
+      _ended: true,
+      _ending: true,
+      _redirectCount: 0,
+      _redirects: [],
+      _requestBodyLength: 0,
+      _requestBodyBuffers: [],
+      _eventsCount: 3,
+      _onNativeResponse: [Function (anonymous)],
+      _currentRequest: [Circular *1],
+      _currentUrl: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+      _timeout: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false
+    },
+    [Symbol(shapeMode)]: false,
+    [Symbol(kCapture)]: false,
+    [Symbol(kBytesWritten)]: 0,
+    [Symbol(kNeedDrain)]: false,
+    [Symbol(corked)]: 0,
+    [Symbol(kChunkedBuffer)]: [],
+    [Symbol(kChunkedLength)]: 0,
+    [Symbol(kSocket)]: TLSSocket {
+      _tlsOptions: [Object],
+      _secureEstablished: true,
+      _securePending: false,
+      _newSessionPending: false,
+      _controlReleased: true,
+      secureConnecting: false,
+      _SNICallback: null,
+      servername: 'trading-api.kalshi.com',
+      alpnProtocol: false,
+      authorized: true,
+      authorizationError: null,
+      encrypted: true,
+      _events: [Object: null prototype],
+      _eventsCount: 9,
+      connecting: false,
+      _hadError: false,
+      _parent: null,
+      _host: 'trading-api.kalshi.com',
+      _closeAfterHandlingError: false,
+      _readableState: [ReadableState],
+      _writableState: [WritableState],
+      allowHalfOpen: false,
+      _maxListeners: undefined,
+      _sockname: null,
+      _pendingData: null,
+      _pendingEncoding: '',
+      server: undefined,
+      _server: null,
+      ssl: [TLSWrap],
+      _requestCert: true,
+      _rejectUnauthorized: true,
+      timeout: 5000,
+      parser: null,
+      _httpMessage: null,
+      autoSelectFamilyAttemptedAddresses: [Array],
+      [Symbol(alpncallback)]: null,
+      [Symbol(res)]: [TLSWrap],
+      [Symbol(verified)]: true,
+      [Symbol(pendingSession)]: null,
+      [Symbol(async_id_symbol)]: -1,
+      [Symbol(kHandle)]: [TLSWrap],
+      [Symbol(lastWriteQueueSize)]: 0,
+      [Symbol(timeout)]: Timeout {
+        _idleTimeout: 5000,
+        _idlePrev: [TimersList],
+        _idleNext: [TimersList],
+        _idleStart: 82681,
+        _onTimeout: [Function: bound ],
+        _timerArgs: undefined,
+        _repeat: null,
+        _destroyed: false,
+        [Symbol(refed)]: false,
+        [Symbol(kHasPrimitive)]: false,
+        [Symbol(asyncId)]: 2480,
+        [Symbol(triggerId)]: 2478,
+        [Symbol(kAsyncContextFrame)]: undefined,
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object]
+      },
+      [Symbol(kBuffer)]: null,
+      [Symbol(kBufferCb)]: null,
+      [Symbol(kBufferGen)]: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kSetNoDelay)]: false,
+      [Symbol(kSetKeepAlive)]: true,
+      [Symbol(kSetKeepAliveInitialDelay)]: 1,
+      [Symbol(kBytesRead)]: 0,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(connect-options)]: [Object],
+      [Symbol(kPerfHooksNetConnectContext)]: [Object]
+    },
+    [Symbol(kOutHeaders)]: [Object: null prototype] {
+      accept: [Array],
+      'content-type': [Array],
+      'kalshi-access-key': [Array],
+      'kalshi-access-signature': [Array],
+      'kalshi-access-timestamp': [Array],
+      'user-agent': [Array],
+      'accept-encoding': [Array],
+      'x-vercel-id': [Array],
+      host: [Array]
+    },
+    [Symbol(errored)]: null,
+    [Symbol(kHighWaterMark)]: 65536,
+    [Symbol(kRejectNonStandardBodyWrites)]: false,
+    [Symbol(kUniqueHeaders)]: null
+  },
+  response: {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: Object [AxiosHeaders] {
+      server: 'awselb/2.0',
+      date: 'Tue, 18 Nov 2025 22:41:27 GMT',
+      'content-type': 'text/plain; charset=utf-8',
+      'content-length': '96',
+      connection: 'keep-alive'
+    },
+    config: {
+      transitional: [Object],
+      adapter: [Array],
+      transformRequest: [Array],
+      transformResponse: [Array],
+      timeout: 0,
+      xsrfCookieName: 'XSRF-TOKEN',
+      xsrfHeaderName: 'X-XSRF-TOKEN',
+      maxContentLength: -1,
+      maxBodyLength: -1,
+      env: [Object],
+      validateStatus: [Function: validateStatus],
+      headers: [Object [AxiosHeaders]],
+      method: 'get',
+      url: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+      allowAbsoluteUrls: true,
+      data: undefined
+    },
+    request: <ref *1> ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: true,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: true,
+      _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'Content-Type: application/json\r\n' +
+        'KALSHI-ACCESS-KEY: bf7032cd-0348-4988-9396-a479ad7fdc2a\r\n' +
+        'KALSHI-ACCESS-SIGNATURE: LLDBncYjcMlYn+ui4JoiyFKo3JmqwurdGrN3fxzYWCn62bB+lHijxnWAXbxfIN+o7vixA3Ph3Z+hghuzOnbRutMVRlfQ5SyL1kSNohYVTpamHYdAeOudlPngj6lscEVkFITSDxUSD7whaU2T960zUGFLmxvgIBO7bQ1A8sfh3bSt49lKTauEl0JMOq4ydzRlj/GhlLjA1lUzoDSD+78rnrS3tX3Vz0agtO4eVbz0w9Od/cds5usV9UB4TUtzXGhp55RBbdKE+cW9GcDyxJ9QifrsVtL2OpPmWGN8W7xYP9euSNRrOmjpm/BnKCVrnqGbWSLWQN6/ujyBFynA2cQwQw==\r\n' +
+        'KALSHI-ACCESS-TIMESTAMP: 1763505687801\r\n' +
+        'User-Agent: axios/1.13.2\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'x-vercel-id: iad1::pstjl-1763505687107-e467b4fe8c78\r\n' +
+        'Host: trading-api.kalshi.com\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      path: '/trade-api/v2/portfolio/balance',
+      _ended: true,
+      res: [IncomingMessage],
+      aborted: false,
+      timeoutCb: null,
+      upgradeOrConnect: false,
+      parser: null,
+      maxHeadersCount: null,
+      reusedSocket: false,
+      host: 'trading-api.kalshi.com',
+      protocol: 'https:',
+      _redirectable: [Writable],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(kNeedDrain)]: false,
+      [Symbol(corked)]: 0,
+      [Symbol(kChunkedBuffer)]: [],
+      [Symbol(kChunkedLength)]: 0,
+      [Symbol(kSocket)]: [TLSSocket],
+      [Symbol(kOutHeaders)]: [Object: null prototype],
+      [Symbol(errored)]: null,
+      [Symbol(kHighWaterMark)]: 65536,
+      [Symbol(kRejectNonStandardBodyWrites)]: false,
+      [Symbol(kUniqueHeaders)]: null
+    },
+    data: 'API has been moved to https://api.elections.kalshi.com/\n' +
+      'Please check our docs on how to migrate.'
+  },
+  status: 401
 }
-2025-11-18 22:15:48.372 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-18 22:41:28.023 [warning] sx.bet balance check not implemented - requires Web3 integration
