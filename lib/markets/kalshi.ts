@@ -63,6 +63,28 @@ export class KalshiAPI {
       // Use RSA PRIVATE KEY as standard wrapper for raw keys.
       formattedKey = `-----BEGIN RSA PRIVATE KEY-----\n${formattedKey}\n-----END RSA PRIVATE KEY-----`;
     }
+
+    // 4. Try to convert RSA PRIVATE KEY (PKCS#1) to PRIVATE KEY (PKCS#8) if needed
+    // Kalshi often provides RSA keys, but Node.js crypto prefers PKCS#8
+    if (formattedKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+      try {
+        const crypto = require('crypto');
+        // Try to parse as RSA key and convert to PKCS#8
+        const keyObject = crypto.createPrivateKey({
+          key: formattedKey,
+          format: 'pem',
+          type: 'pkcs1'
+        });
+        // Export as PKCS#8 format
+        formattedKey = keyObject.export({
+          type: 'pkcs8',
+          format: 'pem'
+        }) as string;
+      } catch (error) {
+        // If conversion fails, return original
+        console.error('Failed to convert RSA key to PKCS#8:', error);
+      }
+    }
     
     return formattedKey;
   }
