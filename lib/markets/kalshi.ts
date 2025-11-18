@@ -33,8 +33,22 @@ export class KalshiAPI {
 
   constructor() {
     this.apiKey = process.env.KALSHI_API_KEY || '';
-    this.privateKey = process.env.KALSHI_PRIVATE_KEY || '';
+    this.privateKey = this.formatPrivateKey(process.env.KALSHI_PRIVATE_KEY || '');
     this.email = process.env.KALSHI_EMAIL || '';
+  }
+
+  private formatPrivateKey(key: string): string {
+    if (!key) return '';
+    
+    // Handle escaped newlines (common in .env files)
+    let formattedKey = key.replace(/\\n/g, '\n');
+    
+    // Ensure it has the correct headers if missing (assuming RSA key)
+    if (!formattedKey.includes('-----BEGIN')) {
+      formattedKey = `-----BEGIN PRIVATE KEY-----\n${formattedKey}\n-----END PRIVATE KEY-----`;
+    }
+    
+    return formattedKey;
   }
 
   /**
