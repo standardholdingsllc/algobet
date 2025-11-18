@@ -1,16 +1,6 @@
-2025-11-18 22:41:59.164 [error] Error sending balance alert email: Error: Greeting never received
-    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
-    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
-    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
-    at listOnTimeout (node:internal/timers:588:17)
-    at process.processTimers (node:internal/timers:523:7) {
-  code: 'ETIMEDOUT',
-  command: 'CONN'
-}
-2025-11-18 22:42:27.230 [error] Vercel Runtime Timeout Error: Task timed out after 60 seconds
-2025-11-18 22:41:27.697 [info] [2025-11-18T22:41:27.697Z] Cron scan starting...
-2025-11-18 22:41:27.698 [info] [2025-11-18T22:41:27.698Z] Scanning for arbitrage opportunities...
-2025-11-18 22:41:27.882 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
+2025-11-18 22:55:43.662 [info] [2025-11-18T22:55:43.661Z] Cron scan starting...
+2025-11-18 22:55:43.663 [info] [2025-11-18T22:55:43.662Z] Scanning for arbitrage opportunities...
+2025-11-18 22:55:43.831 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
     at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
     at IncomingMessage.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
     at IncomingMessage.emit (node:events:531:35)
@@ -47,13 +37,13 @@
       Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
       'KALSHI-ACCESS-KEY': 'bf7032cd-0348-4988-9396-a479ad7fdc2a',
-      'KALSHI-ACCESS-SIGNATURE': 'LLDBncYjcMlYn+ui4JoiyFKo3JmqwurdGrN3fxzYWCn62bB+lHijxnWAXbxfIN+o7vixA3Ph3Z+hghuzOnbRutMVRlfQ5SyL1kSNohYVTpamHYdAeOudlPngj6lscEVkFITSDxUSD7whaU2T960zUGFLmxvgIBO7bQ1A8sfh3bSt49lKTauEl0JMOq4ydzRlj/GhlLjA1lUzoDSD+78rnrS3tX3Vz0agtO4eVbz0w9Od/cds5usV9UB4TUtzXGhp55RBbdKE+cW9GcDyxJ9QifrsVtL2OpPmWGN8W7xYP9euSNRrOmjpm/BnKCVrnqGbWSLWQN6/ujyBFynA2cQwQw==',
-      'KALSHI-ACCESS-TIMESTAMP': '1763505687801',
+      'KALSHI-ACCESS-SIGNATURE': 'YSRcctUJjfYco7bPgV9HSCS11oUnO+qLycVgcJX3eBmGhTeh6ua+acbM71jBVFEZcQMgsap8MivpT8/tsMFShmzHrjOTVYDAJpisL7l5AWYnNJwUC0RdJBX4fbgjULLJ802YMokSEtlJUEPc8NVvK/eRzV/BtroBijunLQR75ujXL9BzkvY2777HU3O+M1cfmdrOpElkl+2YIcdN+tYFLHSoTT6IgZiVr3uXPCWzdwZQI5JM5r6ZcMwECXQ4zRdfReOGIG5CvndMdHcI93hK6lUaIu1DZPWMDsIi2rC9XKDhrWFQEKVnUBMsYiKxzrii8XVcH56CSS7xPoycGnnEAQ==',
+      'KALSHI-ACCESS-TIMESTAMP': '1763506543749',
       'User-Agent': 'axios/1.13.2',
       'Accept-Encoding': 'gzip, compress, deflate, br'
     },
     method: 'get',
-    url: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+    url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
     allowAbsoluteUrls: true,
     data: undefined
   },
@@ -94,12 +84,12 @@
       'Accept: application/json, text/plain, */*\r\n' +
       'Content-Type: application/json\r\n' +
       'KALSHI-ACCESS-KEY: bf7032cd-0348-4988-9396-a479ad7fdc2a\r\n' +
-      'KALSHI-ACCESS-SIGNATURE: LLDBncYjcMlYn+ui4JoiyFKo3JmqwurdGrN3fxzYWCn62bB+lHijxnWAXbxfIN+o7vixA3Ph3Z+hghuzOnbRutMVRlfQ5SyL1kSNohYVTpamHYdAeOudlPngj6lscEVkFITSDxUSD7whaU2T960zUGFLmxvgIBO7bQ1A8sfh3bSt49lKTauEl0JMOq4ydzRlj/GhlLjA1lUzoDSD+78rnrS3tX3Vz0agtO4eVbz0w9Od/cds5usV9UB4TUtzXGhp55RBbdKE+cW9GcDyxJ9QifrsVtL2OpPmWGN8W7xYP9euSNRrOmjpm/BnKCVrnqGbWSLWQN6/ujyBFynA2cQwQw==\r\n' +
-      'KALSHI-ACCESS-TIMESTAMP: 1763505687801\r\n' +
+      'KALSHI-ACCESS-SIGNATURE: YSRcctUJjfYco7bPgV9HSCS11oUnO+qLycVgcJX3eBmGhTeh6ua+acbM71jBVFEZcQMgsap8MivpT8/tsMFShmzHrjOTVYDAJpisL7l5AWYnNJwUC0RdJBX4fbgjULLJ802YMokSEtlJUEPc8NVvK/eRzV/BtroBijunLQR75ujXL9BzkvY2777HU3O+M1cfmdrOpElkl+2YIcdN+tYFLHSoTT6IgZiVr3uXPCWzdwZQI5JM5r6ZcMwECXQ4zRdfReOGIG5CvndMdHcI93hK6lUaIu1DZPWMDsIi2rC9XKDhrWFQEKVnUBMsYiKxzrii8XVcH56CSS7xPoycGnnEAQ==\r\n' +
+      'KALSHI-ACCESS-TIMESTAMP: 1763506543749\r\n' +
       'User-Agent: axios/1.13.2\r\n' +
       'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-      'x-vercel-id: iad1::pstjl-1763505687107-e467b4fe8c78\r\n' +
-      'Host: trading-api.kalshi.com\r\n' +
+      'x-vercel-id: iad1::7rxb4-1763506543119-ae10dfbb7609\r\n' +
+      'Host: api.elections.kalshi.com\r\n' +
       'Connection: keep-alive\r\n' +
       '\r\n',
     _keepAliveTimeout: 0,
@@ -157,12 +147,12 @@
       _dumped: false,
       req: [Circular *1],
       _eventsCount: 4,
-      responseUrl: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+      responseUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
       redirects: [],
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false,
       [Symbol(kHeaders)]: [Object],
-      [Symbol(kHeadersCount)]: 10,
+      [Symbol(kHeadersCount)]: 22,
       [Symbol(kTrailers)]: null,
       [Symbol(kTrailersCount)]: 0
     },
@@ -172,7 +162,7 @@
     parser: null,
     maxHeadersCount: null,
     reusedSocket: false,
-    host: 'trading-api.kalshi.com',
+    host: 'api.elections.kalshi.com',
     protocol: 'https:',
     _redirectable: Writable {
       _events: [Object],
@@ -188,7 +178,7 @@
       _eventsCount: 3,
       _onNativeResponse: [Function (anonymous)],
       _currentRequest: [Circular *1],
-      _currentUrl: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+      _currentUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
       _timeout: null,
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false
@@ -208,7 +198,7 @@
       _controlReleased: true,
       secureConnecting: false,
       _SNICallback: null,
-      servername: 'trading-api.kalshi.com',
+      servername: 'api.elections.kalshi.com',
       alpnProtocol: false,
       authorized: true,
       authorizationError: null,
@@ -218,7 +208,7 @@
       connecting: false,
       _hadError: false,
       _parent: null,
-      _host: 'trading-api.kalshi.com',
+      _host: 'api.elections.kalshi.com',
       _closeAfterHandlingError: false,
       _readableState: [ReadableState],
       _writableState: [WritableState],
@@ -247,15 +237,15 @@
         _idleTimeout: 5000,
         _idlePrev: [TimersList],
         _idleNext: [TimersList],
-        _idleStart: 82681,
+        _idleStart: 84749,
         _onTimeout: [Function: bound ],
         _timerArgs: undefined,
         _repeat: null,
         _destroyed: false,
         [Symbol(refed)]: false,
         [Symbol(kHasPrimitive)]: false,
-        [Symbol(asyncId)]: 2480,
-        [Symbol(triggerId)]: 2478,
+        [Symbol(asyncId)]: 2446,
+        [Symbol(triggerId)]: 2444,
         [Symbol(kAsyncContextFrame)]: undefined,
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
@@ -295,11 +285,17 @@
     status: 401,
     statusText: 'Unauthorized',
     headers: Object [AxiosHeaders] {
-      server: 'awselb/2.0',
-      date: 'Tue, 18 Nov 2025 22:41:27 GMT',
-      'content-type': 'text/plain; charset=utf-8',
-      'content-length': '96',
-      connection: 'keep-alive'
+      'content-type': 'application/json; charset=utf-8',
+      'content-length': '155',
+      connection: 'keep-alive',
+      date: 'Tue, 18 Nov 2025 22:55:43 GMT',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none';",
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'x-cache': 'Error from cloudfront',
+      via: '1.1 31113f2f23c4ce8a8af1d88a37137806.cloudfront.net (CloudFront)',
+      'x-amz-cf-pop': 'IAD12-P1',
+      'x-amz-cf-id': '0HbSOvFrKov35i5M0oQnq6lY5Di2B_3zxembCV9FgZp4Eq3crq98qg=='
     },
     config: {
       transitional: [Object],
@@ -315,7 +311,7 @@
       validateStatus: [Function: validateStatus],
       headers: [Object [AxiosHeaders]],
       method: 'get',
-      url: 'https://trading-api.kalshi.com/trade-api/v2/portfolio/balance',
+      url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
       allowAbsoluteUrls: true,
       data: undefined
     },
@@ -348,12 +344,12 @@
         'Accept: application/json, text/plain, */*\r\n' +
         'Content-Type: application/json\r\n' +
         'KALSHI-ACCESS-KEY: bf7032cd-0348-4988-9396-a479ad7fdc2a\r\n' +
-        'KALSHI-ACCESS-SIGNATURE: LLDBncYjcMlYn+ui4JoiyFKo3JmqwurdGrN3fxzYWCn62bB+lHijxnWAXbxfIN+o7vixA3Ph3Z+hghuzOnbRutMVRlfQ5SyL1kSNohYVTpamHYdAeOudlPngj6lscEVkFITSDxUSD7whaU2T960zUGFLmxvgIBO7bQ1A8sfh3bSt49lKTauEl0JMOq4ydzRlj/GhlLjA1lUzoDSD+78rnrS3tX3Vz0agtO4eVbz0w9Od/cds5usV9UB4TUtzXGhp55RBbdKE+cW9GcDyxJ9QifrsVtL2OpPmWGN8W7xYP9euSNRrOmjpm/BnKCVrnqGbWSLWQN6/ujyBFynA2cQwQw==\r\n' +
-        'KALSHI-ACCESS-TIMESTAMP: 1763505687801\r\n' +
+        'KALSHI-ACCESS-SIGNATURE: YSRcctUJjfYco7bPgV9HSCS11oUnO+qLycVgcJX3eBmGhTeh6ua+acbM71jBVFEZcQMgsap8MivpT8/tsMFShmzHrjOTVYDAJpisL7l5AWYnNJwUC0RdJBX4fbgjULLJ802YMokSEtlJUEPc8NVvK/eRzV/BtroBijunLQR75ujXL9BzkvY2777HU3O+M1cfmdrOpElkl+2YIcdN+tYFLHSoTT6IgZiVr3uXPCWzdwZQI5JM5r6ZcMwECXQ4zRdfReOGIG5CvndMdHcI93hK6lUaIu1DZPWMDsIi2rC9XKDhrWFQEKVnUBMsYiKxzrii8XVcH56CSS7xPoycGnnEAQ==\r\n' +
+        'KALSHI-ACCESS-TIMESTAMP: 1763506543749\r\n' +
         'User-Agent: axios/1.13.2\r\n' +
         'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-        'x-vercel-id: iad1::pstjl-1763505687107-e467b4fe8c78\r\n' +
-        'Host: trading-api.kalshi.com\r\n' +
+        'x-vercel-id: iad1::7rxb4-1763506543119-ae10dfbb7609\r\n' +
+        'Host: api.elections.kalshi.com\r\n' +
         'Connection: keep-alive\r\n' +
         '\r\n',
       _keepAliveTimeout: 0,
@@ -373,7 +369,7 @@
       parser: null,
       maxHeadersCount: null,
       reusedSocket: false,
-      host: 'trading-api.kalshi.com',
+      host: 'api.elections.kalshi.com',
       protocol: 'https:',
       _redirectable: [Writable],
       [Symbol(shapeMode)]: false,
@@ -390,9 +386,8 @@
       [Symbol(kRejectNonStandardBodyWrites)]: false,
       [Symbol(kUniqueHeaders)]: null
     },
-    data: 'API has been moved to https://api.elections.kalshi.com/\n' +
-      'Please check our docs on how to migrate.'
+    data: { error: [Object] }
   },
   status: 401
 }
-2025-11-18 22:41:28.023 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-18 22:55:43.978 [warning] sx.bet balance check not implemented - requires Web3 integration

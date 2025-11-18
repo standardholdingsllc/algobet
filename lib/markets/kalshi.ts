@@ -126,7 +126,9 @@ export class KalshiAPI {
     const bodyString = body ? JSON.stringify(body) : '';
     
     // Create signature
-    const message = `${timestamp}${method}${path}${bodyString}`;
+    // Note: For GET requests with no body, Kalshi requires the method to be uppercase
+    // and the path to start with the API version prefix (e.g. /trade-api/v2/portfolio/balance)
+    const message = `${timestamp}${method.toUpperCase()}${path}${bodyString}`;
     const signer = crypto.createSign('SHA256');
     signer.update(message);
     signer.end();
