@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getBotHealth, setBotStatus, updateBotHealth } from './status';
+import { getBotHealth, setBotStatus, updateBotHealth, updateWatchdogHeartbeat, recordRestart } from './status';
 
 /**
  * Watchdog endpoint - monitors bot health and auto-restarts if needed
@@ -24,6 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Update watchdog heartbeat
+    await updateWatchdogHeartbeat();
+    
     const health = await getBotHealth();
     
     console.log(`[Watchdog] Health check at ${new Date().toISOString()}`);
@@ -31,7 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       healthy: health.healthy,
       running: health.running,
       minutesSinceLastScan: health.minutesSinceLastScan,
-      consecutiveErrors: health.consecutiveErrors
+      consecutiveErrors: health.consecutiveErrors,
+      restartAttempts: health.restartAttempts,
+      restartThrottled: health.restartThrottled
     });
 
     // If bot is not running, no action needed
@@ -42,6 +47,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Check for soft restart condition (2 missed scans)
+    if (health.minutesSinceLastScan !== undefined && health.minutesSinceLastScan >= 2 && health.minutesSinceLastScan < 5) {
+      console.log(`[Watchdog] ⚠️ Soft restart: ${health.minutesSinceLastScan} missed scan cycles`);
+      
+      // Record soft restart (doesn't count towards throttle)
+      const restartAllowed = await recordRestart(`Soft restart: ${health.minutesSinceLastScan} missed scan cycles`, true);
+      
+      if (restartAllowed) {
+        // Perform soft restart
+        await setBotStatus(false);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        await setBotStatus(true);
+        
+        console.log(`[Watchdog] ✅ Soft restart completed`);
+        
+        return res.status(200).json({
+          message: 'Soft restart performed',
+          reason: `${health.minutesSinceLastScan} missed scan cycles`,
+          action: 'soft_restart',
+          health,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
     // If bot is healthy, no action needed
     if (health.healthy) {
       return res.status(200).json({
@@ -50,22 +80,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Bot is unhealthy - determine the issue and restart
+    // Bot is unhealthy - determine the issue and attempt full restart
     const issues: string[] = [];
+    let restartReason = '';
     
     if (health.minutesSinceLastScan !== undefined && health.minutesSinceLastScan >= 5) {
-      issues.push(`No scan in ${health.minutesSinceLastScan} minutes`);
+      const issue = `No scan in ${health.minutesSinceLastScan} minutes`;
+      issues.push(issue);
+      restartReason = issue;
     }
     
     if (health.consecutiveErrors >= 5) {
-      issues.push(`${health.consecutiveErrors} consecutive errors`);
+      const issue = `${health.consecutiveErrors} consecutive errors`;
+      issues.push(issue);
+      if (!restartReason) restartReason = issue;
+    }
+
+    if (health.minutesSinceWatchdog !== undefined && health.minutesSinceWatchdog >= 10) {
+      const issue = `Watchdog inactive for ${health.minutesSinceWatchdog} minutes`;
+      issues.push(issue);
+      if (!restartReason) restartReason = issue;
     }
 
     console.log(`[Watchdog] 🚨 Bot is unhealthy: ${issues.join(', ')}`);
-    console.log(`[Watchdog] 🔄 Initiating auto-restart...`);
 
-    // Perform restart by re-enabling the bot
-    // This resets the health counters on next successful scan
+    // Check if restart is throttled
+    if (health.restartThrottled) {
+      console.log(`[Watchdog] ⛔ Restart blocked: throttle limit reached`);
+      return res.status(200).json({
+        message: 'Restart blocked due to throttle limit',
+        issues,
+        health,
+        action: 'blocked',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Attempt full restart with throttle check
+    const restartAllowed = await recordRestart(`Restart triggered: ${restartReason}`, false);
+
+    if (!restartAllowed) {
+      console.log(`[Watchdog] ⛔ Restart blocked: throttle limit reached (3 restarts in 60 minutes)`);
+      return res.status(200).json({
+        message: 'Restart blocked: throttle limit reached (3 restarts in 60 minutes)',
+        issues,
+        health,
+        action: 'throttled',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log(`[Watchdog] 🔄 Initiating full restart...`);
+    console.log(`[Watchdog] Reason: ${restartReason}`);
+
+    // Perform full restart
     await setBotStatus(false);
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
     await setBotStatus(true);
@@ -77,6 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       message: 'Bot was unhealthy and has been restarted',
+      reason: restartReason,
       issues,
       health,
       action: 'restarted',

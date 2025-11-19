@@ -41,12 +41,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     let scanSuccess = false;
     let errorMessage = '';
+    const scanStartTime = Date.now();
     
     try {
       const bot = new ArbitrageBotEngine();
       await bot.scanOnce();
       scanSuccess = true;
-      console.log(`[${new Date().toISOString()}] Cron scan completed successfully`);
+      const scanDuration = Date.now() - scanStartTime;
+      console.log(`[${new Date().toISOString()}] Cron scan completed successfully in ${scanDuration}ms`);
     } catch (scanError: any) {
       // Log the error but don't throw - we want to continue running
       console.error(`[${new Date().toISOString()}] Scan error (will retry next cycle):`, scanError.message);
@@ -54,8 +56,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       scanSuccess = false;
     }
 
+    // Calculate scan duration
+    const scanDurationMs = Date.now() - scanStartTime;
+
     // Update health status regardless of success/failure
-    await updateBotHealth(scanSuccess);
+    await updateBotHealth(scanSuccess, scanDurationMs);
 
     if (scanSuccess) {
       return res.status(200).json({

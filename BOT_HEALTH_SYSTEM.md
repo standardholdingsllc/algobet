@@ -13,22 +13,35 @@ Your AlgoBet bot now has a **bulletproof health monitoring and auto-restart syst
 - Monitors time since last scan
 - Counts consecutive errors
 - Stores total scans and error statistics
+- **NEW**: Tracks scan duration metrics (last & average)
+- **NEW**: Monitors watchdog heartbeat
 
 ### 2. **Graceful Error Recovery**
 - Individual scan failures don't stop the bot
 - Errors are logged but the bot continues running
 - Automatic retry on next cron cycle (1 minute)
 
-### 3. **Auto-Restart**
-- Watchdog monitors bot health every 5 minutes
-- Automatically restarts if unhealthy
+### 3. **Smart Auto-Restart**
+- **NEW**: Soft restart after 2 missed scans (doesn't count towards throttle)
+- Full restart after 5+ minutes of no scans or 5+ consecutive errors
+- **NEW**: Restart throttling (max 3 restarts per 60 minutes)
+- **NEW**: Detailed restart reason logging
 - Resets error counters on successful restart
 
-### 4. **Dashboard Health Display**
+### 4. **Watchdog Monitoring**
+- Monitors bot health every 5 minutes
+- **NEW**: Updates heartbeat timestamp on every run
+- **NEW**: Bot marked unhealthy if watchdog inactive for 10+ minutes
+- Automatically restarts if unhealthy (with throttle protection)
+
+### 5. **Dashboard Health Display**
 - Real-time health status indicator
 - Shows last scan time
 - Displays error count
 - Visual health indicator (green/red)
+- **NEW**: Shows average scan duration
+- **NEW**: Displays health reasons when unhealthy
+- **NEW**: Shows restart throttle status
 
 ---
 
@@ -47,10 +60,13 @@ Your AlgoBet bot now has a **bulletproof health monitoring and auto-restart syst
 #### 2. **Watchdog Cron** (`/api/bot/watchdog`)
 - **Schedule**: Every 5 minutes (`*/5 * * * *`)
 - **Purpose**: Monitors bot health and auto-restarts
-- **Triggers**:
-  - No scan in 5+ minutes (when it should run every minute)
-  - 5+ consecutive errors
-- **Action**: Restarts bot and resets error counters
+- **Features**:
+  - Updates watchdog heartbeat timestamp
+  - **Soft Restart**: 2+ missed scans (doesn't count towards throttle)
+  - **Full Restart**: 5+ minutes no scans OR 5+ consecutive errors
+  - **Restart Throttling**: Max 3 restarts per 60 minutes
+  - Detailed restart reason logging
+- **Action**: Restarts bot and resets error counters (if not throttled)
 
 #### 3. **Health Status API** (`/api/bot/status`)
 - **Purpose**: Provides detailed health metrics
@@ -64,7 +80,15 @@ Your AlgoBet bot now has a **bulletproof health monitoring and auto-restart syst
     "minutesSinceLastScan": 0,
     "consecutiveErrors": 0,
     "totalScans": 142,
-    "totalErrors": 3
+    "totalErrors": 3,
+    "watchdogLastRun": "2025-11-19T06:10:00.000Z",
+    "minutesSinceWatchdog": 2,
+    "restartAttempts": 0,
+    "restartThrottled": false,
+    "lastRestartReason": null,
+    "lastScanDurationMs": 2340,
+    "averageScanDurationMs": 2156,
+    "healthReasons": ["All systems operational"]
   }
   ```
 
@@ -81,41 +105,63 @@ Your AlgoBet bot now has a **bulletproof health monitoring and auto-restart syst
 - Bot is running
 - Last scan within 5 minutes
 - Less than 5 consecutive errors
+- **NEW**: Watchdog active (ran within 10 minutes)
+- **NEW**: Not restart throttled
 
 ### Unhealthy ❌
-- Bot is running BUT:
+- Bot is running BUT any of these:
   - No scan in 5+ minutes, OR
-  - 5+ consecutive errors
+  - 5+ consecutive errors, OR
+  - **NEW**: Watchdog inactive for 10+ minutes, OR
+  - **NEW**: Restart throttling active (3 restarts in 60 min)
 
 ---
 
 ## 🔄 Auto-Restart Flow
 
+### Soft Restart (2 missed scans)
 ```
-1. Watchdog runs every 5 minutes
+1. Watchdog detects 2+ minutes since last scan
    ↓
-2. Checks bot health
+2. Logs: "[Watchdog] Soft restart: 2 missed scan cycles"
    ↓
-3. If unhealthy:
-   a. Logs the issue
-   b. Disables bot (setBotStatus(false))
-   c. Waits 2 seconds
-   d. Re-enables bot (setBotStatus(true))
-   e. Resets error counter
+3. Disables bot → waits 1 second → re-enables
    ↓
-4. Bot resumes scanning on next cron cycle
+4. Does NOT count towards throttle limit
+   ↓
+5. Bot resumes scanning on next cron cycle
+```
+
+### Full Restart (5+ minutes or 5+ errors)
+```
+1. Watchdog detects unhealthy state
+   ↓
+2. Checks restart throttle (max 3 per 60 min)
+   ↓
+3. If throttled:
+   - Log: "[Watchdog] Restart blocked: throttle limit reached"
+   - Mark as restartThrottled = true
+   - Return without restarting
+   ↓
+4. If not throttled:
+   a. Log restart reason
+   b. Increment restart counter
+   c. Disables bot → waits 2 seconds → re-enables
+   d. Resets error counter
+   ↓
+5. Bot resumes scanning on next cron cycle
 ```
 
 ---
 
 ## 🎨 Dashboard Display
 
-When the bot is running, you'll see:
+When the bot is running and healthy, you'll see:
 
 ```
 Dashboard
 Monitor your arbitrage trading bot
-● Healthy • 142 scans • Last scan: 0m ago
+● Healthy • 142 scans • Last: 0m ago • Avg: 2.1s
 ```
 
 Or if unhealthy:
@@ -123,7 +169,18 @@ Or if unhealthy:
 ```
 Dashboard
 Monitor your arbitrage trading bot
-● Unhealthy • 142 scans • Last scan: 7m ago • 5 errors
+● Unhealthy • 142 scans • Last: 7m ago • Avg: 2.3s
+No scan in 7 minutes • 5 consecutive errors
+```
+
+Or if restart throttled:
+
+```
+Dashboard
+Monitor your arbitrage trading bot
+● Unhealthy • 142 scans • Last: 2m ago • Avg: 2.1s
+Restart throttling active
+⚠️ Restart throttled (3/3 restarts in last hour)
 ```
 
 ---
@@ -234,4 +291,53 @@ Your bot will now run **24/7 for weeks** without needing manual restarts. Even i
 - Vercel has brief outages
 
 The bot will **automatically recover and continue running**! 🚀
+
+---
+
+## 🆕 New Features Summary
+
+### 1. Watchdog Heartbeat
+- Tracks when watchdog last ran
+- Bot marked unhealthy if watchdog inactive for 10+ minutes
+- Prevents silent failures of the monitoring system itself
+
+### 2. Restart Throttling
+- Maximum 3 restarts per 60-minute window
+- Prevents restart loops from draining resources
+- Automatically resets after 60 minutes
+- Soft restarts don't count towards limit
+
+### 3. Soft Restart
+- Triggered after 2 missed scans (early intervention)
+- Faster recovery (1 second wait vs 2 seconds)
+- Doesn't count towards throttle limit
+- Prevents escalation to full restart
+
+### 4. Restart Reason Logging
+- Every restart logs a clear reason
+- Exposed in `/api/bot/status` as `lastRestartReason`
+- Examples:
+  - "Soft restart: 2 missed scan cycles"
+  - "Restart triggered: No scan in 7 minutes"
+  - "Restart triggered: 6 consecutive errors"
+  - "Throttled: Restart triggered: No scan in 8 minutes"
+
+### 5. Scan Duration Metrics
+- Tracks duration of each scan in milliseconds
+- Calculates weighted moving average (80% old, 20% new)
+- Exposed as `lastScanDurationMs` and `averageScanDurationMs`
+- Helps identify performance degradation
+
+### 6. Enhanced Health Logic
+- Four health criteria (was two):
+  1. Scan recency (< 5 minutes)
+  2. Error count (< 5 consecutive)
+  3. Watchdog heartbeat (< 10 minutes)
+  4. Restart throttle status
+- Returns `healthReasons` array with specific issues
+- More granular health status
+
+---
+
+**Your bot is now production-ready for 24/7 operation with advanced monitoring!** 🚀
 

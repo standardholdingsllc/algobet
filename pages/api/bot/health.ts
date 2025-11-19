@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getBotHealth, setBotStatus } from './status';
+import { getBotHealth, setBotStatus, recordRestart } from './status';
 
 /**
  * Health check and auto-recovery endpoint
@@ -23,8 +23,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // If bot is unhealthy and auto-restart is enabled
     if (!health.healthy && health.running && autoRestart) {
       console.log('🔄 Bot is unhealthy - attempting auto-restart...');
+      console.log(`   - Health reasons: ${health.healthReasons.join(', ')}`);
       console.log(`   - Minutes since last scan: ${health.minutesSinceLastScan}`);
       console.log(`   - Consecutive errors: ${health.consecutiveErrors}`);
+      
+      // Check if restart is allowed (throttle check)
+      const restartReason = `Manual restart: ${health.healthReasons[0] || 'unhealthy'}`;
+      const restartAllowed = await recordRestart(restartReason, false);
+      
+      if (!restartAllowed) {
+        console.log('⛔ Restart blocked: throttle limit reached');
+        return res.status(200).json({
+          ...health,
+          action: 'blocked',
+          message: 'Restart blocked: throttle limit reached (3 restarts in 60 minutes)'
+        });
+      }
       
       // Reset the bot by toggling status
       await setBotStatus(false);

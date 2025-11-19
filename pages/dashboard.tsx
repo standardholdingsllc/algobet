@@ -16,6 +16,14 @@ interface BotHealth {
   consecutiveErrors: number;
   totalScans: number;
   totalErrors: number;
+  watchdogLastRun?: string;
+  minutesSinceWatchdog?: number;
+  restartAttempts: number;
+  restartThrottled: boolean;
+  lastRestartReason?: string;
+  lastScanDurationMs?: number;
+  averageScanDurationMs?: number;
+  healthReasons: string[];
 }
 
 export default function DashboardPage() {
@@ -183,30 +191,42 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-600 mt-1">Monitor your arbitrage trading bot</p>
             {botHealth && botRunning && (
-              <div className="mt-2 flex items-center space-x-4 text-sm">
-                <div className={`flex items-center ${botHealth.healthy ? 'text-green-600' : 'text-red-600'}`}>
-                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${botHealth.healthy ? 'bg-green-600' : 'bg-red-600'} animate-pulse`}></span>
-                  {botHealth.healthy ? 'Healthy' : 'Unhealthy'}
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center space-x-4 text-sm">
+                  <div className={`flex items-center ${botHealth.healthy ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${botHealth.healthy ? 'bg-green-600' : 'bg-red-600'} animate-pulse`}></span>
+                    {botHealth.healthy ? 'Healthy' : 'Unhealthy'}
+                  </div>
+                  <span className="text-gray-500">•</span>
+                  <span className="text-gray-600">
+                    {botHealth.totalScans} scans
+                  </span>
+                  {botHealth.minutesSinceLastScan !== undefined && (
+                    <>
+                      <span className="text-gray-500">•</span>
+                      <span className="text-gray-600">
+                        Last: {botHealth.minutesSinceLastScan}m ago
+                      </span>
+                    </>
+                  )}
+                  {botHealth.averageScanDurationMs && (
+                    <>
+                      <span className="text-gray-500">•</span>
+                      <span className="text-gray-600">
+                        Avg: {(botHealth.averageScanDurationMs / 1000).toFixed(1)}s
+                      </span>
+                    </>
+                  )}
                 </div>
-                <span className="text-gray-500">•</span>
-                <span className="text-gray-600">
-                  {botHealth.totalScans} scans
-                </span>
-                {botHealth.minutesSinceLastScan !== undefined && (
-                  <>
-                    <span className="text-gray-500">•</span>
-                    <span className="text-gray-600">
-                      Last scan: {botHealth.minutesSinceLastScan}m ago
-                    </span>
-                  </>
+                {!botHealth.healthy && botHealth.healthReasons && botHealth.healthReasons.length > 0 && (
+                  <div className="text-xs text-red-600">
+                    {botHealth.healthReasons.join(' • ')}
+                  </div>
                 )}
-                {botHealth.consecutiveErrors > 0 && (
-                  <>
-                    <span className="text-gray-500">•</span>
-                    <span className="text-orange-600">
-                      {botHealth.consecutiveErrors} errors
-                    </span>
-                  </>
+                {botHealth.restartThrottled && (
+                  <div className="text-xs text-orange-600">
+                    ⚠️ Restart throttled ({botHealth.restartAttempts}/3 restarts in last hour)
+                  </div>
                 )}
               </div>
             )}
