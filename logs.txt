@@ -1,21 +1,23 @@
-2025-11-19 00:10:32.745 [info] [2025-11-19T00:10:32.744Z] Cron scan starting...
-2025-11-19 00:10:32.747 [info] [2025-11-19T00:10:32.747Z] Scanning for arbitrage opportunities...
-2025-11-19 00:10:32.920 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
+2025-11-19 01:37:07.721 [info] [2025-11-19T01:37:07.720Z] Cron scan starting...
+2025-11-19 01:37:07.732 [info] [2025-11-19T01:37:07.723Z] Scanning for arbitrage opportunities...
+2025-11-19 01:37:08.045 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-19 01:37:09.077 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025267EDCE8733-50A9A65E050: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.098 [error] Error fetching sx.bet markets: AxiosError: Request failed with status code 404
     at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
-    at IncomingMessage.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
-    at IncomingMessage.emit (node:events:531:35)
+    at BrotliDecompress.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
+    at BrotliDecompress.emit (node:events:519:28)
     at endReadableNT (node:internal/streams/readable:1698:12)
     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
     at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:32:2110)
-    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2912)
+    at async i.getOpenMarkets (/var/task/.next/server/pages/api/bot/cron.js:32:7047)
+    at async Promise.all (index 2)
+    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:3670)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
-    at async i (/var/task/.next/server/pages/api/bot/cron.js:32:12540)
+    at async i (/var/task/.next/server/pages/api/bot/cron.js:32:12852)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
-    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515)
-    at async r9.handleCatchallRenderRequest (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:38432) {
+    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
   code: 'ERR_BAD_REQUEST',
   config: {
     transitional: {
@@ -36,14 +38,12 @@
     headers: Object [AxiosHeaders] {
       Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
-      'KALSHI-ACCESS-KEY': '9901b2a2-76f3-4aae-a65e-e1ff254986fd',
-      'KALSHI-ACCESS-SIGNATURE': 'pSHhW0q+UiPss4jmv25YMbYjghscGfZ5SqQB8gtjY+MRRiKKrfDbcS8SgwyKV/n5S9bI2xD5aNNln+ZPXYEahgEZjuYVolAgtzs8QNantv4DK3jexd1YqV5rt+q4jSCy7Z3zYuZtoy7ukib0yGHiPkkVyXAqwzn9uekrI57HcJHhia+tZKSC3l9x61oqFTqFnE7wWaEwr9xj+2X7sibX6VRN8Phi2uP6BQ7JSf2D1WAqZlAZRbCbIW18EyncRuzImVowEy4VlMCvAW8mm8kvjHZYePAE7h22P/K0/96MxEAM80nhYgs+mK2jW3kiVS5Hw6o48f89x4gjB7Lv94ATSQ==',
-      'KALSHI-ACCESS-TIMESTAMP': '1763511032843',
+      'X-Api-Key': 'c3df9063-8564-44f2-92b5-413b5b30ffa2',
       'User-Agent': 'axios/1.13.2',
       'Accept-Encoding': 'gzip, compress, deflate, br'
     },
     method: 'get',
-    url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+    url: 'https://api.sx.bet/fixtures',
     allowAbsoluteUrls: true,
     data: undefined
   },
@@ -80,16 +80,14 @@
     finished: true,
     _headerSent: true,
     _closed: true,
-    _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+    _header: 'GET /fixtures HTTP/1.1\r\n' +
       'Accept: application/json, text/plain, */*\r\n' +
       'Content-Type: application/json\r\n' +
-      'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
-      'KALSHI-ACCESS-SIGNATURE: pSHhW0q+UiPss4jmv25YMbYjghscGfZ5SqQB8gtjY+MRRiKKrfDbcS8SgwyKV/n5S9bI2xD5aNNln+ZPXYEahgEZjuYVolAgtzs8QNantv4DK3jexd1YqV5rt+q4jSCy7Z3zYuZtoy7ukib0yGHiPkkVyXAqwzn9uekrI57HcJHhia+tZKSC3l9x61oqFTqFnE7wWaEwr9xj+2X7sibX6VRN8Phi2uP6BQ7JSf2D1WAqZlAZRbCbIW18EyncRuzImVowEy4VlMCvAW8mm8kvjHZYePAE7h22P/K0/96MxEAM80nhYgs+mK2jW3kiVS5Hw6o48f89x4gjB7Lv94ATSQ==\r\n' +
-      'KALSHI-ACCESS-TIMESTAMP: 1763511032843\r\n' +
+      'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
       'User-Agent: axios/1.13.2\r\n' +
       'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-      'x-vercel-id: iad1::csjvx-1763511032232-0a4e0cfff8a5\r\n' +
-      'Host: api.elections.kalshi.com\r\n' +
+      'x-vercel-id: iad1::n4lck-1763516227133-6db299274d5b\r\n' +
+      'Host: api.sx.bet\r\n' +
       'Connection: keep-alive\r\n' +
       '\r\n',
     _keepAliveTimeout: 0,
@@ -102,7 +100,7 @@
       protocol: 'https:',
       options: [Object: null prototype],
       requests: [Object: null prototype] {},
-      sockets: [Object: null prototype] {},
+      sockets: [Object: null prototype],
       freeSockets: [Object: null prototype],
       keepAliveMsecs: 1000,
       keepAlive: true,
@@ -110,7 +108,7 @@
       maxFreeSockets: 256,
       scheduling: 'lifo',
       maxTotalSockets: Infinity,
-      totalSocketCount: 1,
+      totalSocketCount: 4,
       agentKeepAliveTimeoutBuffer: 1000,
       maxCachedSessions: 100,
       _sessionCache: [Object],
@@ -122,7 +120,7 @@
     maxHeaderSize: undefined,
     insecureHTTPParser: undefined,
     joinDuplicateHeaders: undefined,
-    path: '/trade-api/v2/portfolio/balance',
+    path: '/fixtures',
     _ended: true,
     res: IncomingMessage {
       _events: [Object],
@@ -140,19 +138,19 @@
       upgrade: false,
       url: '',
       method: null,
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
+      statusCode: 404,
+      statusMessage: 'Not Found',
       client: [TLSSocket],
-      _consuming: false,
+      _consuming: true,
       _dumped: false,
       req: [Circular *1],
       _eventsCount: 4,
-      responseUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      responseUrl: 'https://api.sx.bet/fixtures',
       redirects: [],
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false,
       [Symbol(kHeaders)]: [Object],
-      [Symbol(kHeadersCount)]: 22,
+      [Symbol(kHeadersCount)]: 38,
       [Symbol(kTrailers)]: null,
       [Symbol(kTrailersCount)]: 0
     },
@@ -161,8 +159,8 @@
     upgradeOrConnect: false,
     parser: null,
     maxHeadersCount: null,
-    reusedSocket: false,
-    host: 'api.elections.kalshi.com',
+    reusedSocket: true,
+    host: 'api.sx.bet',
     protocol: 'https:',
     _redirectable: Writable {
       _events: [Object],
@@ -178,7 +176,7 @@
       _eventsCount: 3,
       _onNativeResponse: [Function (anonymous)],
       _currentRequest: [Circular *1],
-      _currentUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      _currentUrl: 'https://api.sx.bet/fixtures',
       _timeout: null,
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false
@@ -198,7 +196,7 @@
       _controlReleased: true,
       secureConnecting: false,
       _SNICallback: null,
-      servername: 'api.elections.kalshi.com',
+      servername: 'api.sx.bet',
       alpnProtocol: false,
       authorized: true,
       authorizationError: null,
@@ -208,7 +206,7 @@
       connecting: false,
       _hadError: false,
       _parent: null,
-      _host: 'api.elections.kalshi.com',
+      _host: 'api.sx.bet',
       _closeAfterHandlingError: false,
       _readableState: [ReadableState],
       _writableState: [WritableState],
@@ -236,21 +234,21 @@
       [Symbol(timeout)]: Timeout {
         _idleTimeout: 5000,
         _idlePrev: [TimersList],
-        _idleNext: [TimersList],
-        _idleStart: 43040,
+        _idleNext: [Timeout],
+        _idleStart: 62462,
         _onTimeout: [Function: bound ],
         _timerArgs: undefined,
         _repeat: null,
         _destroyed: false,
         [Symbol(refed)]: false,
         [Symbol(kHasPrimitive)]: false,
-        [Symbol(asyncId)]: 2446,
-        [Symbol(triggerId)]: 2444,
+        [Symbol(asyncId)]: 3526,
+        [Symbol(triggerId)]: 3524,
         [Symbol(kAsyncContextFrame)]: undefined,
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
-        [Symbol(kResourceStore)]: [Object]
+        [Symbol(kResourceStore)]: {}
       },
       [Symbol(kBuffer)]: null,
       [Symbol(kBufferCb)]: null,
@@ -268,9 +266,7 @@
     [Symbol(kOutHeaders)]: [Object: null prototype] {
       accept: [Array],
       'content-type': [Array],
-      'kalshi-access-key': [Array],
-      'kalshi-access-signature': [Array],
-      'kalshi-access-timestamp': [Array],
+      'x-api-key': [Array],
       'user-agent': [Array],
       'accept-encoding': [Array],
       'x-vercel-id': [Array],
@@ -282,20 +278,27 @@
     [Symbol(kUniqueHeaders)]: null
   },
   response: {
-    status: 401,
-    statusText: 'Unauthorized',
+    status: 404,
+    statusText: 'Not Found',
     headers: Object [AxiosHeaders] {
+      date: 'Wed, 19 Nov 2025 01:37:09 GMT',
       'content-type': 'application/json; charset=utf-8',
-      'content-length': '155',
+      'transfer-encoding': 'chunked',
       connection: 'keep-alive',
-      date: 'Wed, 19 Nov 2025 00:10:32 GMT',
+      vary: 'Origin',
+      'access-control-allow-credentials': 'true',
+      'x-dns-prefetch-control': 'off',
+      'x-frame-options': 'SAMEORIGIN',
+      'strict-transport-security': 'max-age=15552000; includeSubDomains',
+      'x-download-options': 'noopen',
       'x-content-type-options': 'nosniff',
-      'content-security-policy': "default-src 'none';",
-      'strict-transport-security': 'max-age=31536000; includeSubDomains',
-      'x-cache': 'Error from cloudfront',
-      via: '1.1 7eeed291abf48890d3f36565208941a8.cloudfront.net (CloudFront)',
-      'x-amz-cf-pop': 'IAD12-P1',
-      'x-amz-cf-id': 'o7hzd7Yf_rvKJR8QEEt53_iGfYZ-pHiNK-kPAoi33iSDHUhYEmtw_Q=='
+      'x-xss-protection': '1; mode=block',
+      'x-powered-by': 'Express',
+      etag: 'W/"47-WtYGojL0p/jQJHbNORnza+dRyYA"',
+      'cf-cache-status': 'DYNAMIC',
+      server: 'cloudflare',
+      'cf-ray': '9a0bfb0f9a98c99d-IAD',
+      'alt-svc': 'h3=":443"; ma=86400'
     },
     config: {
       transitional: [Object],
@@ -311,7 +314,7 @@
       validateStatus: [Function: validateStatus],
       headers: [Object [AxiosHeaders]],
       method: 'get',
-      url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      url: 'https://api.sx.bet/fixtures',
       allowAbsoluteUrls: true,
       data: undefined
     },
@@ -340,16 +343,14 @@
       finished: true,
       _headerSent: true,
       _closed: true,
-      _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+      _header: 'GET /fixtures HTTP/1.1\r\n' +
         'Accept: application/json, text/plain, */*\r\n' +
         'Content-Type: application/json\r\n' +
-        'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
-        'KALSHI-ACCESS-SIGNATURE: pSHhW0q+UiPss4jmv25YMbYjghscGfZ5SqQB8gtjY+MRRiKKrfDbcS8SgwyKV/n5S9bI2xD5aNNln+ZPXYEahgEZjuYVolAgtzs8QNantv4DK3jexd1YqV5rt+q4jSCy7Z3zYuZtoy7ukib0yGHiPkkVyXAqwzn9uekrI57HcJHhia+tZKSC3l9x61oqFTqFnE7wWaEwr9xj+2X7sibX6VRN8Phi2uP6BQ7JSf2D1WAqZlAZRbCbIW18EyncRuzImVowEy4VlMCvAW8mm8kvjHZYePAE7h22P/K0/96MxEAM80nhYgs+mK2jW3kiVS5Hw6o48f89x4gjB7Lv94ATSQ==\r\n' +
-        'KALSHI-ACCESS-TIMESTAMP: 1763511032843\r\n' +
+        'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
         'User-Agent: axios/1.13.2\r\n' +
         'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-        'x-vercel-id: iad1::csjvx-1763511032232-0a4e0cfff8a5\r\n' +
-        'Host: api.elections.kalshi.com\r\n' +
+        'x-vercel-id: iad1::n4lck-1763516227133-6db299274d5b\r\n' +
+        'Host: api.sx.bet\r\n' +
         'Connection: keep-alive\r\n' +
         '\r\n',
       _keepAliveTimeout: 0,
@@ -360,7 +361,7 @@
       maxHeaderSize: undefined,
       insecureHTTPParser: undefined,
       joinDuplicateHeaders: undefined,
-      path: '/trade-api/v2/portfolio/balance',
+      path: '/fixtures',
       _ended: true,
       res: [IncomingMessage],
       aborted: false,
@@ -368,8 +369,8 @@
       upgradeOrConnect: false,
       parser: null,
       maxHeadersCount: null,
-      reusedSocket: false,
-      host: 'api.elections.kalshi.com',
+      reusedSocket: true,
+      host: 'api.sx.bet',
       protocol: 'https:',
       _redirectable: [Writable],
       [Symbol(shapeMode)]: false,
@@ -386,39 +387,382 @@
       [Symbol(kRejectNonStandardBodyWrites)]: false,
       [Symbol(kUniqueHeaders)]: null
     },
-    data: { error: [Object] }
+    data: {
+      message: 'Cannot GET /fixtures',
+      error: 'Not Found',
+      statusCode: 404
+    }
   },
-  status: 401
+  status: 404
 }
-2025-11-19 00:10:33.084 [warning] sx.bet balance check not implemented - requires Web3 integration
-2025-11-19 00:11:03.811 [error] Error sending balance alert email: Error: Greeting never received
-    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
-    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
-    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
-    at listOnTimeout (node:internal/timers:588:17)
-    at process.processTimers (node:internal/timers:523:7) {
-  code: 'ETIMEDOUT',
-  command: 'CONN'
-}
+2025-11-19 01:37:09.103 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A272D233014-B013B090643: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.128 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-5FE5DC6DF32: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.151 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202555C8862C35D-384EFF3FC8D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.177 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20255504D349CC8-CD464CF2241: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.201 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025FA712BDF045-DCDCFC50E39: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.225 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251178489E705-6D6086DB6BE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.254 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202514B8264AB8C-D9162F4F5DA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.283 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025422D76B49F8-32227AD2733: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.310 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A6F2E3A3A86-3005A5AA785: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.336 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250BDD58500E8-CB4BCDDEB18: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.361 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D7040633608-ECE45B9F069: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.384 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-5D65DB06527-A6681A86B74: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.409 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025E4C32B43BDE-CA7F1400478: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.433 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20259B0CB30DCDD-61E57E8FB8A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.456 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250BDD58500E8-E3C0F8F2029: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.480 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D3481B902D6-7F2DE18A198: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.504 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250D293784DE0-F24AF3A4B5D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.527 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250BDD58500E8-1F1E1BD7BCE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.580 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256907C94DB9C-21F96479A02: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.603 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202525D76F5A820-8A261D4C1F8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.629 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250D293784DE0-84F60D1072F: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.653 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025B18C1173A0F-989E9457A3D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.682 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025308B9BD7634-4C89C1A1DDF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.708 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S202534DD267A330-ABBF80E9675: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.734 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S202566CAAA58C6F-51DBE400BEF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.774 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202502E0E1753AA-B8025908D54: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.802 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-1C9F9FFA7BF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.829 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20256E5F19AF5F0-07183974E04: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.856 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025CB363D20B2F-52F05A957BF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.888 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202547216EF180B-F8FE7713DE7: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.909 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202543F16C55F07-5B943A41327: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.934 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025E4C32B43BDE-57CADC0C859: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.961 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025040F8B8D10B-33C18F60A3D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.983 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D162839651C-8CCFBE3C548: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.007 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202502385B9D087-0137137D47A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.044 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20258EB479C524B-B079880459C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.071 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S20254BEED92C65E-1A9638CD7F1: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.096 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A731151B652-289738FF715: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.121 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251EBCA06ACD0-41190CE9FF8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.146 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20253D8E1068C6D-A06C0355113: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.172 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-A1899484C95: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.194 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259847CB0CA76-FD8F7B4FBA1: 429
+2025-11-19 01:37:10.224 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025A4BA9841C40-BCE48692537: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.247 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202598D52CCDB67-773981E9F7D: 429
+2025-11-19 01:37:10.276 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20250C0A42C192F-BAB380408C8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.303 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025339B51FE002-4EFDEC0BFB6: 429
+2025-11-19 01:37:10.329 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S20256CC06BDEC91-BC92A9FEB43: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.351 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-F76AD8061C4: 429
+2025-11-19 01:37:10.389 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025BE876DD874C-0C9CA4D59BA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.411 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251A6CF7F9413-53D5FBDDE2F: 429
+2025-11-19 01:37:10.433 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025508A4DAF09D-1F108C142BC: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.459 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202522E4194437B-BEF4CC7ABD1: 429
+2025-11-19 01:37:10.484 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202509C3DD43A28-056EA6C53C7: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.508 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20253DFAC0D1263-D9CA1B10281: 429
+2025-11-19 01:37:10.544 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256A6B5F189FE-117C533A717: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.569 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202540B4EF81BAB-B0B9F05A9DF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.593 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20252F5FF907F7D-C3682C64D3B: 429
+2025-11-19 01:37:10.619 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-D2AEC13D271: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.642 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025339B51FE002-1D77C372360: 429
+2025-11-19 01:37:10.662 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-5B2B8DB02BF: 429
+2025-11-19 01:37:10.687 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025958B4FD3D2D-3D8EE1CF049: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.710 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251793898E98D-36EAAE70386: 429
+2025-11-19 01:37:10.734 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259C64F085613-AC49BA7775B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.758 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025BC7CE7B78EA-AB31B7493CB: 429
+2025-11-19 01:37:10.781 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C2970CB484B-BD1ED1AAB81: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.803 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-060D6E0639C: 429
+2025-11-19 01:37:10.829 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D1E457BD809-383EC168B7D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.854 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025512FCC2AB76-AF282939A0D: 429
+2025-11-19 01:37:10.878 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025532C6C7B4C1-4E0CC0CC951: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.901 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A2EB6C062BC-871D6C38ECF: 429
+2025-11-19 01:37:10.928 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-D59A8DA6E13: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.950 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C13697D8BC7-0A46CA73ED3: 429
+2025-11-19 01:37:10.976 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259C64F085613-6B07FEF8AA9: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.996 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20256C3F19512FF-32DEB8BA6D9: 429
+2025-11-19 01:37:11.021 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A2EB6C062BC-E969723D75A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.048 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-43FD7F26E8D-8416FAD3A91: 429
+2025-11-19 01:37:11.073 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-FF014E7BDD2: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.097 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D1E457BD809-0E2509D0BE3: 429
+2025-11-19 01:37:11.122 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-87E63C514CC: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.147 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A2EB6C062BC-8202A9D3216: 429
+2025-11-19 01:37:11.170 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025EBBF3F55B77-EC4AED0AB94: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.191 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-4114F6B3B50: 429
+2025-11-19 01:37:11.215 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025DB054CB88ED-34EB9AA2972: 429
+2025-11-19 01:37:11.239 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025E45180359DA-1A632550A2C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.261 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025B5BB1665961-8A9383993A7: 429
+2025-11-19 01:37:11.283 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A2659F95A66-3710B5888CE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.306 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A8D4DB6377B-D661924DD0D: 429
+2025-11-19 01:37:11.329 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A72677CB22A-2E78F9AA5DA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.351 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D7FFBE28BCE-1DCC3EA8FBF: 429
+2025-11-19 01:37:11.377 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20254E9760D3918-E5F4562894C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.403 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025471DF8A635B-A9AEAECB819: 429
+2025-11-19 01:37:11.424 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A8D4DB6377B-DAD93202B53: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.455 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025FFB019C00ED-18E72816026: 429
+2025-11-19 01:37:11.484 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025471DF8A635B-2607C6A4D50: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.508 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202538148F19AE5-65DD55DEDD7: 429
+2025-11-19 01:37:11.534 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250FA26A298A8-56FA4A7E885: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.558 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CD4ADD2024B-C615BE32D0B: 429
+2025-11-19 01:37:11.582 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202508EDFC09FE7-E2C2119F076: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.604 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20254D37EE4BF75-EA2E02C5047: 429
+2025-11-19 01:37:11.628 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CD4ADD2024B-93FE0A6B536: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.649 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D7FFBE28BCE-641C05E7F48: 429
+2025-11-19 01:37:11.680 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C43BF809444-38D29AFCAC3: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.705 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-FC5D1D32AA8-1E70EDEA6E9: 429
+2025-11-19 01:37:11.731 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-E33BCCD2C71: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.756 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025FB3C9B51DE7-A7A481DFDDE: 429
+2025-11-19 01:37:11.784 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C13697D8BC7-65185D0CDDA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.801 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256FC61E99ACC-BB8E8A8859C: 429
+2025-11-19 01:37:11.824 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025EC46464CC6C-0A3B0E4D624: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.846 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-BF70BBB96A5: 429
+2025-11-19 01:37:11.866 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F317463A1BD-435D575F9B3: 429
+2025-11-19 01:37:11.887 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CA4DA3BA509-3B497BB4648: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.906 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251A3A8ACED81-B3D30E11D1A: 429
+2025-11-19 01:37:11.929 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A8D4DB6377B-1C4E3AECC3B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.950 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025CE44F811CAA-51592F62504: 429
+2025-11-19 01:37:11.974 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D19097E90E0-8537C5FBBB4: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.995 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A0309516BE0-517B8AEFC1D: 429
+2025-11-19 01:37:12.019 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C43BF809444-590754877E8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.041 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025056768BBD6B-D5C7DEDA30E: 429
+2025-11-19 01:37:12.064 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025EC46464CC6C-5422E1C31CB: 429
+2025-11-19 01:37:12.086 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C43BF809444-CE227DF8139: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.109 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025BDEBEA45D26-490B91E6DF6: 429
+2025-11-19 01:37:12.131 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025ED66CE651A0-2F0C14B9550: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.154 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-68B4355936F: 429
+2025-11-19 01:37:12.176 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025641B1AE36DC-192CD0AB978: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.196 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202579EE6433ED6-838C0B11D7D: 429
+2025-11-19 01:37:12.220 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A72677CB22A-D0D3794FFB5: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.238 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-167F9FF0D46: 429
+2025-11-19 01:37:12.257 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202535AA6772F7E-0649E4E3631: 429
+2025-11-19 01:37:12.286 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-35178555C09: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.308 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256CC06BDEC91-699D0E73BDE: 429
+2025-11-19 01:37:12.330 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20253DFAC0D1263-3981C78AAF4: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.350 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025DDD9D938FE9-00F61157376: 429
+2025-11-19 01:37:12.373 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202545605FA239E-91FCC5650E3: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.393 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D6536558AD4-B6DD75222B1: 429
+2025-11-19 01:37:12.416 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D75294F9078-1251CF46A81: 429
+2025-11-19 01:37:12.440 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025B812053AE21-4023DF3B7F0: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.466 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025BDEBEA45D26-0D25A78E1D4: 429
+2025-11-19 01:37:12.490 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A7ADA459408-CDE2952084D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.510 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025FFB019C00ED-82D2EA1424E: 429
+2025-11-19 01:37:12.532 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025555B1A98F60-CDD7253936F: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.554 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025072BDE98007-84550625A72: 429
+2025-11-19 01:37:12.578 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251448A469B95-24734236EEA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.608 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-3F583796681: 429
+2025-11-19 01:37:12.632 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-F16191C7636: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.654 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259E63D1CEA3F-C1FF7565341: 429
+2025-11-19 01:37:12.678 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-FC5D1D32AA8-7F83B57B630: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.699 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-0F9D9231A46: 429
+2025-11-19 01:37:12.722 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20254E1B956A2EE-BF56238816C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.745 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E289289EA9B-6FA6927EE2A: 429
+2025-11-19 01:37:12.766 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20257168BA23E8D-07321C0C811: 429
+2025-11-19 01:37:12.787 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C1972A6FB08-90453EDE071: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.808 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-214A7B43323: 429
+2025-11-19 01:37:12.829 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-8EDB00A0068: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.849 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E289289EA9B-A1C2FD1F82B: 429
+2025-11-19 01:37:12.868 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025E903DB9FCEC-92C14387B7B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.887 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025DAC77126A72-F517703CA83: 429
+2025-11-19 01:37:12.907 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-FC5D1D32AA8-A337514E6DC: 429
+2025-11-19 01:37:12.926 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025F5CBFD2B717-9AFD32DFD6B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.946 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025102F1E136F9-4D5DCF364CB: 429
+2025-11-19 01:37:12.969 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CA5E313A095-32D4EF0B9EB: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.993 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025DAC77126A72-D6459A43FD4: 429
+2025-11-19 01:37:13.012 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-F505EC56462: 429
+2025-11-19 01:37:13.033 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251EBA8DD3EDC-9206555F0AD: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.054 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202564B3910BC5A-B6BF753E64C: 429
+2025-11-19 01:37:13.075 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-E493A1E5A9B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.096 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-D657BA51026: 429
+2025-11-19 01:37:13.118 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20258787FECFA4C-281C174D9B8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.140 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202500539B77CD5-5396FEEC796: 429
+2025-11-19 01:37:13.162 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E70D3A7B8EC-704311A3AB3: 429
+2025-11-19 01:37:13.185 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250FAAFEEB323-BA7C58F3A24: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.207 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025F9BBDC5CCD3-BF9E3E545D7: 429
+2025-11-19 01:37:13.231 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20255C44E30B4C6-C7CC94BD528: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.251 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C81ADA6FD7F-C501905D823: 429
+2025-11-19 01:37:13.274 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025DAC77126A72-8AA9102AB78: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.304 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025DA559A7F53C-E44F58446BC: 429
+2025-11-19 01:37:13.325 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-4B46F58D3FD: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.343 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202564B3910BC5A-8BCA15A1390: 429
+2025-11-19 01:37:13.364 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250FAAFEEB323-1C21BCD2264: 429
+2025-11-19 01:37:13.385 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20252FB1DF83503-856129B0031: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.407 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F2234AE0B89-73057120676: 429
+2025-11-19 01:37:13.427 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C81ADA6FD7F-E61533AC598: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.446 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CFA55553788-31E64380147: 429
+2025-11-19 01:37:13.468 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E70D3A7B8EC-E5B312D1A12: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.487 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202521C0EB313B7-9BE2FCF77F8: 429
+2025-11-19 01:37:13.508 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F7F24626480-70DD434E89E: 429
+2025-11-19 01:37:13.529 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025240EB63B400-14569FDDB6A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.549 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20258787FECFA4C-6D6CA012E50: 429
+2025-11-19 01:37:13.569 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-9131AAA3B6E: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.591 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259A9B3BEF5F0-56269E16136: 429
+2025-11-19 01:37:13.611 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-D394FDF0284: 429
+2025-11-19 01:37:13.632 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F596645A98F-EE631049AC8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.653 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20257CFD516359C-B5E8E3E2F07: 429
+2025-11-19 01:37:13.679 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202560CD3156710-2E758CB1B63: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.707 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-060F9910C11: 429
+2025-11-19 01:37:13.731 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-50215AAFA73: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.750 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20252954A5F4C8C-F838D7D4846: 429
+2025-11-19 01:37:13.771 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025240EB63B400-F851BD4F1CE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.790 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025C7A160B013C-FA6D49960F9: 429
+2025-11-19 01:37:13.809 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202527B217916D3-FB023D0BF1C: 429
+2025-11-19 01:37:13.809 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
+2025-11-19 01:37:13.811 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-19 01:37:13.836 [info] Found 0 matching markets across platforms
+2025-11-19 01:37:13.836 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-19 01:37:13.836 [info] 📊 Standard scanning - every 30 seconds
+2025-11-19 01:37:13.837 [info] [2025-11-19T01:37:13.836Z] Cron scan completed
 
-2025-11-19 00:12:09.747 [info] [2025-11-19T00:12:09.746Z] Cron scan starting...
-2025-11-19 00:12:09.750 [info] [2025-11-19T00:12:09.749Z] Scanning for arbitrage opportunities...
-2025-11-19 00:12:09.888 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
+2025-11-19 01:37:12.510 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025FFB019C00ED-82D2EA1424E: 429
+2025-11-19 01:37:12.532 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025555B1A98F60-CDD7253936F: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.554 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025072BDE98007-84550625A72: 429
+2025-11-19 01:37:12.578 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251448A469B95-24734236EEA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.608 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-3F583796681: 429
+2025-11-19 01:37:12.632 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-F16191C7636: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.654 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259E63D1CEA3F-C1FF7565341: 429
+2025-11-19 01:37:12.678 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-FC5D1D32AA8-7F83B57B630: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.699 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-0F9D9231A46: 429
+2025-11-19 01:37:12.722 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20254E1B956A2EE-BF56238816C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.745 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E289289EA9B-6FA6927EE2A: 429
+2025-11-19 01:37:12.766 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20257168BA23E8D-07321C0C811: 429
+2025-11-19 01:37:12.787 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C1972A6FB08-90453EDE071: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.808 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-214A7B43323: 429
+2025-11-19 01:37:12.829 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-8EDB00A0068: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.849 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E289289EA9B-A1C2FD1F82B: 429
+2025-11-19 01:37:12.868 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025E903DB9FCEC-92C14387B7B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.887 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025DAC77126A72-F517703CA83: 429
+2025-11-19 01:37:12.907 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-FC5D1D32AA8-A337514E6DC: 429
+2025-11-19 01:37:12.926 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025F5CBFD2B717-9AFD32DFD6B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.946 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025102F1E136F9-4D5DCF364CB: 429
+2025-11-19 01:37:12.969 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CA5E313A095-32D4EF0B9EB: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.993 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025DAC77126A72-D6459A43FD4: 429
+2025-11-19 01:37:13.012 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-F505EC56462: 429
+2025-11-19 01:37:13.033 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251EBA8DD3EDC-9206555F0AD: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.054 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202564B3910BC5A-B6BF753E64C: 429
+2025-11-19 01:37:13.075 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-E493A1E5A9B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.096 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-D657BA51026: 429
+2025-11-19 01:37:13.118 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20258787FECFA4C-281C174D9B8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.140 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202500539B77CD5-5396FEEC796: 429
+2025-11-19 01:37:13.162 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E70D3A7B8EC-704311A3AB3: 429
+2025-11-19 01:37:13.185 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250FAAFEEB323-BA7C58F3A24: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.207 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025F9BBDC5CCD3-BF9E3E545D7: 429
+2025-11-19 01:37:13.231 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20255C44E30B4C6-C7CC94BD528: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.251 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C81ADA6FD7F-C501905D823: 429
+2025-11-19 01:37:13.274 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025DAC77126A72-8AA9102AB78: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.304 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025DA559A7F53C-E44F58446BC: 429
+2025-11-19 01:37:13.325 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-4B46F58D3FD: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.343 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202564B3910BC5A-8BCA15A1390: 429
+2025-11-19 01:37:13.364 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250FAAFEEB323-1C21BCD2264: 429
+2025-11-19 01:37:13.385 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20252FB1DF83503-856129B0031: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.407 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F2234AE0B89-73057120676: 429
+2025-11-19 01:37:13.427 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C81ADA6FD7F-E61533AC598: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.446 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CFA55553788-31E64380147: 429
+2025-11-19 01:37:13.468 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025E70D3A7B8EC-E5B312D1A12: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.487 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202521C0EB313B7-9BE2FCF77F8: 429
+2025-11-19 01:37:13.508 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F7F24626480-70DD434E89E: 429
+2025-11-19 01:37:13.529 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025240EB63B400-14569FDDB6A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.549 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20258787FECFA4C-6D6CA012E50: 429
+2025-11-19 01:37:13.569 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-9131AAA3B6E: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.591 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259A9B3BEF5F0-56269E16136: 429
+2025-11-19 01:37:13.611 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-D394FDF0284: 429
+2025-11-19 01:37:13.632 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F596645A98F-EE631049AC8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.653 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20257CFD516359C-B5E8E3E2F07: 429
+2025-11-19 01:37:13.679 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202560CD3156710-2E758CB1B63: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.707 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251D8949C74FE-060F9910C11: 429
+2025-11-19 01:37:13.731 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-50215AAFA73: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.750 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20252954A5F4C8C-F838D7D4846: 429
+2025-11-19 01:37:13.771 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025240EB63B400-F851BD4F1CE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:13.790 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025C7A160B013C-FA6D49960F9: 429
+2025-11-19 01:37:13.809 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202527B217916D3-FB023D0BF1C: 429
+2025-11-19 01:37:13.809 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
+2025-11-19 01:37:13.811 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-19 01:37:13.836 [info] Found 0 matching markets across platforms
+2025-11-19 01:37:13.836 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-19 01:37:13.836 [info] 📊 Standard scanning - every 30 seconds
+2025-11-19 01:37:13.837 [info] [2025-11-19T01:37:13.836Z] Cron scan completed
+2025-11-19 01:37:10.758 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025BC7CE7B78EA-AB31B7493CB: 429
+2025-11-19 01:37:10.781 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C2970CB484B-BD1ED1AAB81: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.803 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-060D6E0639C: 429
+2025-11-19 01:37:10.829 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D1E457BD809-383EC168B7D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.854 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025512FCC2AB76-AF282939A0D: 429
+2025-11-19 01:37:10.878 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025532C6C7B4C1-4E0CC0CC951: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.901 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A2EB6C062BC-871D6C38ECF: 429
+2025-11-19 01:37:10.928 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-D59A8DA6E13: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.950 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C13697D8BC7-0A46CA73ED3: 429
+2025-11-19 01:37:10.976 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259C64F085613-6B07FEF8AA9: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.996 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20256C3F19512FF-32DEB8BA6D9: 429
+2025-11-19 01:37:11.021 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A2EB6C062BC-E969723D75A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.048 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-43FD7F26E8D-8416FAD3A91: 429
+2025-11-19 01:37:11.073 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-FF014E7BDD2: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.097 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D1E457BD809-0E2509D0BE3: 429
+2025-11-19 01:37:11.122 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-87E63C514CC: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.147 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A2EB6C062BC-8202A9D3216: 429
+2025-11-19 01:37:11.170 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025EBBF3F55B77-EC4AED0AB94: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.191 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-4114F6B3B50: 429
+2025-11-19 01:37:11.215 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025DB054CB88ED-34EB9AA2972: 429
+2025-11-19 01:37:11.239 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025E45180359DA-1A632550A2C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.261 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025B5BB1665961-8A9383993A7: 429
+2025-11-19 01:37:11.283 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A2659F95A66-3710B5888CE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.306 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A8D4DB6377B-D661924DD0D: 429
+2025-11-19 01:37:11.329 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A72677CB22A-2E78F9AA5DA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.351 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D7FFBE28BCE-1DCC3EA8FBF: 429
+2025-11-19 01:37:11.377 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20254E9760D3918-E5F4562894C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.403 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025471DF8A635B-A9AEAECB819: 429
+2025-11-19 01:37:11.424 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A8D4DB6377B-DAD93202B53: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.455 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025FFB019C00ED-18E72816026: 429
+2025-11-19 01:37:11.484 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025471DF8A635B-2607C6A4D50: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.508 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202538148F19AE5-65DD55DEDD7: 429
+2025-11-19 01:37:11.534 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250FA26A298A8-56FA4A7E885: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.558 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CD4ADD2024B-C615BE32D0B: 429
+2025-11-19 01:37:11.582 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202508EDFC09FE7-E2C2119F076: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.604 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20254D37EE4BF75-EA2E02C5047: 429
+2025-11-19 01:37:11.628 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CD4ADD2024B-93FE0A6B536: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.649 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D7FFBE28BCE-641C05E7F48: 429
+2025-11-19 01:37:11.680 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C43BF809444-38D29AFCAC3: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.705 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-FC5D1D32AA8-1E70EDEA6E9: 429
+2025-11-19 01:37:11.731 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-E33BCCD2C71: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.756 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025FB3C9B51DE7-A7A481DFDDE: 429
+2025-11-19 01:37:11.784 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C13697D8BC7-65185D0CDDA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.801 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256FC61E99ACC-BB8E8A8859C: 429
+2025-11-19 01:37:11.824 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025EC46464CC6C-0A3B0E4D624: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.846 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-BF70BBB96A5: 429
+2025-11-19 01:37:11.866 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025F317463A1BD-435D575F9B3: 429
+2025-11-19 01:37:11.887 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025CA4DA3BA509-3B497BB4648: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.906 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251A3A8ACED81-B3D30E11D1A: 429
+2025-11-19 01:37:11.929 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A8D4DB6377B-1C4E3AECC3B: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.950 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025CE44F811CAA-51592F62504: 429
+2025-11-19 01:37:11.974 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D19097E90E0-8537C5FBBB4: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:11.995 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A0309516BE0-517B8AEFC1D: 429
+2025-11-19 01:37:12.019 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C43BF809444-590754877E8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.041 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025056768BBD6B-D5C7DEDA30E: 429
+2025-11-19 01:37:12.064 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025EC46464CC6C-5422E1C31CB: 429
+2025-11-19 01:37:12.086 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025C43BF809444-CE227DF8139: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.109 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025BDEBEA45D26-490B91E6DF6: 429
+2025-11-19 01:37:12.131 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025ED66CE651A0-2F0C14B9550: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.154 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20255122607DE85-68B4355936F: 429
+2025-11-19 01:37:12.176 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025641B1AE36DC-192CD0AB978: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.196 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202579EE6433ED6-838C0B11D7D: 429
+2025-11-19 01:37:12.220 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A72677CB22A-D0D3794FFB5: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.238 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A72677CB22A-167F9FF0D46: 429
+2025-11-19 01:37:12.257 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202535AA6772F7E-0649E4E3631: 429
+2025-11-19 01:37:12.286 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-35178555C09: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.308 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256CC06BDEC91-699D0E73BDE: 429
+2025-11-19 01:37:12.330 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20253DFAC0D1263-3981C78AAF4: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.350 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025DDD9D938FE9-00F61157376: 429
+2025-11-19 01:37:12.373 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202545605FA239E-91FCC5650E3: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.393 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D6536558AD4-B6DD75222B1: 429
+2025-11-19 01:37:12.416 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D75294F9078-1251CF46A81: 429
+2025-11-19 01:37:12.440 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025B812053AE21-4023DF3B7F0: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:12.466 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025BDEBEA45D26-0D25A78E1D4: 429
+2025-11-19 01:37:12.490 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A7ADA459408-CDE2952084D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:07.721 [info] [2025-11-19T01:37:07.720Z] Cron scan starting...
+2025-11-19 01:37:07.732 [info] [2025-11-19T01:37:07.723Z] Scanning for arbitrage opportunities...
+2025-11-19 01:37:08.045 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-19 01:37:09.077 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025267EDCE8733-50A9A65E050: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.098 [error] Error fetching sx.bet markets: AxiosError: Request failed with status code 404
     at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
-    at IncomingMessage.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
-    at IncomingMessage.emit (node:events:531:35)
+    at BrotliDecompress.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
+    at BrotliDecompress.emit (node:events:519:28)
     at endReadableNT (node:internal/streams/readable:1698:12)
     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
     at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:32:2110)
-    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2912)
+    at async i.getOpenMarkets (/var/task/.next/server/pages/api/bot/cron.js:32:7047)
+    at async Promise.all (index 2)
+    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:3670)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
-    at async i (/var/task/.next/server/pages/api/bot/cron.js:32:12540)
+    at async i (/var/task/.next/server/pages/api/bot/cron.js:32:12852)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
-    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515)
-    at async r9.handleCatchallRenderRequest (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:38432) {
+    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
   code: 'ERR_BAD_REQUEST',
   config: {
     transitional: {
@@ -439,14 +783,12 @@
     headers: Object [AxiosHeaders] {
       Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
-      'KALSHI-ACCESS-KEY': '9901b2a2-76f3-4aae-a65e-e1ff254986fd',
-      'KALSHI-ACCESS-SIGNATURE': 'QVtmKEVPNwEtkhs62OBEP4dNpr7KRncKqcD6YyhRyuN1lUPjA69YHRLXvrszs7PeyfxNjMT3rD4wukzLk/DE8Z6qkmVj3TrkWsui5MCxWsjQi4nmiyPHtp8pHLGmc9UxCRD0C/9M3+Ge9DTNlDGeNYiWs7nBeDcDkMmjr4t3jNZCfrUArX6gRj7WwNrma9G/cabaa2Xhgp1g2QdBb1/BPKM8ZFpEujsX53jY3cXguU8stdvhH3ln4gI0kPLlZVrBvbyTitVVAAjWY/fzu/aYfBhTgcKL738DE+qrgr2+djmr02VMr/0s34DMLvEOW1J3yZMbBfzGcp0oz3nfLxdrTA==',
-      'KALSHI-ACCESS-TIMESTAMP': '1763511129821',
+      'X-Api-Key': 'c3df9063-8564-44f2-92b5-413b5b30ffa2',
       'User-Agent': 'axios/1.13.2',
       'Accept-Encoding': 'gzip, compress, deflate, br'
     },
     method: 'get',
-    url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+    url: 'https://api.sx.bet/fixtures',
     allowAbsoluteUrls: true,
     data: undefined
   },
@@ -483,16 +825,14 @@
     finished: true,
     _headerSent: true,
     _closed: true,
-    _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+    _header: 'GET /fixtures HTTP/1.1\r\n' +
       'Accept: application/json, text/plain, */*\r\n' +
       'Content-Type: application/json\r\n' +
-      'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
-      'KALSHI-ACCESS-SIGNATURE: QVtmKEVPNwEtkhs62OBEP4dNpr7KRncKqcD6YyhRyuN1lUPjA69YHRLXvrszs7PeyfxNjMT3rD4wukzLk/DE8Z6qkmVj3TrkWsui5MCxWsjQi4nmiyPHtp8pHLGmc9UxCRD0C/9M3+Ge9DTNlDGeNYiWs7nBeDcDkMmjr4t3jNZCfrUArX6gRj7WwNrma9G/cabaa2Xhgp1g2QdBb1/BPKM8ZFpEujsX53jY3cXguU8stdvhH3ln4gI0kPLlZVrBvbyTitVVAAjWY/fzu/aYfBhTgcKL738DE+qrgr2+djmr02VMr/0s34DMLvEOW1J3yZMbBfzGcp0oz3nfLxdrTA==\r\n' +
-      'KALSHI-ACCESS-TIMESTAMP: 1763511129821\r\n' +
+      'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
       'User-Agent: axios/1.13.2\r\n' +
       'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-      'x-vercel-id: iad1::4kcpx-1763511129119-c3f151bcbf94\r\n' +
-      'Host: api.elections.kalshi.com\r\n' +
+      'x-vercel-id: iad1::n4lck-1763516227133-6db299274d5b\r\n' +
+      'Host: api.sx.bet\r\n' +
       'Connection: keep-alive\r\n' +
       '\r\n',
     _keepAliveTimeout: 0,
@@ -505,7 +845,7 @@
       protocol: 'https:',
       options: [Object: null prototype],
       requests: [Object: null prototype] {},
-      sockets: [Object: null prototype] {},
+      sockets: [Object: null prototype],
       freeSockets: [Object: null prototype],
       keepAliveMsecs: 1000,
       keepAlive: true,
@@ -513,7 +853,7 @@
       maxFreeSockets: 256,
       scheduling: 'lifo',
       maxTotalSockets: Infinity,
-      totalSocketCount: 1,
+      totalSocketCount: 4,
       agentKeepAliveTimeoutBuffer: 1000,
       maxCachedSessions: 100,
       _sessionCache: [Object],
@@ -525,7 +865,7 @@
     maxHeaderSize: undefined,
     insecureHTTPParser: undefined,
     joinDuplicateHeaders: undefined,
-    path: '/trade-api/v2/portfolio/balance',
+    path: '/fixtures',
     _ended: true,
     res: IncomingMessage {
       _events: [Object],
@@ -543,19 +883,19 @@
       upgrade: false,
       url: '',
       method: null,
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
+      statusCode: 404,
+      statusMessage: 'Not Found',
       client: [TLSSocket],
-      _consuming: false,
+      _consuming: true,
       _dumped: false,
       req: [Circular *1],
       _eventsCount: 4,
-      responseUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      responseUrl: 'https://api.sx.bet/fixtures',
       redirects: [],
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false,
       [Symbol(kHeaders)]: [Object],
-      [Symbol(kHeadersCount)]: 22,
+      [Symbol(kHeadersCount)]: 38,
       [Symbol(kTrailers)]: null,
       [Symbol(kTrailersCount)]: 0
     },
@@ -564,8 +904,8 @@
     upgradeOrConnect: false,
     parser: null,
     maxHeadersCount: null,
-    reusedSocket: false,
-    host: 'api.elections.kalshi.com',
+    reusedSocket: true,
+    host: 'api.sx.bet',
     protocol: 'https:',
     _redirectable: Writable {
       _events: [Object],
@@ -581,7 +921,7 @@
       _eventsCount: 3,
       _onNativeResponse: [Function (anonymous)],
       _currentRequest: [Circular *1],
-      _currentUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      _currentUrl: 'https://api.sx.bet/fixtures',
       _timeout: null,
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false
@@ -601,7 +941,7 @@
       _controlReleased: true,
       secureConnecting: false,
       _SNICallback: null,
-      servername: 'api.elections.kalshi.com',
+      servername: 'api.sx.bet',
       alpnProtocol: false,
       authorized: true,
       authorizationError: null,
@@ -611,7 +951,7 @@
       connecting: false,
       _hadError: false,
       _parent: null,
-      _host: 'api.elections.kalshi.com',
+      _host: 'api.sx.bet',
       _closeAfterHandlingError: false,
       _readableState: [ReadableState],
       _writableState: [WritableState],
@@ -639,21 +979,21 @@
       [Symbol(timeout)]: Timeout {
         _idleTimeout: 5000,
         _idlePrev: [TimersList],
-        _idleNext: [TimersList],
-        _idleStart: 62992,
+        _idleNext: [Timeout],
+        _idleStart: 62462,
         _onTimeout: [Function: bound ],
         _timerArgs: undefined,
         _repeat: null,
         _destroyed: false,
         [Symbol(refed)]: false,
         [Symbol(kHasPrimitive)]: false,
-        [Symbol(asyncId)]: 2446,
-        [Symbol(triggerId)]: 2444,
+        [Symbol(asyncId)]: 3526,
+        [Symbol(triggerId)]: 3524,
         [Symbol(kAsyncContextFrame)]: undefined,
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
-        [Symbol(kResourceStore)]: [Object]
+        [Symbol(kResourceStore)]: {}
       },
       [Symbol(kBuffer)]: null,
       [Symbol(kBufferCb)]: null,
@@ -671,9 +1011,7 @@
     [Symbol(kOutHeaders)]: [Object: null prototype] {
       accept: [Array],
       'content-type': [Array],
-      'kalshi-access-key': [Array],
-      'kalshi-access-signature': [Array],
-      'kalshi-access-timestamp': [Array],
+      'x-api-key': [Array],
       'user-agent': [Array],
       'accept-encoding': [Array],
       'x-vercel-id': [Array],
@@ -685,20 +1023,27 @@
     [Symbol(kUniqueHeaders)]: null
   },
   response: {
-    status: 401,
-    statusText: 'Unauthorized',
+    status: 404,
+    statusText: 'Not Found',
     headers: Object [AxiosHeaders] {
+      date: 'Wed, 19 Nov 2025 01:37:09 GMT',
       'content-type': 'application/json; charset=utf-8',
-      'content-length': '155',
+      'transfer-encoding': 'chunked',
       connection: 'keep-alive',
-      date: 'Wed, 19 Nov 2025 00:12:09 GMT',
+      vary: 'Origin',
+      'access-control-allow-credentials': 'true',
+      'x-dns-prefetch-control': 'off',
+      'x-frame-options': 'SAMEORIGIN',
+      'strict-transport-security': 'max-age=15552000; includeSubDomains',
+      'x-download-options': 'noopen',
       'x-content-type-options': 'nosniff',
-      'content-security-policy': "default-src 'none';",
-      'strict-transport-security': 'max-age=31536000; includeSubDomains',
-      'x-cache': 'Error from cloudfront',
-      via: '1.1 4a9f56098c7d51e12b8d2ac77b6f1bcc.cloudfront.net (CloudFront)',
-      'x-amz-cf-pop': 'IAD12-P1',
-      'x-amz-cf-id': 'Yy5MGCOh6m8bsL3XL07ERDX-dJr5a9wQ3GKUx7q354T95e-hGpZvrw=='
+      'x-xss-protection': '1; mode=block',
+      'x-powered-by': 'Express',
+      etag: 'W/"47-WtYGojL0p/jQJHbNORnza+dRyYA"',
+      'cf-cache-status': 'DYNAMIC',
+      server: 'cloudflare',
+      'cf-ray': '9a0bfb0f9a98c99d-IAD',
+      'alt-svc': 'h3=":443"; ma=86400'
     },
     config: {
       transitional: [Object],
@@ -714,7 +1059,7 @@
       validateStatus: [Function: validateStatus],
       headers: [Object [AxiosHeaders]],
       method: 'get',
-      url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      url: 'https://api.sx.bet/fixtures',
       allowAbsoluteUrls: true,
       data: undefined
     },
@@ -743,16 +1088,14 @@
       finished: true,
       _headerSent: true,
       _closed: true,
-      _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+      _header: 'GET /fixtures HTTP/1.1\r\n' +
         'Accept: application/json, text/plain, */*\r\n' +
         'Content-Type: application/json\r\n' +
-        'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
-        'KALSHI-ACCESS-SIGNATURE: QVtmKEVPNwEtkhs62OBEP4dNpr7KRncKqcD6YyhRyuN1lUPjA69YHRLXvrszs7PeyfxNjMT3rD4wukzLk/DE8Z6qkmVj3TrkWsui5MCxWsjQi4nmiyPHtp8pHLGmc9UxCRD0C/9M3+Ge9DTNlDGeNYiWs7nBeDcDkMmjr4t3jNZCfrUArX6gRj7WwNrma9G/cabaa2Xhgp1g2QdBb1/BPKM8ZFpEujsX53jY3cXguU8stdvhH3ln4gI0kPLlZVrBvbyTitVVAAjWY/fzu/aYfBhTgcKL738DE+qrgr2+djmr02VMr/0s34DMLvEOW1J3yZMbBfzGcp0oz3nfLxdrTA==\r\n' +
-        'KALSHI-ACCESS-TIMESTAMP: 1763511129821\r\n' +
+        'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
         'User-Agent: axios/1.13.2\r\n' +
         'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-        'x-vercel-id: iad1::4kcpx-1763511129119-c3f151bcbf94\r\n' +
-        'Host: api.elections.kalshi.com\r\n' +
+        'x-vercel-id: iad1::n4lck-1763516227133-6db299274d5b\r\n' +
+        'Host: api.sx.bet\r\n' +
         'Connection: keep-alive\r\n' +
         '\r\n',
       _keepAliveTimeout: 0,
@@ -763,7 +1106,7 @@
       maxHeaderSize: undefined,
       insecureHTTPParser: undefined,
       joinDuplicateHeaders: undefined,
-      path: '/trade-api/v2/portfolio/balance',
+      path: '/fixtures',
       _ended: true,
       res: [IncomingMessage],
       aborted: false,
@@ -771,8 +1114,8 @@
       upgradeOrConnect: false,
       parser: null,
       maxHeadersCount: null,
-      reusedSocket: false,
-      host: 'api.elections.kalshi.com',
+      reusedSocket: true,
+      host: 'api.sx.bet',
       protocol: 'https:',
       _redirectable: [Writable],
       [Symbol(shapeMode)]: false,
@@ -789,8 +1132,74 @@
       [Symbol(kRejectNonStandardBodyWrites)]: false,
       [Symbol(kUniqueHeaders)]: null
     },
-    data: { error: [Object] }
+    data: {
+      message: 'Cannot GET /fixtures',
+      error: 'Not Found',
+      statusCode: 404
+    }
   },
-  status: 401
+  status: 404
 }
-2025-11-19 00:12:10.019 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-19 01:37:09.103 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A272D233014-B013B090643: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.128 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-5FE5DC6DF32: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.151 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202555C8862C35D-384EFF3FC8D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.177 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20255504D349CC8-CD464CF2241: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.201 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025FA712BDF045-DCDCFC50E39: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.225 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251178489E705-6D6086DB6BE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.254 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202514B8264AB8C-D9162F4F5DA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.283 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025422D76B49F8-32227AD2733: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.310 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025A6F2E3A3A86-3005A5AA785: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.336 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250BDD58500E8-CB4BCDDEB18: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.361 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025D7040633608-ECE45B9F069: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.384 [error] Error fetching orderbook for KXMVEMENTIONSSINGLE-5D65DB06527-A6681A86B74: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.409 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025E4C32B43BDE-CA7F1400478: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.433 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20259B0CB30DCDD-61E57E8FB8A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.456 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250BDD58500E8-E3C0F8F2029: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.480 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D3481B902D6-7F2DE18A198: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.504 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250D293784DE0-F24AF3A4B5D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.527 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250BDD58500E8-1F1E1BD7BCE: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.580 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256907C94DB9C-21F96479A02: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.603 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202525D76F5A820-8A261D4C1F8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.629 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20250D293784DE0-84F60D1072F: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.653 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025B18C1173A0F-989E9457A3D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.682 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025308B9BD7634-4C89C1A1DDF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.708 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S202534DD267A330-ABBF80E9675: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.734 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S202566CAAA58C6F-51DBE400BEF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.774 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202502E0E1753AA-B8025908D54: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.802 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-1C9F9FFA7BF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.829 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20256E5F19AF5F0-07183974E04: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.856 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025CB363D20B2F-52F05A957BF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.888 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202547216EF180B-F8FE7713DE7: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.909 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202543F16C55F07-5B943A41327: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.934 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025E4C32B43BDE-57CADC0C859: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.961 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025040F8B8D10B-33C18F60A3D: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:09.983 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025D162839651C-8CCFBE3C548: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.007 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202502385B9D087-0137137D47A: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.044 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20258EB479C524B-B079880459C: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.071 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S20254BEED92C65E-1A9638CD7F1: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.096 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025A731151B652-289738FF715: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.121 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251EBCA06ACD0-41190CE9FF8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.146 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20253D8E1068C6D-A06C0355113: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.172 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202548A1E17C9BD-A1899484C95: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.194 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259847CB0CA76-FD8F7B4FBA1: 429
+2025-11-19 01:37:10.224 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025A4BA9841C40-BCE48692537: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.247 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202598D52CCDB67-773981E9F7D: 429
+2025-11-19 01:37:10.276 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20250C0A42C192F-BAB380408C8: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.303 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025339B51FE002-4EFDEC0BFB6: 429
+2025-11-19 01:37:10.329 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S20256CC06BDEC91-BC92A9FEB43: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.351 [error] Error fetching orderbook for KXMVENFLSINGLEGAME-S2025F5482A7C1C5-F76AD8061C4: 429
+2025-11-19 01:37:10.389 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025BE876DD874C-0C9CA4D59BA: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.411 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20251A6CF7F9413-53D5FBDDE2F: 429
+2025-11-19 01:37:10.433 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025508A4DAF09D-1F108C142BC: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.459 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202522E4194437B-BEF4CC7ABD1: 429
+2025-11-19 01:37:10.484 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S202509C3DD43A28-056EA6C53C7: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.508 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S20253DFAC0D1263-D9CA1B10281: 429
+2025-11-19 01:37:10.544 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20256A6B5F189FE-117C533A717: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.569 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202540B4EF81BAB-B0B9F05A9DF: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.593 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20252F5FF907F7D-C3682C64D3B: 429
+2025-11-19 01:37:10.619 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-D2AEC13D271: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.642 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S2025339B51FE002-1D77C372360: 429
+2025-11-19 01:37:10.662 [error] Error fetching orderbook for KXMVENBASINGLEGAME-S202599E2485A6F1-5B2B8DB02BF: 429
+2025-11-19 01:37:10.687 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S2025958B4FD3D2D-3D8EE1CF049: Cannot read properties of null (reading 'length')
+2025-11-19 01:37:10.710 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20251793898E98D-36EAAE70386: 429
+2025-11-19 01:37:10.734 [error] Error fetching orderbook for KXMVESPORTSMULTIGAMEEXTENDED-S20259C64F085613-AC49BA7775B: Cannot read properties of null (reading 'length')

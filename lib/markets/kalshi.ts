@@ -254,12 +254,16 @@ export class KalshiAPI {
       const response = await axios.get(`${BASE_URL}/markets/${ticker}/orderbook`);
       const orderbook: KalshiOrderbook = response.data.orderbook;
 
-      const bestYesPrice = orderbook.yes.length > 0 ? orderbook.yes[0][0] : 0;
-      const bestNoPrice = orderbook.no.length > 0 ? orderbook.no[0][0] : 0;
+      // Handle null/missing orderbook data safely
+      const bestYesPrice = orderbook?.yes?.length > 0 ? orderbook.yes[0][0] : 0;
+      const bestNoPrice = orderbook?.no?.length > 0 ? orderbook.no[0][0] : 0;
 
       return { bestYesPrice, bestNoPrice };
     } catch (error: any) {
-      console.error(`Error fetching orderbook for ${ticker}:`, error.response?.status || error.message);
+      // Silently return 0 for 429 rate limits to avoid log spam
+      if (error.response?.status !== 429) {
+        console.error(`Error fetching orderbook for ${ticker}:`, error.response?.status || error.message);
+      }
       return { bestYesPrice: 0, bestNoPrice: 0 };
     }
   }
@@ -270,11 +274,49 @@ export class KalshiAPI {
       const headers = await this.generateAuthHeaders('GET', `${API_SIGNATURE_PREFIX}${path}`);
       
       const response = await axios.get(`${BASE_URL}${path}`, { headers });
-      return response.data.balance / 100; // Convert cents to dollars
+      return response.data.balance / 100; // Convert cents to dollars (available cash only)
     } catch (error: any) {
       // Never log full error - it contains API keys in headers
       console.error('Error fetching Kalshi balance:', error.response?.status || error.message);
       return 0;
+    }
+  }
+
+  async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
+    try {
+      // Get available cash
+      const cashBalance = await this.getBalance();
+      
+      // Get positions value
+      const positions = await this.getPositions();
+      let positionsValue = 0;
+      
+      for (const position of positions) {
+        // Calculate current value of positions
+        // Kalshi positions have: position_count, side ('yes' or 'no'), market info
+        if (position.position && position.market_ticker) {
+          try {
+            const orderbook = await this.getOrderbook(position.market_ticker);
+            const currentPrice = position.side === 'yes' ? orderbook.bestYesPrice : orderbook.bestNoPrice;
+            const positionCount = Math.abs(position.position);
+            
+            // Position value = count * current_price / 100
+            positionsValue += (positionCount * currentPrice) / 100;
+          } catch (err) {
+            // Skip positions we can't value
+            console.error(`Error valuing position ${position.market_ticker}:`, err);
+          }
+        }
+      }
+      
+      return {
+        totalValue: cashBalance + positionsValue,
+        availableCash: cashBalance,
+        positionsValue: positionsValue
+      };
+    } catch (error: any) {
+      console.error('Error fetching Kalshi total balance:', error.response?.status || error.message);
+      return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
   }
 
