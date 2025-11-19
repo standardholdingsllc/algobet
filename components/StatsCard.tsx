@@ -21,9 +21,9 @@ export default function StatsCard({
   trend,
   color = 'blue',
 }: StatsCardProps) {
-  // Debug logging for balance cards
+  // Debug logging for balance cards - UPDATED
   if (title.includes('Balance')) {
-    console.log(`StatsCard ${title}:`, { value, subtitle, hasSubtitle: !!subtitle });
+    console.log(`StatsCard ${title} [v2]:`, { value, subtitle, change, hasSubtitle: !!subtitle, hasChange: !!change });
   }
   
   const colorClasses = {
