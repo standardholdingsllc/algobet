@@ -159,14 +159,20 @@ export class KalshiAPI {
     }
     
     // Create signature - EXACT format required by Kalshi
+    // CRITICAL: Kalshi requires RSA-PSS signature, not PKCS#1 v1.5!
     const message = `${timestamp}${method.toUpperCase()}${path}${bodyString}`;
-    const signer = crypto.createSign('SHA256');
-    signer.update(message);
-    signer.end();
     
     let signature;
     try {
-      signature = signer.sign(this.privateKey, 'base64');
+      // Use RSA-PSS padding as required by Kalshi API
+      signature = crypto.sign('sha256', Buffer.from(message), {
+        key: this.privateKey,
+        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+        saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
+      });
+      
+      // Convert to base64
+      signature = signature.toString('base64');
     } catch (error: any) {
       console.error('Error signing Kalshi request:', error.message);
       // Log key debug info (safe)

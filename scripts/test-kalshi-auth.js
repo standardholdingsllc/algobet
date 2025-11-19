@@ -99,11 +99,14 @@ async function testAuthentication() {
   console.log('  Full Message:', message.substring(0, 50) + '...\n');
   
   try {
-    const signer = crypto.createSign('SHA256');
-    signer.update(message);
-    signer.end();
+    // CRITICAL: Kalshi requires RSA-PSS signature, not PKCS#1 v1.5!
+    const signatureBuffer = crypto.sign('sha256', Buffer.from(message), {
+      key: privateKey,
+      padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
+    });
     
-    const signature = signer.sign(privateKey, 'base64');
+    const signature = signatureBuffer.toString('base64');
     
     console.log('✅ Signature Generated:');
     console.log('  ', signature.substring(0, 60) + '...\n');
