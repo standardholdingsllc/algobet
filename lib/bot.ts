@@ -96,15 +96,22 @@ export class ArbitrageBotEngine {
     ]);
 
     // Check balance thresholds and send alerts
+    // Send emails without blocking (fire and forget to prevent timeouts)
     if (config.emailAlerts) {
       if (kalshiBalance < config.balanceThresholds.kalshi) {
-        await sendBalanceAlert('kalshi', kalshiBalance, config.balanceThresholds.kalshi);
+        sendBalanceAlert('kalshi', kalshiBalance, config.balanceThresholds.kalshi).catch(err => 
+          console.error('Email alert failed (non-blocking):', err.message)
+        );
       }
       if (polymarketBalance < config.balanceThresholds.polymarket) {
-        await sendBalanceAlert('polymarket', polymarketBalance, config.balanceThresholds.polymarket);
+        sendBalanceAlert('polymarket', polymarketBalance, config.balanceThresholds.polymarket).catch(err => 
+          console.error('Email alert failed (non-blocking):', err.message)
+        );
       }
       if (sxbetBalance < config.balanceThresholds.sxbet) {
-        await sendBalanceAlert('sxbet', sxbetBalance, config.balanceThresholds.sxbet);
+        sendBalanceAlert('sxbet', sxbetBalance, config.balanceThresholds.sxbet).catch(err => 
+          console.error('Email alert failed (non-blocking):', err.message)
+        );
       }
     }
 
