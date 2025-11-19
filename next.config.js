@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// Force rebuild to clear cache - Nov 19, 2025
 const nextConfig = {
   reactStrictMode: true,
   env: {
