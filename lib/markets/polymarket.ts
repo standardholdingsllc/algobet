@@ -103,36 +103,10 @@ export class PolymarketAPI {
   }
 
   async getBalance(): Promise<number> {
-    // Get available collateral balance from CLOB API
+    // For Polymarket, getBalance returns total value (cash + positions)
+    // Use getTotalBalance() to get detailed breakdown
     if (!this.walletAddress) {
       console.warn('Polymarket wallet address not configured; returning 0 balance');
-      return 0;
-    }
-
-    try {
-      // Try CLOB API for collateral balance first
-      const response = await axios.get(`${BASE_URL}/balance`, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        params: {
-          address: this.walletAddress,
-        },
-      });
-
-      // CLOB API returns available collateral
-      const balance = parseFloat(response.data.balance || response.data.collateral || '0');
-      return Number.isFinite(balance) ? balance : 0;
-    } catch (error: any) {
-      console.error('Error fetching Polymarket collateral balance:', error.response?.status || error.message);
-      // Fallback: return 0 if CLOB balance endpoint fails
-      return 0;
-    }
-  }
-
-  async getPositionsValue(): Promise<number> {
-    // Get total value of positions from Data API
-    if (!this.walletAddress) {
       return 0;
     }
 
@@ -143,20 +117,47 @@ export class PolymarketAPI {
         },
       });
 
-      // The /value endpoint returns the value of positions
+      // The /value endpoint returns total account value (cash + positions)
       const balanceEntry = Array.isArray(response.data)
         ? response.data.find((entry: any) => entry.user?.toLowerCase() === this.walletAddress.toLowerCase())
         : null;
 
       if (!balanceEntry) {
+        console.warn('Polymarket balance response did not include the requested wallet; defaulting to 0');
         return 0;
       }
 
       const value = parseFloat(balanceEntry.value);
       return Number.isFinite(value) ? value : 0;
     } catch (error) {
-      console.error('Error fetching Polymarket positions value:', error);
+      console.error('Error fetching Polymarket balance:', error);
       return 0;
+    }
+  }
+
+  async getAvailableBalance(): Promise<number> {
+    // Get available cash balance from CLOB API
+    if (!this.walletAddress) {
+      return 0;
+    }
+
+    try {
+      // CLOB API balance endpoint
+      const response = await axios.get(`${BASE_URL}/balance`, {
+        params: {
+          address: this.walletAddress,
+        },
+      });
+
+      console.log('[Polymarket] CLOB balance response:', response.data);
+
+      // Parse the balance from response
+      const balance = parseFloat(response.data.balance || response.data.collateral || response.data.available || '0');
+      return Number.isFinite(balance) ? balance : 0;
+    } catch (error: any) {
+      console.warn('[Polymarket] CLOB balance endpoint failed:', error.response?.status || error.message);
+      // Return null to indicate we couldn't get the cash balance
+      return -1; // Use -1 as a sentinel value
     }
   }
 
@@ -167,21 +168,75 @@ export class PolymarketAPI {
     }
 
     try {
-      // Get available collateral (cash) from CLOB API
-      const availableCash = await this.getBalance();
-      console.log(`[Polymarket] ✅ Available collateral (cash): $${availableCash.toFixed(2)}`);
+      // Get total account value (cash + positions) from /value endpoint
+      const totalValue = await this.getBalance();
+      console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
       
-      // Get positions value from Data API
-      const positionsValue = await this.getPositionsValue();
+      // Try to get available cash from CLOB API
+      const clobCash = await this.getAvailableBalance();
+      
+      if (clobCash >= 0) {
+        // CLOB API worked! Use it for cash balance
+        console.log(`[Polymarket] 💵 Available cash (from CLOB): $${clobCash.toFixed(2)}`);
+        const positionsValue = totalValue - clobCash;
+        console.log(`[Polymarket] 💰 Positions value (calculated): $${positionsValue.toFixed(2)}`);
+        
+        return {
+          totalValue: totalValue,
+          availableCash: clobCash,
+          positionsValue: Math.max(0, positionsValue)
+        };
+      }
+      
+      // CLOB API failed, fall back to calculating from positions
+      console.log('[Polymarket] ⚠️ CLOB API unavailable, calculating from positions...');
+      
+      // Get positions to calculate their value
+      const positions = await this.getPositions();
+      console.log(`[Polymarket] 📊 Found ${positions.length} positions`);
+      
+      // Log first position for debugging
+      if (positions.length > 0) {
+        console.log(`[Polymarket] 🔍 Sample position:`, JSON.stringify(positions[0], null, 2));
+      }
+      
+      let positionsValue = 0;
+      
+      for (const position of positions) {
+        // Try different field names for position value
+        const value = position.value || position.current_value || position.currentValue;
+        
+        if (value) {
+          const parsedValue = parseFloat(value);
+          if (Number.isFinite(parsedValue)) {
+            positionsValue += parsedValue;
+            console.log(`[Polymarket]   → Position value: $${parsedValue.toFixed(2)}`);
+          }
+        } else if (position.size && position.outcome_price) {
+          // Fallback: calculate from size and price
+          const calculatedValue = parseFloat(position.size) * parseFloat(position.outcome_price);
+          if (Number.isFinite(calculatedValue)) {
+            positionsValue += calculatedValue;
+            console.log(`[Polymarket]   → Calculated: ${position.size} @ $${position.outcome_price} = $${calculatedValue.toFixed(2)}`);
+          }
+        } else {
+          console.warn(`[Polymarket] ⚠️ Skipping position - missing value data:`, {
+            id: position.id,
+            market: position.market,
+            availableFields: Object.keys(position)
+          });
+        }
+      }
+      
       console.log(`[Polymarket] 💰 Positions value: $${positionsValue.toFixed(2)}`);
       
-      // Total value = cash + positions
-      const totalValue = availableCash + positionsValue;
-      console.log(`[Polymarket] 💵 Total account value: $${totalValue.toFixed(2)}`);
+      // Available cash = total value - positions value
+      const availableCash = totalValue - positionsValue;
+      console.log(`[Polymarket] 💵 Available cash (calculated): $${availableCash.toFixed(2)}`);
       
       return {
         totalValue: totalValue,
-        availableCash: availableCash,
+        availableCash: Math.max(0, availableCash), // Ensure non-negative
         positionsValue: positionsValue
       };
     } catch (error: any) {
