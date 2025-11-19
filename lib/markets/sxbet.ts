@@ -136,13 +136,21 @@ export class SXBetAPI {
         console.warn(`[sx.bet] Fixtures endpoint not available (${fixtureError.response?.status}), continuing without fixture data`);
       }
 
-      // Get best odds for each market
-      const ordersResponse = await axios.get(`${BASE_URL}/orders/book`, {
-        headers: this.getHeaders(),
-        params: {
-          baseToken: this.baseToken,
-        },
-      });
+      // Try to get best odds for each market (but make it optional)
+      let ordersResponse: any;
+      try {
+        ordersResponse = await axios.get(`${BASE_URL}/orders/book`, {
+          headers: this.getHeaders(),
+          params: {
+            baseToken: this.baseToken,
+          },
+        });
+        console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} orders from order book`);
+      } catch (ordersError: any) {
+        // Orders endpoint not available
+        console.warn(`[sx.bet] Orders/book endpoint not available (${ordersError.response?.status}), cannot fetch markets without order data`);
+        return [];
+      }
 
       const markets: Market[] = [];
       const maxDate = new Date();

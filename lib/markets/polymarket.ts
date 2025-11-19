@@ -79,8 +79,10 @@ export class PolymarketAPI {
         }
         
         const expiryDate = new Date(market.end_date_iso);
+        const now = new Date();
         
-        if (expiryDate > maxDate) {
+        // Skip if market has expired OR is too far in the future
+        if (expiryDate < now || expiryDate > maxDate) {
           skippedExpired++;
           continue;
         }
