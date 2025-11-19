@@ -1,50 +1,43 @@
-// Check if all required environment variables are set
+// Check if SX.bet environment variables are loaded
+console.log('🔧 SX.bet Environment Variable Check\n');
+console.log('─'.repeat(50));
 
-const required = [
-  'NEXTAUTH_SECRET',
-  'NEXTAUTH_URL',
-  'ADMIN_USERNAME',
-  'ADMIN_PASSWORD_HASH',
-  'KALSHI_API_KEY',
-  'KALSHI_PRIVATE_KEY',
-  'KALSHI_EMAIL',
-  'POLYMARKET_API_KEY',
-  'POLYMARKET_PRIVATE_KEY',
-  'POLYMARKET_WALLET_ADDRESS',
-  'GITHUB_TOKEN',
-  'GITHUB_OWNER',
-  'GITHUB_REPO',
-  'EMAIL_HOST',
-  'EMAIL_PORT',
-  'EMAIL_USER',
-  'EMAIL_PASS',
-  'ALERT_EMAIL',
+const envVars = [
+  'SBET_API_KEY',
+  'SBET_WALLET_ADDRESS',
+  'SBET_PRIVATE_KEY'
 ];
 
-console.log('🔍 Checking environment variables...\n');
+let allSet = true;
 
-const missing = [];
-const present = [];
+envVars.forEach(varName => {
+  const value = process.env[varName];
+  const isSet = !!value;
+  const status = isSet ? '✅' : '❌';
+  const displayValue = isSet ? `(length: ${value.length})` : 'Not set';
 
-for (const key of required) {
-  if (process.env[key]) {
-    present.push(key);
-    console.log(`✅ ${key}`);
-  } else {
-    missing.push(key);
-    console.log(`❌ ${key} - MISSING`);
+  console.log(`${status} ${varName}: ${displayValue}`);
+
+  if (!isSet) {
+    allSet = false;
   }
-}
+});
 
-console.log(`\n📊 Summary: ${present.length}/${required.length} variables set`);
+console.log('\n' + '─'.repeat(50));
 
-if (missing.length > 0) {
-  console.log('\n⚠️  Missing required environment variables:');
-  missing.forEach((key) => console.log(`   - ${key}`));
-  console.log('\nPlease add these to your .env file before running the application.');
-  process.exit(1);
+if (allSet) {
+  console.log('✅ All SX.bet environment variables are configured!');
+  console.log('\n📋 Next steps:');
+  console.log('   1. Run: node scripts/debug-sxbet.js');
+  console.log('   2. Check if API endpoints are accessible');
 } else {
-  console.log('\n✅ All required environment variables are set!');
-  process.exit(0);
+  console.log('❌ Some SX.bet environment variables are missing');
+  console.log('\n📋 Required environment variables:');
+  console.log('   SBET_API_KEY - Get from SX.bet Discord');
+  console.log('   SBET_WALLET_ADDRESS - Your SX Network wallet address');
+  console.log('   SBET_PRIVATE_KEY - Private key for signing transactions');
+  console.log('\n💡 Make sure these are set in your .env file or environment');
 }
 
+console.log('\n🎯 Current working directory:', process.cwd());
+console.log('📁 Script location:', __filename);

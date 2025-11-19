@@ -1,9 +1,29 @@
-// Debug SX.bet API endpoints
+// Debug SX.bet API endpoints and environment variables
 const axios = require('axios');
 
 const BASE_URL = 'https://api.sx.bet';
 const API_KEY = process.env.SBET_API_KEY;
+const WALLET_ADDRESS = process.env.SBET_WALLET_ADDRESS;
+const PRIVATE_KEY = process.env.SBET_PRIVATE_KEY;
 const BASE_TOKEN = '0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B';
+
+// Check environment variables
+console.log('🔧 Environment Variable Check:');
+console.log(`   SBET_API_KEY: ${API_KEY ? '✅ Set (length: ' + API_KEY.length + ')' : '❌ Not set'}`);
+console.log(`   SBET_WALLET_ADDRESS: ${WALLET_ADDRESS ? '✅ Set' : '❌ Not set'}`);
+console.log(`   SBET_PRIVATE_KEY: ${PRIVATE_KEY ? '✅ Set' : '❌ Not set'}`);
+console.log('');
+
+// If no API key, show instructions
+if (!API_KEY) {
+  console.log('❌ SBET_API_KEY is required for SX.bet API access');
+  console.log('📋 To get an API key:');
+  console.log('   1. Join SX.bet Discord: https://discord.gg/sxbet');
+  console.log('   2. Contact the team for an API key');
+  console.log('   3. Set SBET_API_KEY in your environment variables');
+  console.log('');
+  process.exit(1);
+}
 
 async function testEndpoint(name, url, params = {}, headers = {}) {
   console.log(`\n🔍 Testing ${name}...`);
