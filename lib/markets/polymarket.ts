@@ -103,6 +103,8 @@ export class PolymarketAPI {
   }
 
   async getBalance(): Promise<number> {
+    // For Polymarket, getBalance returns total value (cash + positions)
+    // Use getTotalBalance() to get detailed breakdown
     if (!this.walletAddress) {
       console.warn('Polymarket wallet address not configured; returning 0 balance');
       return 0;
@@ -130,6 +132,44 @@ export class PolymarketAPI {
     } catch (error) {
       console.error('Error fetching Polymarket balance:', error);
       return 0;
+    }
+  }
+
+  async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
+    if (!this.walletAddress) {
+      console.warn('Polymarket wallet address not configured');
+      return { totalValue: 0, availableCash: 0, positionsValue: 0 };
+    }
+
+    try {
+      // Get total value (includes positions)
+      const totalValue = await this.getBalance();
+      
+      // Get positions to calculate their value
+      const positions = await this.getPositions();
+      let positionsValue = 0;
+      
+      for (const position of positions) {
+        // Polymarket positions have current value already calculated
+        if (position.value) {
+          positionsValue += parseFloat(position.value);
+        } else if (position.size && position.outcome_price) {
+          // Fallback: calculate from size and price
+          positionsValue += parseFloat(position.size) * parseFloat(position.outcome_price);
+        }
+      }
+      
+      // Available cash = total value - positions value
+      const availableCash = totalValue - positionsValue;
+      
+      return {
+        totalValue: totalValue,
+        availableCash: Math.max(0, availableCash), // Ensure non-negative
+        positionsValue: positionsValue
+      };
+    } catch (error) {
+      console.error('Error fetching Polymarket total balance:', error);
+      return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
   }
 

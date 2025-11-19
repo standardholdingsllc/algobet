@@ -84,27 +84,33 @@ export class ArbitrageBotEngine {
     // Get configuration
     const config = await getConfig();
 
-    // Update balances
-    const kalshiBalance = await this.kalshi.getBalance();
-    const polymarketBalance = await this.polymarket.getBalance();
-    const sxbetBalance = await this.sxbet.getBalance();
+    // Get detailed balance information (total value, available cash, positions)
+    const kalshiBalances = await this.kalshi.getTotalBalance();
+    const polymarketBalances = await this.polymarket.getTotalBalance();
+    const sxbetBalance = await this.sxbet.getBalance(); // sx.bet doesn't have getTotalBalance yet
 
+    // Log balance breakdown for visibility
+    console.log(`💰 Kalshi: Total $${kalshiBalances.totalValue.toFixed(2)} (Cash: $${kalshiBalances.availableCash.toFixed(2)}, Positions: $${kalshiBalances.positionsValue.toFixed(2)})`);
+    console.log(`💰 Polymarket: Total $${polymarketBalances.totalValue.toFixed(2)} (Cash: $${polymarketBalances.availableCash.toFixed(2)}, Positions: $${polymarketBalances.positionsValue.toFixed(2)})`);
+    console.log(`💰 SX.bet: $${sxbetBalance.toFixed(2)}`);
+
+    // Store total values in balance records (for display)
     await updateBalances([
-      { platform: 'kalshi', balance: kalshiBalance, lastUpdated: new Date() },
-      { platform: 'polymarket', balance: polymarketBalance, lastUpdated: new Date() },
+      { platform: 'kalshi', balance: kalshiBalances.totalValue, lastUpdated: new Date() },
+      { platform: 'polymarket', balance: polymarketBalances.totalValue, lastUpdated: new Date() },
       { platform: 'sxbet', balance: sxbetBalance, lastUpdated: new Date() },
     ]);
 
-    // Check balance thresholds and send alerts
+    // Check balance thresholds and send alerts (use total value for alerts)
     // Send emails without blocking (fire and forget to prevent timeouts)
     if (config.emailAlerts) {
-      if (kalshiBalance < config.balanceThresholds.kalshi) {
-        sendBalanceAlert('kalshi', kalshiBalance, config.balanceThresholds.kalshi).catch(err => 
+      if (kalshiBalances.totalValue < config.balanceThresholds.kalshi) {
+        sendBalanceAlert('kalshi', kalshiBalances.totalValue, config.balanceThresholds.kalshi).catch(err => 
           console.error('Email alert failed (non-blocking):', err.message)
         );
       }
-      if (polymarketBalance < config.balanceThresholds.polymarket) {
-        sendBalanceAlert('polymarket', polymarketBalance, config.balanceThresholds.polymarket).catch(err => 
+      if (polymarketBalances.totalValue < config.balanceThresholds.polymarket) {
+        sendBalanceAlert('polymarket', polymarketBalances.totalValue, config.balanceThresholds.polymarket).catch(err => 
           console.error('Email alert failed (non-blocking):', err.message)
         );
       }
