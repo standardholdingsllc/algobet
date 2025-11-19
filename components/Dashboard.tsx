@@ -62,6 +62,13 @@ export default function Dashboard() {
   const polymarketCash = polymarketBalanceData?.availableCash ?? polymarketBalance;
   
   const sxbetBalance = sxbetBalanceData?.balance || 0;
+  
+  // Debug: Log balance data
+  console.log('Balance Data:', {
+    kalshi: { balance: kalshiBalance, cash: kalshiCash, data: kalshiBalanceData },
+    polymarket: { balance: polymarketBalance, cash: polymarketCash, data: polymarketBalanceData },
+    sxbet: { balance: sxbetBalance, data: sxbetBalanceData }
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
