@@ -286,11 +286,17 @@ export class KalshiAPI {
     try {
       // Get available cash
       const cashBalance = await this.getBalance();
-      console.log(`[Kalshi] Cash balance: $${cashBalance.toFixed(2)}`);
+      console.log(`[Kalshi] ✅ Cash balance: $${cashBalance.toFixed(2)}`);
       
       // Get positions value
       const positions = await this.getPositions();
-      console.log(`[Kalshi] Found ${positions.length} positions`);
+      console.log(`[Kalshi] 📊 Found ${positions.length} positions`);
+      
+      // Log first position for debugging
+      if (positions.length > 0) {
+        console.log(`[Kalshi] 🔍 Sample position:`, JSON.stringify(positions[0], null, 2));
+      }
+      
       let positionsValue = 0;
       
       for (const position of positions) {
@@ -299,24 +305,32 @@ export class KalshiAPI {
         // Handle potential property name variations
         const ticker = position.market_ticker || position.ticker;
         const count = position.position || position.count || position.quantity;
+        const side = position.side;
+        
+        console.log(`[Kalshi] Processing position: ticker=${ticker}, count=${count}, side=${side}`);
         
         if (count && ticker) {
           try {
             const orderbook = await this.getOrderbook(ticker);
-            const currentPrice = position.side === 'yes' ? orderbook.bestYesPrice : orderbook.bestNoPrice;
+            const currentPrice = side === 'yes' ? orderbook.bestYesPrice : orderbook.bestNoPrice;
             const positionCount = Math.abs(count);
             
             // Position value = count * current_price / 100
-            positionsValue += (positionCount * currentPrice) / 100;
-          } catch (err) {
+            const value = (positionCount * currentPrice) / 100;
+            positionsValue += value;
+            
+            console.log(`[Kalshi]   → ${ticker}: ${positionCount} contracts @ $${currentPrice/100} = $${value.toFixed(2)}`);
+          } catch (err: any) {
             // Skip positions we can't value
-            console.error(`Error valuing position ${ticker}:`, err);
+            console.error(`[Kalshi] ❌ Error valuing position ${ticker}:`, err.message);
           }
+        } else {
+          console.warn(`[Kalshi] ⚠️ Skipping position - missing data:`, { ticker, count, side });
         }
       }
       
-      console.log(`[Kalshi] Positions value: $${positionsValue.toFixed(2)}`);
-      console.log(`[Kalshi] Total value: $${(cashBalance + positionsValue).toFixed(2)}`);
+      console.log(`[Kalshi] 💰 Positions value: $${positionsValue.toFixed(2)}`);
+      console.log(`[Kalshi] 💵 Total value: $${(cashBalance + positionsValue).toFixed(2)}`);
       
       return {
         totalValue: cashBalance + positionsValue,
@@ -324,7 +338,7 @@ export class KalshiAPI {
         positionsValue: positionsValue
       };
     } catch (error: any) {
-      console.error('Error fetching Kalshi total balance:', error.response?.status || error.message);
+      console.error('[Kalshi] ❌ Error fetching total balance:', error.response?.status || error.message);
       return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
   }

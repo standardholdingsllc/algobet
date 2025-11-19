@@ -137,43 +137,55 @@ export class PolymarketAPI {
 
   async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
     if (!this.walletAddress) {
-      console.warn('Polymarket wallet address not configured');
+      console.warn('[Polymarket] ⚠️ Wallet address not configured');
       return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
 
     try {
       // Get total value (includes positions)
       const totalValue = await this.getBalance();
-      console.log(`[Polymarket] Total account value: $${totalValue.toFixed(2)}`);
+      console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
       
       // Get positions to calculate their value
       const positions = await this.getPositions();
-      console.log(`[Polymarket] Found ${positions.length} positions`);
+      console.log(`[Polymarket] 📊 Found ${positions.length} positions`);
+      
+      // Log first position for debugging
+      if (positions.length > 0) {
+        console.log(`[Polymarket] 🔍 Sample position:`, JSON.stringify(positions[0], null, 2));
+      }
+      
       let positionsValue = 0;
       
       for (const position of positions) {
         // Polymarket positions have current value already calculated
         if (position.value) {
-          positionsValue += parseFloat(position.value);
+          const value = parseFloat(position.value);
+          positionsValue += value;
+          console.log(`[Polymarket]   → Position value: $${value.toFixed(2)}`);
         } else if (position.size && position.outcome_price) {
           // Fallback: calculate from size and price
-          positionsValue += parseFloat(position.size) * parseFloat(position.outcome_price);
+          const value = parseFloat(position.size) * parseFloat(position.outcome_price);
+          positionsValue += value;
+          console.log(`[Polymarket]   → Calculated: ${position.size} @ $${position.outcome_price} = $${value.toFixed(2)}`);
+        } else {
+          console.warn(`[Polymarket] ⚠️ Skipping position - missing data:`, position);
         }
       }
       
-      console.log(`[Polymarket] Positions value: $${positionsValue.toFixed(2)}`);
+      console.log(`[Polymarket] 💰 Positions value: $${positionsValue.toFixed(2)}`);
       
       // Available cash = total value - positions value
       const availableCash = totalValue - positionsValue;
-      console.log(`[Polymarket] Available cash: $${availableCash.toFixed(2)}`);
+      console.log(`[Polymarket] 💵 Available cash: $${availableCash.toFixed(2)}`);
       
       return {
         totalValue: totalValue,
         availableCash: Math.max(0, availableCash), // Ensure non-negative
         positionsValue: positionsValue
       };
-    } catch (error) {
-      console.error('Error fetching Polymarket total balance:', error);
+    } catch (error: any) {
+      console.error('[Polymarket] ❌ Error fetching total balance:', error.message);
       return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
   }
