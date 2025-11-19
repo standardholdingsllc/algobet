@@ -145,11 +145,20 @@ export class KalshiAPI {
 
   private async generateAuthHeaders(method: string, path: string, body?: any): Promise<Record<string, string>> {
     const timestamp = Date.now().toString();
-    const bodyString = body ? JSON.stringify(body) : '';
     
-    // Create signature
-    // Note: For GET requests with no body, Kalshi requires the method to be uppercase
-    // and the path to start with the API version prefix (e.g. /trade-api/v2/portfolio/balance)
+    // CRITICAL: For GET/DELETE requests, body MUST be empty string, not undefined, null, or {}
+    // Kalshi signature format: ${timestamp}${METHOD}${path}${body}
+    // Any deviation (including "{}", "undefined", "null", or spaces) breaks authentication
+    let bodyString = '';
+    if (body !== undefined && body !== null) {
+      const serialized = JSON.stringify(body);
+      // Only use body if it's not an empty object
+      if (serialized !== '{}') {
+        bodyString = serialized;
+      }
+    }
+    
+    // Create signature - EXACT format required by Kalshi
     const message = `${timestamp}${method.toUpperCase()}${path}${bodyString}`;
     const signer = crypto.createSign('SHA256');
     signer.update(message);
@@ -171,12 +180,19 @@ export class KalshiAPI {
       throw error;
     }
 
-    return {
-      'Content-Type': 'application/json',
+    // Build headers - only include Content-Type for requests with body
+    const headers: Record<string, string> = {
       'KALSHI-ACCESS-KEY': this.apiKey,
       'KALSHI-ACCESS-SIGNATURE': signature,
       'KALSHI-ACCESS-TIMESTAMP': timestamp,
     };
+    
+    // Only add Content-Type if we have a body
+    if (bodyString) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
   }
 
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
@@ -222,8 +238,8 @@ export class KalshiAPI {
       }
 
       return markets;
-    } catch (error) {
-      console.error('Error fetching Kalshi markets:', error);
+    } catch (error: any) {
+      console.error('Error fetching Kalshi markets:', error.response?.status || error.message);
       return [];
     }
   }
@@ -237,8 +253,8 @@ export class KalshiAPI {
       const bestNoPrice = orderbook.no.length > 0 ? orderbook.no[0][0] : 0;
 
       return { bestYesPrice, bestNoPrice };
-    } catch (error) {
-      console.error(`Error fetching orderbook for ${ticker}:`, error);
+    } catch (error: any) {
+      console.error(`Error fetching orderbook for ${ticker}:`, error.response?.status || error.message);
       return { bestYesPrice: 0, bestNoPrice: 0 };
     }
   }
@@ -250,8 +266,9 @@ export class KalshiAPI {
       
       const response = await axios.get(`${BASE_URL}${path}`, { headers });
       return response.data.balance / 100; // Convert cents to dollars
-    } catch (error) {
-      console.error('Error fetching Kalshi balance:', error);
+    } catch (error: any) {
+      // Never log full error - it contains API keys in headers
+      console.error('Error fetching Kalshi balance:', error.response?.status || error.message);
       return 0;
     }
   }
@@ -287,7 +304,7 @@ export class KalshiAPI {
       
       return { success: false, error: 'Order not filled' };
     } catch (error: any) {
-      console.error('Error placing Kalshi bet:', error);
+      console.error('Error placing Kalshi bet:', error.response?.status || error.message);
       return { success: false, error: error.message };
     }
   }
@@ -299,8 +316,8 @@ export class KalshiAPI {
       
       await axios.delete(`${BASE_URL}${path}`, { headers });
       return true;
-    } catch (error) {
-      console.error('Error canceling Kalshi order:', error);
+    } catch (error: any) {
+      console.error('Error canceling Kalshi order:', error.response?.status || error.message);
       return false;
     }
   }
@@ -312,8 +329,8 @@ export class KalshiAPI {
       
       const response = await axios.get(`${BASE_URL}${path}`, { headers });
       return response.data.positions || [];
-    } catch (error) {
-      console.error('Error fetching Kalshi positions:', error);
+    } catch (error: any) {
+      console.error('Error fetching Kalshi positions:', error.response?.status || error.message);
       return [];
     }
   }

@@ -1,26 +1,796 @@
-2025-11-18 23:29:37.680 [info] [2025-11-18T23:29:37.679Z] Cron scan starting...
-2025-11-18 23:29:37.681 [info] [2025-11-18T23:29:37.680Z] Scanning for arbitrage opportunities...
-2025-11-18 23:29:37.935 [error] Error signing Kalshi request: error:1E08010C:DECODER routines::unsupported
-2025-11-18 23:29:37.935 [error] Key format debug: {
-  length: 1187,
-  hasHeaders: true,
-  headerType: '-----BEGIN PRIVATE KEY-----',
-  lines: 19
-}
-2025-11-18 23:29:37.936 [error] Error fetching Kalshi balance: Error: error:1E08010C:DECODER routines::unsupported
-    at Sign.sign (node:internal/crypto/sig:128:29)
-    at d.generateAuthHeaders (/var/task/.next/server/pages/api/bot/cron.js:32:692)
-    at d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:32:2065)
-    at g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2930)
+2025-11-19 00:10:32.745 [info] [2025-11-19T00:10:32.744Z] Cron scan starting...
+2025-11-19 00:10:32.747 [info] [2025-11-19T00:10:32.747Z] Scanning for arbitrage opportunities...
+2025-11-19 00:10:32.920 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
+    at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:32:2110)
+    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2912)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
     at async i (/var/task/.next/server/pages/api/bot/cron.js:32:12540)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
-    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
-  opensslErrorStack: [ 'error:1E08010C:DECODER routines::unsupported' ],
-  library: 'DECODER routines',
-  reason: 'unsupported',
-  code: 'ERR_OSSL_UNSUPPORTED'
+    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515)
+    at async r9.handleCatchallRenderRequest (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:38432) {
+  code: 'ERR_BAD_REQUEST',
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 0,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/json',
+      'KALSHI-ACCESS-KEY': '9901b2a2-76f3-4aae-a65e-e1ff254986fd',
+      'KALSHI-ACCESS-SIGNATURE': 'pSHhW0q+UiPss4jmv25YMbYjghscGfZ5SqQB8gtjY+MRRiKKrfDbcS8SgwyKV/n5S9bI2xD5aNNln+ZPXYEahgEZjuYVolAgtzs8QNantv4DK3jexd1YqV5rt+q4jSCy7Z3zYuZtoy7ukib0yGHiPkkVyXAqwzn9uekrI57HcJHhia+tZKSC3l9x61oqFTqFnE7wWaEwr9xj+2X7sibX6VRN8Phi2uP6BQ7JSf2D1WAqZlAZRbCbIW18EyncRuzImVowEy4VlMCvAW8mm8kvjHZYePAE7h22P/K0/96MxEAM80nhYgs+mK2jW3kiVS5Hw6o48f89x4gjB7Lv94ATSQ==',
+      'KALSHI-ACCESS-TIMESTAMP': '1763511032843',
+      'User-Agent': 'axios/1.13.2',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    method: 'get',
+    url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> ClientRequest {
+    _events: [Object: null prototype] {
+      error: [Array],
+      abort: [Function (anonymous)],
+      aborted: [Function (anonymous)],
+      connect: [Function (anonymous)],
+      socket: [Function (anonymous)],
+      timeout: [Function (anonymous)],
+      finish: [Function: requestOnFinish]
+    },
+    _eventsCount: 7,
+    _maxListeners: undefined,
+    outputData: [],
+    outputSize: 0,
+    writable: true,
+    destroyed: true,
+    _last: true,
+    chunkedEncoding: false,
+    shouldKeepAlive: true,
+    maxRequestsOnConnectionReached: false,
+    _defaultKeepAlive: true,
+    useChunkedEncodingByDefault: false,
+    sendDate: false,
+    _removedConnection: false,
+    _removedContLen: false,
+    _removedTE: false,
+    strictContentLength: false,
+    _contentLength: 0,
+    _hasBody: true,
+    _trailer: '',
+    finished: true,
+    _headerSent: true,
+    _closed: true,
+    _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+      'Accept: application/json, text/plain, */*\r\n' +
+      'Content-Type: application/json\r\n' +
+      'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
+      'KALSHI-ACCESS-SIGNATURE: pSHhW0q+UiPss4jmv25YMbYjghscGfZ5SqQB8gtjY+MRRiKKrfDbcS8SgwyKV/n5S9bI2xD5aNNln+ZPXYEahgEZjuYVolAgtzs8QNantv4DK3jexd1YqV5rt+q4jSCy7Z3zYuZtoy7ukib0yGHiPkkVyXAqwzn9uekrI57HcJHhia+tZKSC3l9x61oqFTqFnE7wWaEwr9xj+2X7sibX6VRN8Phi2uP6BQ7JSf2D1WAqZlAZRbCbIW18EyncRuzImVowEy4VlMCvAW8mm8kvjHZYePAE7h22P/K0/96MxEAM80nhYgs+mK2jW3kiVS5Hw6o48f89x4gjB7Lv94ATSQ==\r\n' +
+      'KALSHI-ACCESS-TIMESTAMP: 1763511032843\r\n' +
+      'User-Agent: axios/1.13.2\r\n' +
+      'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+      'x-vercel-id: iad1::csjvx-1763511032232-0a4e0cfff8a5\r\n' +
+      'Host: api.elections.kalshi.com\r\n' +
+      'Connection: keep-alive\r\n' +
+      '\r\n',
+    _keepAliveTimeout: 0,
+    _onPendingData: [Function: nop],
+    agent: Agent {
+      _events: [Object: null prototype],
+      _eventsCount: 2,
+      _maxListeners: undefined,
+      defaultPort: 443,
+      protocol: 'https:',
+      options: [Object: null prototype],
+      requests: [Object: null prototype] {},
+      sockets: [Object: null prototype] {},
+      freeSockets: [Object: null prototype],
+      keepAliveMsecs: 1000,
+      keepAlive: true,
+      maxSockets: Infinity,
+      maxFreeSockets: 256,
+      scheduling: 'lifo',
+      maxTotalSockets: Infinity,
+      totalSocketCount: 1,
+      agentKeepAliveTimeoutBuffer: 1000,
+      maxCachedSessions: 100,
+      _sessionCache: [Object],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false
+    },
+    socketPath: undefined,
+    method: 'GET',
+    maxHeaderSize: undefined,
+    insecureHTTPParser: undefined,
+    joinDuplicateHeaders: undefined,
+    path: '/trade-api/v2/portfolio/balance',
+    _ended: true,
+    res: IncomingMessage {
+      _events: [Object],
+      _readableState: [ReadableState],
+      _maxListeners: undefined,
+      socket: null,
+      httpVersionMajor: 1,
+      httpVersionMinor: 1,
+      httpVersion: '1.1',
+      complete: true,
+      rawHeaders: [Array],
+      rawTrailers: [],
+      joinDuplicateHeaders: undefined,
+      aborted: false,
+      upgrade: false,
+      url: '',
+      method: null,
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+      client: [TLSSocket],
+      _consuming: false,
+      _dumped: false,
+      req: [Circular *1],
+      _eventsCount: 4,
+      responseUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      redirects: [],
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kHeaders)]: [Object],
+      [Symbol(kHeadersCount)]: 22,
+      [Symbol(kTrailers)]: null,
+      [Symbol(kTrailersCount)]: 0
+    },
+    aborted: false,
+    timeoutCb: null,
+    upgradeOrConnect: false,
+    parser: null,
+    maxHeadersCount: null,
+    reusedSocket: false,
+    host: 'api.elections.kalshi.com',
+    protocol: 'https:',
+    _redirectable: Writable {
+      _events: [Object],
+      _writableState: [WritableState],
+      _maxListeners: undefined,
+      _options: [Object],
+      _ended: true,
+      _ending: true,
+      _redirectCount: 0,
+      _redirects: [],
+      _requestBodyLength: 0,
+      _requestBodyBuffers: [],
+      _eventsCount: 3,
+      _onNativeResponse: [Function (anonymous)],
+      _currentRequest: [Circular *1],
+      _currentUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      _timeout: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false
+    },
+    [Symbol(shapeMode)]: false,
+    [Symbol(kCapture)]: false,
+    [Symbol(kBytesWritten)]: 0,
+    [Symbol(kNeedDrain)]: false,
+    [Symbol(corked)]: 0,
+    [Symbol(kChunkedBuffer)]: [],
+    [Symbol(kChunkedLength)]: 0,
+    [Symbol(kSocket)]: TLSSocket {
+      _tlsOptions: [Object],
+      _secureEstablished: true,
+      _securePending: false,
+      _newSessionPending: false,
+      _controlReleased: true,
+      secureConnecting: false,
+      _SNICallback: null,
+      servername: 'api.elections.kalshi.com',
+      alpnProtocol: false,
+      authorized: true,
+      authorizationError: null,
+      encrypted: true,
+      _events: [Object: null prototype],
+      _eventsCount: 9,
+      connecting: false,
+      _hadError: false,
+      _parent: null,
+      _host: 'api.elections.kalshi.com',
+      _closeAfterHandlingError: false,
+      _readableState: [ReadableState],
+      _writableState: [WritableState],
+      allowHalfOpen: false,
+      _maxListeners: undefined,
+      _sockname: null,
+      _pendingData: null,
+      _pendingEncoding: '',
+      server: undefined,
+      _server: null,
+      ssl: [TLSWrap],
+      _requestCert: true,
+      _rejectUnauthorized: true,
+      timeout: 5000,
+      parser: null,
+      _httpMessage: null,
+      autoSelectFamilyAttemptedAddresses: [Array],
+      [Symbol(alpncallback)]: null,
+      [Symbol(res)]: [TLSWrap],
+      [Symbol(verified)]: true,
+      [Symbol(pendingSession)]: null,
+      [Symbol(async_id_symbol)]: -1,
+      [Symbol(kHandle)]: [TLSWrap],
+      [Symbol(lastWriteQueueSize)]: 0,
+      [Symbol(timeout)]: Timeout {
+        _idleTimeout: 5000,
+        _idlePrev: [TimersList],
+        _idleNext: [TimersList],
+        _idleStart: 43040,
+        _onTimeout: [Function: bound ],
+        _timerArgs: undefined,
+        _repeat: null,
+        _destroyed: false,
+        [Symbol(refed)]: false,
+        [Symbol(kHasPrimitive)]: false,
+        [Symbol(asyncId)]: 2446,
+        [Symbol(triggerId)]: 2444,
+        [Symbol(kAsyncContextFrame)]: undefined,
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object]
+      },
+      [Symbol(kBuffer)]: null,
+      [Symbol(kBufferCb)]: null,
+      [Symbol(kBufferGen)]: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kSetNoDelay)]: false,
+      [Symbol(kSetKeepAlive)]: true,
+      [Symbol(kSetKeepAliveInitialDelay)]: 1,
+      [Symbol(kBytesRead)]: 0,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(connect-options)]: [Object],
+      [Symbol(kPerfHooksNetConnectContext)]: [Object]
+    },
+    [Symbol(kOutHeaders)]: [Object: null prototype] {
+      accept: [Array],
+      'content-type': [Array],
+      'kalshi-access-key': [Array],
+      'kalshi-access-signature': [Array],
+      'kalshi-access-timestamp': [Array],
+      'user-agent': [Array],
+      'accept-encoding': [Array],
+      'x-vercel-id': [Array],
+      host: [Array]
+    },
+    [Symbol(errored)]: null,
+    [Symbol(kHighWaterMark)]: 65536,
+    [Symbol(kRejectNonStandardBodyWrites)]: false,
+    [Symbol(kUniqueHeaders)]: null
+  },
+  response: {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: Object [AxiosHeaders] {
+      'content-type': 'application/json; charset=utf-8',
+      'content-length': '155',
+      connection: 'keep-alive',
+      date: 'Wed, 19 Nov 2025 00:10:32 GMT',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none';",
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'x-cache': 'Error from cloudfront',
+      via: '1.1 7eeed291abf48890d3f36565208941a8.cloudfront.net (CloudFront)',
+      'x-amz-cf-pop': 'IAD12-P1',
+      'x-amz-cf-id': 'o7hzd7Yf_rvKJR8QEEt53_iGfYZ-pHiNK-kPAoi33iSDHUhYEmtw_Q=='
+    },
+    config: {
+      transitional: [Object],
+      adapter: [Array],
+      transformRequest: [Array],
+      transformResponse: [Array],
+      timeout: 0,
+      xsrfCookieName: 'XSRF-TOKEN',
+      xsrfHeaderName: 'X-XSRF-TOKEN',
+      maxContentLength: -1,
+      maxBodyLength: -1,
+      env: [Object],
+      validateStatus: [Function: validateStatus],
+      headers: [Object [AxiosHeaders]],
+      method: 'get',
+      url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      allowAbsoluteUrls: true,
+      data: undefined
+    },
+    request: <ref *1> ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: true,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: true,
+      _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'Content-Type: application/json\r\n' +
+        'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
+        'KALSHI-ACCESS-SIGNATURE: pSHhW0q+UiPss4jmv25YMbYjghscGfZ5SqQB8gtjY+MRRiKKrfDbcS8SgwyKV/n5S9bI2xD5aNNln+ZPXYEahgEZjuYVolAgtzs8QNantv4DK3jexd1YqV5rt+q4jSCy7Z3zYuZtoy7ukib0yGHiPkkVyXAqwzn9uekrI57HcJHhia+tZKSC3l9x61oqFTqFnE7wWaEwr9xj+2X7sibX6VRN8Phi2uP6BQ7JSf2D1WAqZlAZRbCbIW18EyncRuzImVowEy4VlMCvAW8mm8kvjHZYePAE7h22P/K0/96MxEAM80nhYgs+mK2jW3kiVS5Hw6o48f89x4gjB7Lv94ATSQ==\r\n' +
+        'KALSHI-ACCESS-TIMESTAMP: 1763511032843\r\n' +
+        'User-Agent: axios/1.13.2\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'x-vercel-id: iad1::csjvx-1763511032232-0a4e0cfff8a5\r\n' +
+        'Host: api.elections.kalshi.com\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      path: '/trade-api/v2/portfolio/balance',
+      _ended: true,
+      res: [IncomingMessage],
+      aborted: false,
+      timeoutCb: null,
+      upgradeOrConnect: false,
+      parser: null,
+      maxHeadersCount: null,
+      reusedSocket: false,
+      host: 'api.elections.kalshi.com',
+      protocol: 'https:',
+      _redirectable: [Writable],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(kNeedDrain)]: false,
+      [Symbol(corked)]: 0,
+      [Symbol(kChunkedBuffer)]: [],
+      [Symbol(kChunkedLength)]: 0,
+      [Symbol(kSocket)]: [TLSSocket],
+      [Symbol(kOutHeaders)]: [Object: null prototype],
+      [Symbol(errored)]: null,
+      [Symbol(kHighWaterMark)]: 65536,
+      [Symbol(kRejectNonStandardBodyWrites)]: false,
+      [Symbol(kUniqueHeaders)]: null
+    },
+    data: { error: [Object] }
+  },
+  status: 401
 }
-2025-11-18 23:29:38.081 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-19 00:10:33.084 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-19 00:11:03.811 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
+}
+
+2025-11-19 00:12:09.747 [info] [2025-11-19T00:12:09.746Z] Cron scan starting...
+2025-11-19 00:12:09.750 [info] [2025-11-19T00:12:09.749Z] Scanning for arbitrage opportunities...
+2025-11-19 00:12:09.888 [error] Error fetching Kalshi balance: AxiosError: Request failed with status code 401
+    at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async d.getBalance (/var/task/.next/server/pages/api/bot/cron.js:32:2110)
+    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:2912)
+    at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2751)
+    at async i (/var/task/.next/server/pages/api/bot/cron.js:32:12540)
+    at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
+    at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
+    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515)
+    at async r9.handleCatchallRenderRequest (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:38432) {
+  code: 'ERR_BAD_REQUEST',
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 0,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/json',
+      'KALSHI-ACCESS-KEY': '9901b2a2-76f3-4aae-a65e-e1ff254986fd',
+      'KALSHI-ACCESS-SIGNATURE': 'QVtmKEVPNwEtkhs62OBEP4dNpr7KRncKqcD6YyhRyuN1lUPjA69YHRLXvrszs7PeyfxNjMT3rD4wukzLk/DE8Z6qkmVj3TrkWsui5MCxWsjQi4nmiyPHtp8pHLGmc9UxCRD0C/9M3+Ge9DTNlDGeNYiWs7nBeDcDkMmjr4t3jNZCfrUArX6gRj7WwNrma9G/cabaa2Xhgp1g2QdBb1/BPKM8ZFpEujsX53jY3cXguU8stdvhH3ln4gI0kPLlZVrBvbyTitVVAAjWY/fzu/aYfBhTgcKL738DE+qrgr2+djmr02VMr/0s34DMLvEOW1J3yZMbBfzGcp0oz3nfLxdrTA==',
+      'KALSHI-ACCESS-TIMESTAMP': '1763511129821',
+      'User-Agent': 'axios/1.13.2',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    method: 'get',
+    url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> ClientRequest {
+    _events: [Object: null prototype] {
+      error: [Array],
+      abort: [Function (anonymous)],
+      aborted: [Function (anonymous)],
+      connect: [Function (anonymous)],
+      socket: [Function (anonymous)],
+      timeout: [Function (anonymous)],
+      finish: [Function: requestOnFinish]
+    },
+    _eventsCount: 7,
+    _maxListeners: undefined,
+    outputData: [],
+    outputSize: 0,
+    writable: true,
+    destroyed: true,
+    _last: true,
+    chunkedEncoding: false,
+    shouldKeepAlive: true,
+    maxRequestsOnConnectionReached: false,
+    _defaultKeepAlive: true,
+    useChunkedEncodingByDefault: false,
+    sendDate: false,
+    _removedConnection: false,
+    _removedContLen: false,
+    _removedTE: false,
+    strictContentLength: false,
+    _contentLength: 0,
+    _hasBody: true,
+    _trailer: '',
+    finished: true,
+    _headerSent: true,
+    _closed: true,
+    _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+      'Accept: application/json, text/plain, */*\r\n' +
+      'Content-Type: application/json\r\n' +
+      'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
+      'KALSHI-ACCESS-SIGNATURE: QVtmKEVPNwEtkhs62OBEP4dNpr7KRncKqcD6YyhRyuN1lUPjA69YHRLXvrszs7PeyfxNjMT3rD4wukzLk/DE8Z6qkmVj3TrkWsui5MCxWsjQi4nmiyPHtp8pHLGmc9UxCRD0C/9M3+Ge9DTNlDGeNYiWs7nBeDcDkMmjr4t3jNZCfrUArX6gRj7WwNrma9G/cabaa2Xhgp1g2QdBb1/BPKM8ZFpEujsX53jY3cXguU8stdvhH3ln4gI0kPLlZVrBvbyTitVVAAjWY/fzu/aYfBhTgcKL738DE+qrgr2+djmr02VMr/0s34DMLvEOW1J3yZMbBfzGcp0oz3nfLxdrTA==\r\n' +
+      'KALSHI-ACCESS-TIMESTAMP: 1763511129821\r\n' +
+      'User-Agent: axios/1.13.2\r\n' +
+      'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+      'x-vercel-id: iad1::4kcpx-1763511129119-c3f151bcbf94\r\n' +
+      'Host: api.elections.kalshi.com\r\n' +
+      'Connection: keep-alive\r\n' +
+      '\r\n',
+    _keepAliveTimeout: 0,
+    _onPendingData: [Function: nop],
+    agent: Agent {
+      _events: [Object: null prototype],
+      _eventsCount: 2,
+      _maxListeners: undefined,
+      defaultPort: 443,
+      protocol: 'https:',
+      options: [Object: null prototype],
+      requests: [Object: null prototype] {},
+      sockets: [Object: null prototype] {},
+      freeSockets: [Object: null prototype],
+      keepAliveMsecs: 1000,
+      keepAlive: true,
+      maxSockets: Infinity,
+      maxFreeSockets: 256,
+      scheduling: 'lifo',
+      maxTotalSockets: Infinity,
+      totalSocketCount: 1,
+      agentKeepAliveTimeoutBuffer: 1000,
+      maxCachedSessions: 100,
+      _sessionCache: [Object],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false
+    },
+    socketPath: undefined,
+    method: 'GET',
+    maxHeaderSize: undefined,
+    insecureHTTPParser: undefined,
+    joinDuplicateHeaders: undefined,
+    path: '/trade-api/v2/portfolio/balance',
+    _ended: true,
+    res: IncomingMessage {
+      _events: [Object],
+      _readableState: [ReadableState],
+      _maxListeners: undefined,
+      socket: null,
+      httpVersionMajor: 1,
+      httpVersionMinor: 1,
+      httpVersion: '1.1',
+      complete: true,
+      rawHeaders: [Array],
+      rawTrailers: [],
+      joinDuplicateHeaders: undefined,
+      aborted: false,
+      upgrade: false,
+      url: '',
+      method: null,
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+      client: [TLSSocket],
+      _consuming: false,
+      _dumped: false,
+      req: [Circular *1],
+      _eventsCount: 4,
+      responseUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      redirects: [],
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kHeaders)]: [Object],
+      [Symbol(kHeadersCount)]: 22,
+      [Symbol(kTrailers)]: null,
+      [Symbol(kTrailersCount)]: 0
+    },
+    aborted: false,
+    timeoutCb: null,
+    upgradeOrConnect: false,
+    parser: null,
+    maxHeadersCount: null,
+    reusedSocket: false,
+    host: 'api.elections.kalshi.com',
+    protocol: 'https:',
+    _redirectable: Writable {
+      _events: [Object],
+      _writableState: [WritableState],
+      _maxListeners: undefined,
+      _options: [Object],
+      _ended: true,
+      _ending: true,
+      _redirectCount: 0,
+      _redirects: [],
+      _requestBodyLength: 0,
+      _requestBodyBuffers: [],
+      _eventsCount: 3,
+      _onNativeResponse: [Function (anonymous)],
+      _currentRequest: [Circular *1],
+      _currentUrl: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      _timeout: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false
+    },
+    [Symbol(shapeMode)]: false,
+    [Symbol(kCapture)]: false,
+    [Symbol(kBytesWritten)]: 0,
+    [Symbol(kNeedDrain)]: false,
+    [Symbol(corked)]: 0,
+    [Symbol(kChunkedBuffer)]: [],
+    [Symbol(kChunkedLength)]: 0,
+    [Symbol(kSocket)]: TLSSocket {
+      _tlsOptions: [Object],
+      _secureEstablished: true,
+      _securePending: false,
+      _newSessionPending: false,
+      _controlReleased: true,
+      secureConnecting: false,
+      _SNICallback: null,
+      servername: 'api.elections.kalshi.com',
+      alpnProtocol: false,
+      authorized: true,
+      authorizationError: null,
+      encrypted: true,
+      _events: [Object: null prototype],
+      _eventsCount: 9,
+      connecting: false,
+      _hadError: false,
+      _parent: null,
+      _host: 'api.elections.kalshi.com',
+      _closeAfterHandlingError: false,
+      _readableState: [ReadableState],
+      _writableState: [WritableState],
+      allowHalfOpen: false,
+      _maxListeners: undefined,
+      _sockname: null,
+      _pendingData: null,
+      _pendingEncoding: '',
+      server: undefined,
+      _server: null,
+      ssl: [TLSWrap],
+      _requestCert: true,
+      _rejectUnauthorized: true,
+      timeout: 5000,
+      parser: null,
+      _httpMessage: null,
+      autoSelectFamilyAttemptedAddresses: [Array],
+      [Symbol(alpncallback)]: null,
+      [Symbol(res)]: [TLSWrap],
+      [Symbol(verified)]: true,
+      [Symbol(pendingSession)]: null,
+      [Symbol(async_id_symbol)]: -1,
+      [Symbol(kHandle)]: [TLSWrap],
+      [Symbol(lastWriteQueueSize)]: 0,
+      [Symbol(timeout)]: Timeout {
+        _idleTimeout: 5000,
+        _idlePrev: [TimersList],
+        _idleNext: [TimersList],
+        _idleStart: 62992,
+        _onTimeout: [Function: bound ],
+        _timerArgs: undefined,
+        _repeat: null,
+        _destroyed: false,
+        [Symbol(refed)]: false,
+        [Symbol(kHasPrimitive)]: false,
+        [Symbol(asyncId)]: 2446,
+        [Symbol(triggerId)]: 2444,
+        [Symbol(kAsyncContextFrame)]: undefined,
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object],
+        [Symbol(kResourceStore)]: [Object]
+      },
+      [Symbol(kBuffer)]: null,
+      [Symbol(kBufferCb)]: null,
+      [Symbol(kBufferGen)]: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kSetNoDelay)]: false,
+      [Symbol(kSetKeepAlive)]: true,
+      [Symbol(kSetKeepAliveInitialDelay)]: 1,
+      [Symbol(kBytesRead)]: 0,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(connect-options)]: [Object],
+      [Symbol(kPerfHooksNetConnectContext)]: [Object]
+    },
+    [Symbol(kOutHeaders)]: [Object: null prototype] {
+      accept: [Array],
+      'content-type': [Array],
+      'kalshi-access-key': [Array],
+      'kalshi-access-signature': [Array],
+      'kalshi-access-timestamp': [Array],
+      'user-agent': [Array],
+      'accept-encoding': [Array],
+      'x-vercel-id': [Array],
+      host: [Array]
+    },
+    [Symbol(errored)]: null,
+    [Symbol(kHighWaterMark)]: 65536,
+    [Symbol(kRejectNonStandardBodyWrites)]: false,
+    [Symbol(kUniqueHeaders)]: null
+  },
+  response: {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: Object [AxiosHeaders] {
+      'content-type': 'application/json; charset=utf-8',
+      'content-length': '155',
+      connection: 'keep-alive',
+      date: 'Wed, 19 Nov 2025 00:12:09 GMT',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none';",
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'x-cache': 'Error from cloudfront',
+      via: '1.1 4a9f56098c7d51e12b8d2ac77b6f1bcc.cloudfront.net (CloudFront)',
+      'x-amz-cf-pop': 'IAD12-P1',
+      'x-amz-cf-id': 'Yy5MGCOh6m8bsL3XL07ERDX-dJr5a9wQ3GKUx7q354T95e-hGpZvrw=='
+    },
+    config: {
+      transitional: [Object],
+      adapter: [Array],
+      transformRequest: [Array],
+      transformResponse: [Array],
+      timeout: 0,
+      xsrfCookieName: 'XSRF-TOKEN',
+      xsrfHeaderName: 'X-XSRF-TOKEN',
+      maxContentLength: -1,
+      maxBodyLength: -1,
+      env: [Object],
+      validateStatus: [Function: validateStatus],
+      headers: [Object [AxiosHeaders]],
+      method: 'get',
+      url: 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance',
+      allowAbsoluteUrls: true,
+      data: undefined
+    },
+    request: <ref *1> ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: true,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: true,
+      _header: 'GET /trade-api/v2/portfolio/balance HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'Content-Type: application/json\r\n' +
+        'KALSHI-ACCESS-KEY: 9901b2a2-76f3-4aae-a65e-e1ff254986fd\r\n' +
+        'KALSHI-ACCESS-SIGNATURE: QVtmKEVPNwEtkhs62OBEP4dNpr7KRncKqcD6YyhRyuN1lUPjA69YHRLXvrszs7PeyfxNjMT3rD4wukzLk/DE8Z6qkmVj3TrkWsui5MCxWsjQi4nmiyPHtp8pHLGmc9UxCRD0C/9M3+Ge9DTNlDGeNYiWs7nBeDcDkMmjr4t3jNZCfrUArX6gRj7WwNrma9G/cabaa2Xhgp1g2QdBb1/BPKM8ZFpEujsX53jY3cXguU8stdvhH3ln4gI0kPLlZVrBvbyTitVVAAjWY/fzu/aYfBhTgcKL738DE+qrgr2+djmr02VMr/0s34DMLvEOW1J3yZMbBfzGcp0oz3nfLxdrTA==\r\n' +
+        'KALSHI-ACCESS-TIMESTAMP: 1763511129821\r\n' +
+        'User-Agent: axios/1.13.2\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'x-vercel-id: iad1::4kcpx-1763511129119-c3f151bcbf94\r\n' +
+        'Host: api.elections.kalshi.com\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      path: '/trade-api/v2/portfolio/balance',
+      _ended: true,
+      res: [IncomingMessage],
+      aborted: false,
+      timeoutCb: null,
+      upgradeOrConnect: false,
+      parser: null,
+      maxHeadersCount: null,
+      reusedSocket: false,
+      host: 'api.elections.kalshi.com',
+      protocol: 'https:',
+      _redirectable: [Writable],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(kNeedDrain)]: false,
+      [Symbol(corked)]: 0,
+      [Symbol(kChunkedBuffer)]: [],
+      [Symbol(kChunkedLength)]: 0,
+      [Symbol(kSocket)]: [TLSSocket],
+      [Symbol(kOutHeaders)]: [Object: null prototype],
+      [Symbol(errored)]: null,
+      [Symbol(kHighWaterMark)]: 65536,
+      [Symbol(kRejectNonStandardBodyWrites)]: false,
+      [Symbol(kUniqueHeaders)]: null
+    },
+    data: { error: [Object] }
+  },
+  status: 401
+}
+2025-11-19 00:12:10.019 [warning] sx.bet balance check not implemented - requires Web3 integration
