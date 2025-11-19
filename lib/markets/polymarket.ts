@@ -103,8 +103,9 @@ export class PolymarketAPI {
   }
 
   async getBalance(): Promise<number> {
-    // For Polymarket, getBalance returns total value (cash + positions)
-    // Use getTotalBalance() to get detailed breakdown
+    // IMPORTANT: /value endpoint returns POSITIONS VALUE ONLY, not total account value
+    // This method is kept for backward compatibility but should not be used alone
+    // Use getTotalBalance() to get the full breakdown
     if (!this.walletAddress) {
       console.warn('Polymarket wallet address not configured; returning 0 balance');
       return 0;
@@ -117,7 +118,7 @@ export class PolymarketAPI {
         },
       });
 
-      // The /value endpoint returns total account value (cash + positions)
+      // The /value endpoint returns POSITIONS VALUE ONLY
       const balanceEntry = Array.isArray(response.data)
         ? response.data.find((entry: any) => entry.user?.toLowerCase() === this.walletAddress.toLowerCase())
         : null;
@@ -132,6 +133,49 @@ export class PolymarketAPI {
     } catch (error) {
       console.error('Error fetching Polymarket balance:', error);
       return 0;
+    }
+  }
+
+  async getWalletBalance(): Promise<number> {
+    // Query the Polygon blockchain to get actual USDC balance
+    // This requires querying the USDC contract on Polygon
+    if (!this.walletAddress) {
+      return 0;
+    }
+
+    try {
+      // Use Polygon RPC to check USDC balance
+      // USDC contract on Polygon: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
+      const POLYGON_RPC = 'https://polygon-rpc.com';
+      const USDC_CONTRACT = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+      
+      // ERC20 balanceOf function signature
+      const data = `0x70a08231000000000000000000000000${this.walletAddress.slice(2)}`;
+      
+      const response = await axios.post(POLYGON_RPC, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_call',
+        params: [
+          {
+            to: USDC_CONTRACT,
+            data: data,
+          },
+          'latest',
+        ],
+      });
+
+      if (response.data.result) {
+        // USDC has 6 decimals
+        const balance = parseInt(response.data.result, 16) / 1e6;
+        console.log(`[Polymarket] 💵 Wallet USDC balance: $${balance.toFixed(2)}`);
+        return balance;
+      }
+
+      return 0;
+    } catch (error: any) {
+      console.warn('[Polymarket] Failed to fetch wallet USDC balance:', error.message);
+      return -1; // Sentinel value indicating failure
     }
   }
 
@@ -168,34 +212,52 @@ export class PolymarketAPI {
     }
 
     try {
-      // Get total account value (cash + positions) from /value endpoint
-      const totalValue = await this.getBalance();
-      console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
+      // Step 1: Get positions value from /value endpoint
+      const positionsValueFromAPI = await this.getBalance();
+      console.log(`[Polymarket] 📊 Positions value (from /value): $${positionsValueFromAPI.toFixed(2)}`);
       
-      // Try to get available cash from CLOB API
+      // Step 2: Try to get wallet USDC balance from blockchain
+      const walletBalance = await this.getWalletBalance();
+      
+      if (walletBalance >= 0) {
+        // Successfully got wallet balance from blockchain
+        console.log(`[Polymarket] 💵 Wallet USDC balance: $${walletBalance.toFixed(2)}`);
+        
+        // Total = wallet balance + positions value
+        const totalValue = walletBalance + positionsValueFromAPI;
+        console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
+        
+        return {
+          totalValue: totalValue,
+          availableCash: walletBalance,
+          positionsValue: positionsValueFromAPI
+        };
+      }
+      
+      // Blockchain query failed, try CLOB API
+      console.log('[Polymarket] ⚠️ Blockchain query failed, trying CLOB API...');
       const clobCash = await this.getAvailableBalance();
       
       if (clobCash >= 0) {
-        // CLOB API worked! Use it for cash balance
+        // CLOB API worked!
         console.log(`[Polymarket] 💵 Available cash (from CLOB): $${clobCash.toFixed(2)}`);
-        const positionsValue = totalValue - clobCash;
-        console.log(`[Polymarket] 💰 Positions value (calculated): $${positionsValue.toFixed(2)}`);
+        const totalValue = clobCash + positionsValueFromAPI;
+        console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
         
         return {
           totalValue: totalValue,
           availableCash: clobCash,
-          positionsValue: Math.max(0, positionsValue)
+          positionsValue: positionsValueFromAPI
         };
       }
       
-      // CLOB API failed, fall back to calculating from positions
-      console.log('[Polymarket] ⚠️ CLOB API unavailable, calculating from positions...');
+      // Both blockchain and CLOB failed - fall back to position-based calculation
+      console.log('[Polymarket] ⚠️ All direct balance queries failed, using position data only...');
       
-      // Get positions to calculate their value
+      // Get detailed positions to verify the value
       const positions = await this.getPositions();
       console.log(`[Polymarket] 📊 Found ${positions.length} positions`);
       
-      // Log first position for debugging
       if (positions.length > 0) {
         console.log(`[Polymarket] 🔍 Sample position:`, JSON.stringify(positions[0], null, 2));
       }
@@ -204,7 +266,7 @@ export class PolymarketAPI {
       
       for (const position of positions) {
         // Try different field names for position value
-        const value = position.value || position.current_value || position.currentValue;
+        const value = position.currentValue || position.value || position.current_value;
         
         if (value) {
           const parsedValue = parseFloat(value);
@@ -212,31 +274,23 @@ export class PolymarketAPI {
             positionsValue += parsedValue;
             console.log(`[Polymarket]   → Position value: $${parsedValue.toFixed(2)}`);
           }
-        } else if (position.size && position.outcome_price) {
-          // Fallback: calculate from size and price
-          const calculatedValue = parseFloat(position.size) * parseFloat(position.outcome_price);
+        } else if (position.size && position.curPrice) {
+          // Fallback: calculate from size and current price
+          const calculatedValue = parseFloat(position.size) * parseFloat(position.curPrice);
           if (Number.isFinite(calculatedValue)) {
             positionsValue += calculatedValue;
-            console.log(`[Polymarket]   → Calculated: ${position.size} @ $${position.outcome_price} = $${calculatedValue.toFixed(2)}`);
+            console.log(`[Polymarket]   → Calculated: ${position.size} @ $${position.curPrice} = $${calculatedValue.toFixed(2)}`);
           }
-        } else {
-          console.warn(`[Polymarket] ⚠️ Skipping position - missing value data:`, {
-            id: position.id,
-            market: position.market,
-            availableFields: Object.keys(position)
-          });
         }
       }
       
-      console.log(`[Polymarket] 💰 Positions value: $${positionsValue.toFixed(2)}`);
+      console.log(`[Polymarket] 💰 Positions value (from positions): $${positionsValue.toFixed(2)}`);
+      console.log(`[Polymarket] ⚠️ Cannot determine cash balance - showing positions only`);
       
-      // Available cash = total value - positions value
-      const availableCash = totalValue - positionsValue;
-      console.log(`[Polymarket] 💵 Available cash (calculated): $${availableCash.toFixed(2)}`);
-      
+      // We can only report positions value, cash is unknown
       return {
-        totalValue: totalValue,
-        availableCash: Math.max(0, availableCash), // Ensure non-negative
+        totalValue: positionsValue,
+        availableCash: 0, // Unknown, defaulting to 0
         positionsValue: positionsValue
       };
     } catch (error: any) {
