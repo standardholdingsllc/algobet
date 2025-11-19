@@ -75,6 +75,9 @@ export class SXBetAPI {
    * Get authentication headers
    */
   private getHeaders(): Record<string, string> {
+    if (!this.apiKey) {
+      console.warn('[sx.bet] No API key configured - endpoints will fail');
+    }
     return {
       'Content-Type': 'application/json',
       'X-Api-Key': this.apiKey,
@@ -127,34 +130,24 @@ export class SXBetAPI {
       // Try to get fixtures for event details (but make it optional)
       let fixtures: SXBetFixture[] = [];
       let fixtureMap = new Map<string, SXBetFixture>();
-      
+
       try {
-        // Try fixtures endpoint without parameters first
+        // Try fixtures endpoint with active status (required parameter)
         const fixturesResponse = await axios.get(`${BASE_URL}/fixtures`, {
           headers: this.getHeaders(),
+          params: { status: 1 }, // Only active fixtures
         });
         fixtures = fixturesResponse.data.data || [];
         fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
         console.log(`[sx.bet] Retrieved ${fixtures.length} fixtures`);
       } catch (fixtureError: any) {
-        // If fixtures endpoint fails, try with active status filter
-        try {
-          const fixturesResponse = await axios.get(`${BASE_URL}/fixtures`, {
-            headers: this.getHeaders(),
-            params: { status: 1 }, // Active fixtures
-          });
-          fixtures = fixturesResponse.data.data || [];
-          fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
-          console.log(`[sx.bet] Retrieved ${fixtures.length} fixtures (with status filter)`);
-        } catch (retryError: any) {
-          // Fixtures endpoint not available - we'll work without it
-          console.warn(`[sx.bet] Fixtures endpoint not available (${fixtureError.response?.status}), continuing without fixture data`);
-        }
+        console.warn(`[sx.bet] Fixtures endpoint not available (${fixtureError.response?.status}), continuing without fixture data`);
       }
 
-      // Try to get best odds for each market (but make it optional)
+      // Try to get active orders (required for market data)
       let ordersResponse: any;
       try {
+        // First try best-odds endpoint
         ordersResponse = await axios.get(`${BASE_URL}/orders/best-odds`, {
           headers: this.getHeaders(),
           params: {
@@ -162,10 +155,22 @@ export class SXBetAPI {
           },
         });
         console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} orders from best-odds endpoint`);
-      } catch (ordersError: any) {
-        // Orders endpoint not available
-        console.warn(`[sx.bet] Best-odds endpoint not available (${ordersError.response?.status}), cannot fetch markets without order data`);
-        return [];
+      } catch (bestOddsError: any) {
+        console.warn(`[sx.bet] Best-odds endpoint failed (${bestOddsError.response?.status}), trying active orders...`);
+
+        try {
+          // Fallback to active orders endpoint
+          ordersResponse = await axios.get(`${BASE_URL}/orders/active`, {
+            headers: this.getHeaders(),
+            params: {
+              baseToken: this.baseToken,
+            },
+          });
+          console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} orders from active orders endpoint`);
+        } catch (activeOrdersError: any) {
+          console.warn(`[sx.bet] Active orders endpoint also failed (${activeOrdersError.response?.status}), cannot fetch markets without order data`);
+          return [];
+        }
       }
 
       const markets: Market[] = [];
@@ -346,13 +351,26 @@ export class SXBetAPI {
    */
   async getOrdersForMarket(marketHash: string, side: 'yes' | 'no'): Promise<SXBetOrder[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/orders/best-odds`, {
-        headers: this.getHeaders(),
-        params: {
-          baseToken: this.baseToken,
-          marketHashes: marketHash,
-        },
-      });
+      let response;
+      try {
+        // Try best-odds first
+        response = await axios.get(`${BASE_URL}/orders/best-odds`, {
+          headers: this.getHeaders(),
+          params: {
+            baseToken: this.baseToken,
+            marketHashes: marketHash,
+          },
+        });
+      } catch (bestOddsError) {
+        // Fallback to active orders
+        response = await axios.get(`${BASE_URL}/orders/active`, {
+          headers: this.getHeaders(),
+          params: {
+            baseToken: this.baseToken,
+            marketHash: marketHash,
+          },
+        });
+      }
 
       const allOrders: SXBetOrder[] = response.data.data || [];
 

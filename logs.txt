@@ -1,426 +1,59 @@
-2025-11-19 22:38:20.481 [info] [2025-11-19T22:38:20.480Z] Cron scan starting...
-2025-11-19 22:38:20.483 [info] [2025-11-19T22:38:20.482Z] Scanning for arbitrage opportunities...
-2025-11-19 22:38:20.624 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-19 22:38:20.624 [info] [Kalshi] 💼 Portfolio value: $27.97
-2025-11-19 22:38:20.624 [info] [Kalshi] 💰 Positions value: $27.14
-2025-11-19 22:38:20.624 [info] [Kalshi] 💵 Total value: $27.97
-2025-11-19 22:38:20.756 [info] [Polymarket] 📊 Positions value (from /value): $21.06
-2025-11-19 22:38:20.893 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-19 22:38:20.893 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-19 22:38:20.894 [info] [Polymarket] ✅ Total account value: $31.06
-2025-11-19 22:38:20.894 [warning] sx.bet balance check not implemented - requires Web3 integration
-2025-11-19 22:38:20.894 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
-2025-11-19 22:38:20.894 [info] 💰 Polymarket: Total $31.06 (Cash: $10.01, Positions: $21.06)
-2025-11-19 22:38:20.894 [info] 💰 SX.bet: $0.00
-2025-11-19 22:38:21.026 [info] [Polymarket] Fetching markets from Gamma API...
-2025-11-19 22:38:21.427 [warning] [sx.bet] Fixtures endpoint not available (404), continuing without fixture data
-2025-11-19 22:38:21.460 [info] [Polymarket] API Response: 200 markets received
-2025-11-19 22:38:21.460 [info] [Polymarket] Sample market structure: {
+2025-11-19 22:57:08.228 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
+}
+2025-11-19 22:57:08.228 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
+}
+2025-11-19 22:57:08.228 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
+}
+2025-11-19 22:57:08.253 [info] [2025-11-19T22:57:08.252Z] Cron scan starting...
+2025-11-19 22:57:08.253 [info] [2025-11-19T22:57:08.253Z] Scanning for arbitrage opportunities...
+2025-11-19 22:57:08.377 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-19 22:57:08.377 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-19 22:57:08.377 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-19 22:57:08.377 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-19 22:57:08.509 [info] [Polymarket] 📊 Positions value (from /value): $21.06
+2025-11-19 22:57:08.609 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 22:57:08.609 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 22:57:08.609 [info] [Polymarket] ✅ Total account value: $31.06
+2025-11-19 22:57:08.609 [warning] sx.bet balance check requires SBET_WALLET_ADDRESS env var
+2025-11-19 22:57:08.609 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-19 22:57:08.609 [info] 💰 Polymarket: Total $31.06 (Cash: $10.01, Positions: $21.06)
+2025-11-19 22:57:08.609 [info] 💰 SX.bet: $0.00
+2025-11-19 22:57:08.621 [info] [Polymarket] Fetching markets from Gamma API...
+2025-11-19 22:57:08.803 [warning] [sx.bet] Fixtures endpoint not available (404), continuing without fixture data
+2025-11-19 22:57:08.841 [warning] [sx.bet] Best-odds endpoint not available (404), cannot fetch markets without order data
+2025-11-19 22:57:09.023 [info] [Polymarket] API Response: 200 markets received
+2025-11-19 22:57:09.023 [info] [Polymarket] Sample market structure: {
   "question": "ARCH Will the match be a draw?"
 }
-2025-11-19 22:38:21.460 [info] [Polymarket] Processed 200 markets:
-2025-11-19 22:38:21.460 [info] - Added: 0
-2025-11-19 22:38:21.460 [info] - Skipped (expired/future): 200
-2025-11-19 22:38:21.460 [info] - Skipped (non-binary): 0
-2025-11-19 22:38:21.460 [info] - Skipped (missing tokens): 0
-2025-11-19 22:38:21.470 [error] Error fetching sx.bet markets: AxiosError: Request failed with status code 404
-    at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
-    at BrotliDecompress.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
-    at BrotliDecompress.emit (node:events:519:28)
-    at endReadableNT (node:internal/streams/readable:1698:12)
-    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
-    at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async i.getOpenMarkets (/var/task/.next/server/chunks/865.js:5:12654)
-    at async Promise.all (index 2)
-    at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:4256)
-    at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2756)
-    at async n (/var/task/.next/server/pages/api/bot/cron.js:28:8064)
-    at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
-    at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
-    at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
-  code: 'ERR_BAD_REQUEST',
-  config: {
-    transitional: {
-      silentJSONParsing: true,
-      forcedJSONParsing: true,
-      clarifyTimeoutError: false
-    },
-    adapter: [ 'xhr', 'http', 'fetch' ],
-    transformRequest: [ [Function: transformRequest] ],
-    transformResponse: [ [Function: transformResponse] ],
-    timeout: 0,
-    xsrfCookieName: 'XSRF-TOKEN',
-    xsrfHeaderName: 'X-XSRF-TOKEN',
-    maxContentLength: -1,
-    maxBodyLength: -1,
-    env: { FormData: [Function], Blob: [class Blob] },
-    validateStatus: [Function: validateStatus],
-    headers: Object [AxiosHeaders] {
-      Accept: 'application/json, text/plain, */*',
-      'Content-Type': 'application/json',
-      'X-Api-Key': 'c3df9063-8564-44f2-92b5-413b5b30ffa2',
-      'User-Agent': 'axios/1.13.2',
-      'Accept-Encoding': 'gzip, compress, deflate, br'
-    },
-    params: { baseToken: '0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B' },
-    method: 'get',
-    url: 'https://api.sx.bet/orders/book',
-    allowAbsoluteUrls: true,
-    data: undefined
-  },
-  request: <ref *1> ClientRequest {
-    _events: [Object: null prototype] {
-      error: [Array],
-      abort: [Function (anonymous)],
-      aborted: [Function (anonymous)],
-      connect: [Function (anonymous)],
-      socket: [Function (anonymous)],
-      timeout: [Function (anonymous)],
-      finish: [Function: requestOnFinish]
-    },
-    _eventsCount: 7,
-    _maxListeners: undefined,
-    outputData: [],
-    outputSize: 0,
-    writable: true,
-    destroyed: true,
-    _last: true,
-    chunkedEncoding: false,
-    shouldKeepAlive: true,
-    maxRequestsOnConnectionReached: false,
-    _defaultKeepAlive: true,
-    useChunkedEncodingByDefault: false,
-    sendDate: false,
-    _removedConnection: false,
-    _removedContLen: false,
-    _removedTE: false,
-    strictContentLength: false,
-    _contentLength: 0,
-    _hasBody: true,
-    _trailer: '',
-    finished: true,
-    _headerSent: true,
-    _closed: true,
-    _header: 'GET /orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B HTTP/1.1\r\n' +
-      'Accept: application/json, text/plain, */*\r\n' +
-      'Content-Type: application/json\r\n' +
-      'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
-      'User-Agent: axios/1.13.2\r\n' +
-      'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-      'x-vercel-id: iad1::rfk8l-1763591899996-472816acbed6\r\n' +
-      'Host: api.sx.bet\r\n' +
-      'Connection: keep-alive\r\n' +
-      '\r\n',
-    _keepAliveTimeout: 0,
-    _onPendingData: [Function: nop],
-    agent: Agent {
-      _events: [Object: null prototype],
-      _eventsCount: 2,
-      _maxListeners: undefined,
-      defaultPort: 443,
-      protocol: 'https:',
-      options: [Object: null prototype],
-      requests: [Object: null prototype] {},
-      sockets: [Object: null prototype] {},
-      freeSockets: [Object: null prototype],
-      keepAliveMsecs: 1000,
-      keepAlive: true,
-      maxSockets: Infinity,
-      maxFreeSockets: 256,
-      scheduling: 'lifo',
-      maxTotalSockets: Infinity,
-      totalSocketCount: 5,
-      agentKeepAliveTimeoutBuffer: 1000,
-      maxCachedSessions: 100,
-      _sessionCache: [Object],
-      [Symbol(shapeMode)]: false,
-      [Symbol(kCapture)]: false
-    },
-    socketPath: undefined,
-    method: 'GET',
-    maxHeaderSize: undefined,
-    insecureHTTPParser: undefined,
-    joinDuplicateHeaders: undefined,
-    path: '/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
-    _ended: true,
-    res: IncomingMessage {
-      _events: [Object],
-      _readableState: [ReadableState],
-      _maxListeners: undefined,
-      socket: null,
-      httpVersionMajor: 1,
-      httpVersionMinor: 1,
-      httpVersion: '1.1',
-      complete: true,
-      rawHeaders: [Array],
-      rawTrailers: [],
-      joinDuplicateHeaders: undefined,
-      aborted: false,
-      upgrade: false,
-      url: '',
-      method: null,
-      statusCode: 404,
-      statusMessage: 'Not Found',
-      client: [TLSSocket],
-      _consuming: true,
-      _dumped: false,
-      req: [Circular *1],
-      _eventsCount: 4,
-      responseUrl: 'https://api.sx.bet/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
-      redirects: [],
-      [Symbol(shapeMode)]: true,
-      [Symbol(kCapture)]: false,
-      [Symbol(kHeaders)]: [Object],
-      [Symbol(kHeadersCount)]: 38,
-      [Symbol(kTrailers)]: null,
-      [Symbol(kTrailersCount)]: 0
-    },
-    aborted: false,
-    timeoutCb: null,
-    upgradeOrConnect: false,
-    parser: null,
-    maxHeadersCount: null,
-    reusedSocket: true,
-    host: 'api.sx.bet',
-    protocol: 'https:',
-    _redirectable: Writable {
-      _events: [Object],
-      _writableState: [WritableState],
-      _maxListeners: undefined,
-      _options: [Object],
-      _ended: true,
-      _ending: true,
-      _redirectCount: 0,
-      _redirects: [],
-      _requestBodyLength: 0,
-      _requestBodyBuffers: [],
-      _eventsCount: 3,
-      _onNativeResponse: [Function (anonymous)],
-      _currentRequest: [Circular *1],
-      _currentUrl: 'https://api.sx.bet/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
-      _timeout: null,
-      [Symbol(shapeMode)]: true,
-      [Symbol(kCapture)]: false
-    },
-    [Symbol(shapeMode)]: false,
-    [Symbol(kCapture)]: false,
-    [Symbol(kBytesWritten)]: 0,
-    [Symbol(kNeedDrain)]: false,
-    [Symbol(corked)]: 0,
-    [Symbol(kChunkedBuffer)]: [],
-    [Symbol(kChunkedLength)]: 0,
-    [Symbol(kSocket)]: TLSSocket {
-      _tlsOptions: [Object],
-      _secureEstablished: true,
-      _securePending: false,
-      _newSessionPending: false,
-      _controlReleased: true,
-      secureConnecting: false,
-      _SNICallback: null,
-      servername: 'api.sx.bet',
-      alpnProtocol: false,
-      authorized: true,
-      authorizationError: null,
-      encrypted: true,
-      _events: [Object: null prototype],
-      _eventsCount: 9,
-      connecting: false,
-      _hadError: false,
-      _parent: null,
-      _host: 'api.sx.bet',
-      _closeAfterHandlingError: false,
-      _readableState: [ReadableState],
-      _writableState: [WritableState],
-      allowHalfOpen: false,
-      _maxListeners: undefined,
-      _sockname: null,
-      _pendingData: null,
-      _pendingEncoding: '',
-      server: undefined,
-      _server: null,
-      ssl: [TLSWrap],
-      _requestCert: true,
-      _rejectUnauthorized: true,
-      timeout: 5000,
-      parser: null,
-      _httpMessage: null,
-      autoSelectFamilyAttemptedAddresses: [Array],
-      [Symbol(alpncallback)]: null,
-      [Symbol(res)]: [TLSWrap],
-      [Symbol(verified)]: true,
-      [Symbol(pendingSession)]: null,
-      [Symbol(async_id_symbol)]: -1,
-      [Symbol(kHandle)]: [TLSWrap],
-      [Symbol(lastWriteQueueSize)]: 0,
-      [Symbol(timeout)]: Timeout {
-        _idleTimeout: 5000,
-        _idlePrev: [TimersList],
-        _idleNext: [Timeout],
-        _idleStart: 34075,
-        _onTimeout: [Function: bound ],
-        _timerArgs: undefined,
-        _repeat: null,
-        _destroyed: false,
-        [Symbol(refed)]: false,
-        [Symbol(kHasPrimitive)]: false,
-        [Symbol(asyncId)]: 3655,
-        [Symbol(triggerId)]: 3653,
-        [Symbol(kAsyncContextFrame)]: undefined,
-        [Symbol(kResourceStore)]: [Object],
-        [Symbol(kResourceStore)]: [Object],
-        [Symbol(kResourceStore)]: [Object],
-        [Symbol(kResourceStore)]: {}
-      },
-      [Symbol(kBuffer)]: null,
-      [Symbol(kBufferCb)]: null,
-      [Symbol(kBufferGen)]: null,
-      [Symbol(shapeMode)]: true,
-      [Symbol(kCapture)]: false,
-      [Symbol(kSetNoDelay)]: false,
-      [Symbol(kSetKeepAlive)]: true,
-      [Symbol(kSetKeepAliveInitialDelay)]: 1,
-      [Symbol(kBytesRead)]: 0,
-      [Symbol(kBytesWritten)]: 0,
-      [Symbol(connect-options)]: [Object],
-      [Symbol(kPerfHooksNetConnectContext)]: [Object]
-    },
-    [Symbol(kOutHeaders)]: [Object: null prototype] {
-      accept: [Array],
-      'content-type': [Array],
-      'x-api-key': [Array],
-      'user-agent': [Array],
-      'accept-encoding': [Array],
-      'x-vercel-id': [Array],
-      host: [Array]
-    },
-    [Symbol(errored)]: null,
-    [Symbol(kHighWaterMark)]: 65536,
-    [Symbol(kRejectNonStandardBodyWrites)]: false,
-    [Symbol(kUniqueHeaders)]: null
-  },
-  response: {
-    status: 404,
-    statusText: 'Not Found',
-    headers: Object [AxiosHeaders] {
-      date: 'Wed, 19 Nov 2025 22:38:21 GMT',
-      'content-type': 'application/json; charset=utf-8',
-      'transfer-encoding': 'chunked',
-      connection: 'keep-alive',
-      vary: 'Origin',
-      'access-control-allow-credentials': 'true',
-      'x-dns-prefetch-control': 'off',
-      'x-frame-options': 'SAMEORIGIN',
-      'strict-transport-security': 'max-age=15552000; includeSubDomains',
-      'x-download-options': 'noopen',
-      'x-content-type-options': 'nosniff',
-      'x-xss-protection': '1; mode=block',
-      'x-powered-by': 'Express',
-      etag: 'W/"7f-Ju6/lWKT5N2i6zuHBxFRctzPApk"',
-      'cf-cache-status': 'DYNAMIC',
-      server: 'cloudflare',
-      'cf-ray': '9a133287fddce5eb-IAD',
-      'alt-svc': 'h3=":443"; ma=86400'
-    },
-    config: {
-      transitional: [Object],
-      adapter: [Array],
-      transformRequest: [Array],
-      transformResponse: [Array],
-      timeout: 0,
-      xsrfCookieName: 'XSRF-TOKEN',
-      xsrfHeaderName: 'X-XSRF-TOKEN',
-      maxContentLength: -1,
-      maxBodyLength: -1,
-      env: [Object],
-      validateStatus: [Function: validateStatus],
-      headers: [Object [AxiosHeaders]],
-      params: [Object],
-      method: 'get',
-      url: 'https://api.sx.bet/orders/book',
-      allowAbsoluteUrls: true,
-      data: undefined
-    },
-    request: <ref *1> ClientRequest {
-      _events: [Object: null prototype],
-      _eventsCount: 7,
-      _maxListeners: undefined,
-      outputData: [],
-      outputSize: 0,
-      writable: true,
-      destroyed: true,
-      _last: true,
-      chunkedEncoding: false,
-      shouldKeepAlive: true,
-      maxRequestsOnConnectionReached: false,
-      _defaultKeepAlive: true,
-      useChunkedEncodingByDefault: false,
-      sendDate: false,
-      _removedConnection: false,
-      _removedContLen: false,
-      _removedTE: false,
-      strictContentLength: false,
-      _contentLength: 0,
-      _hasBody: true,
-      _trailer: '',
-      finished: true,
-      _headerSent: true,
-      _closed: true,
-      _header: 'GET /orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B HTTP/1.1\r\n' +
-        'Accept: application/json, text/plain, */*\r\n' +
-        'Content-Type: application/json\r\n' +
-        'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
-        'User-Agent: axios/1.13.2\r\n' +
-        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-        'x-vercel-id: iad1::rfk8l-1763591899996-472816acbed6\r\n' +
-        'Host: api.sx.bet\r\n' +
-        'Connection: keep-alive\r\n' +
-        '\r\n',
-      _keepAliveTimeout: 0,
-      _onPendingData: [Function: nop],
-      agent: [Agent],
-      socketPath: undefined,
-      method: 'GET',
-      maxHeaderSize: undefined,
-      insecureHTTPParser: undefined,
-      joinDuplicateHeaders: undefined,
-      path: '/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
-      _ended: true,
-      res: [IncomingMessage],
-      aborted: false,
-      timeoutCb: null,
-      upgradeOrConnect: false,
-      parser: null,
-      maxHeadersCount: null,
-      reusedSocket: true,
-      host: 'api.sx.bet',
-      protocol: 'https:',
-      _redirectable: [Writable],
-      [Symbol(shapeMode)]: false,
-      [Symbol(kCapture)]: false,
-      [Symbol(kBytesWritten)]: 0,
-      [Symbol(kNeedDrain)]: false,
-      [Symbol(corked)]: 0,
-      [Symbol(kChunkedBuffer)]: [],
-      [Symbol(kChunkedLength)]: 0,
-      [Symbol(kSocket)]: [TLSSocket],
-      [Symbol(kOutHeaders)]: [Object: null prototype],
-      [Symbol(errored)]: null,
-      [Symbol(kHighWaterMark)]: 65536,
-      [Symbol(kRejectNonStandardBodyWrites)]: false,
-      [Symbol(kUniqueHeaders)]: null
-    },
-    data: {
-      message: 'Cannot GET /orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
-      error: 'Not Found',
-      statusCode: 404
-    }
-  },
-  status: 404
-}
-2025-11-19 22:38:21.470 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
-2025-11-19 22:38:21.472 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-19 22:38:21.491 [info] Found 0 matching markets across platforms
-2025-11-19 22:38:21.491 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
-2025-11-19 22:38:21.500 [info] 📊 Standard scanning - every 30 seconds
-2025-11-19 22:38:21.500 [info] [2025-11-19T22:38:21.499Z] Cron scan completed successfully in 1019ms
+2025-11-19 22:57:09.023 [info] [Polymarket] Processed 200 markets:
+2025-11-19 22:57:09.023 [info] - Added: 0
+2025-11-19 22:57:09.023 [info] - Skipped (expired/future): 200
+2025-11-19 22:57:09.023 [info] - Skipped (non-binary): 0
+2025-11-19 22:57:09.023 [info] - Skipped (missing tokens): 0
+2025-11-19 22:57:09.180 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
+2025-11-19 22:57:09.181 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-19 22:57:09.213 [info] Found 0 matching markets across platforms
+2025-11-19 22:57:09.213 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-19 22:57:09.213 [info] 📊 Standard scanning - every 30 seconds
+2025-11-19 22:57:09.213 [info] [2025-11-19T22:57:09.205Z] Cron scan completed successfully in 953ms
