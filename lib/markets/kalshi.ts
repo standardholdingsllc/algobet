@@ -218,11 +218,10 @@ export class KalshiAPI {
         const expiryDate = new Date(market.close_time);
         
         if (expiryDate <= maxDate) {
-          // Get orderbook for better pricing
-          const orderbook = await this.getOrderbook(market.ticker);
-          
-          const yesPrice = orderbook.bestYesPrice || market.yes_price;
-          const noPrice = orderbook.bestNoPrice || market.no_price;
+          // Use market prices directly to avoid rate limits
+          // Orderbook fetching would require 200+ requests and exceed Basic tier (20/sec)
+          const yesPrice = market.yes_price;
+          const noPrice = market.no_price;
           
           // Calculate actual fee percentage for this market and price
           // Store the midpoint fee for display (actual fee varies by side)
