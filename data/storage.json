@@ -17,17 +17,23 @@
     {
       "platform": "kalshi",
       "balance": 0.83,
-      "lastUpdated": "2025-11-19T02:09:04.048Z"
+      "availableCash": 0.83,
+      "positionsValue": 0,
+      "lastUpdated": "2025-11-19T02:15:34.926Z"
     },
     {
       "platform": "polymarket",
       "balance": 26.649,
-      "lastUpdated": "2025-11-19T02:09:04.048Z"
+      "availableCash": 26.649,
+      "positionsValue": 0,
+      "lastUpdated": "2025-11-19T02:15:34.926Z"
     },
     {
       "platform": "sxbet",
       "balance": 0,
-      "lastUpdated": "2025-11-19T02:09:04.048Z"
+      "availableCash": 0,
+      "positionsValue": 0,
+      "lastUpdated": "2025-11-19T02:15:34.926Z"
     }
   ]
 }
