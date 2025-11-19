@@ -1,45 +1,29 @@
-2025-11-19 22:06:14.207 [error] Error sending balance alert email: Error: Greeting never received
-    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
-    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
-    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
-    at listOnTimeout (node:internal/timers:588:17)
-    at process.processTimers (node:internal/timers:523:7) {
-  code: 'ETIMEDOUT',
-  command: 'CONN'
+2025-11-19 22:38:20.481 [info] [2025-11-19T22:38:20.480Z] Cron scan starting...
+2025-11-19 22:38:20.483 [info] [2025-11-19T22:38:20.482Z] Scanning for arbitrage opportunities...
+2025-11-19 22:38:20.624 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-19 22:38:20.624 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-19 22:38:20.624 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-19 22:38:20.624 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-19 22:38:20.756 [info] [Polymarket] 📊 Positions value (from /value): $21.06
+2025-11-19 22:38:20.893 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 22:38:20.893 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 22:38:20.894 [info] [Polymarket] ✅ Total account value: $31.06
+2025-11-19 22:38:20.894 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-19 22:38:20.894 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-19 22:38:20.894 [info] 💰 Polymarket: Total $31.06 (Cash: $10.01, Positions: $21.06)
+2025-11-19 22:38:20.894 [info] 💰 SX.bet: $0.00
+2025-11-19 22:38:21.026 [info] [Polymarket] Fetching markets from Gamma API...
+2025-11-19 22:38:21.427 [warning] [sx.bet] Fixtures endpoint not available (404), continuing without fixture data
+2025-11-19 22:38:21.460 [info] [Polymarket] API Response: 200 markets received
+2025-11-19 22:38:21.460 [info] [Polymarket] Sample market structure: {
+  "question": "ARCH Will the match be a draw?"
 }
-2025-11-19 22:06:14.208 [error] Error sending balance alert email: Error: Greeting never received
-    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
-    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
-    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
-    at listOnTimeout (node:internal/timers:588:17)
-    at process.processTimers (node:internal/timers:523:7) {
-  code: 'ETIMEDOUT',
-  command: 'CONN'
-}
-2025-11-19 22:06:14.208 [error] Error sending balance alert email: Error: Greeting never received
-    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
-    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
-    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
-    at listOnTimeout (node:internal/timers:588:17)
-    at process.processTimers (node:internal/timers:523:7) {
-  code: 'ETIMEDOUT',
-  command: 'CONN'
-}
-2025-11-19 22:06:14.236 [info] [2025-11-19T22:06:14.235Z] Cron scan starting...
-2025-11-19 22:06:14.237 [info] [2025-11-19T22:06:14.236Z] Scanning for arbitrage opportunities...
-2025-11-19 22:06:14.356 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-19 22:06:14.356 [info] [Kalshi] 💼 Portfolio value: $27.97
-2025-11-19 22:06:14.356 [info] [Kalshi] 💰 Positions value: $27.14
-2025-11-19 22:06:14.356 [info] [Kalshi] 💵 Total value: $27.97
-2025-11-19 22:06:14.470 [info] [Polymarket] 📊 Positions value (from /value): $21.39
-2025-11-19 22:06:14.506 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-19 22:06:14.506 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-19 22:06:14.506 [info] [Polymarket] ✅ Total account value: $31.39
-2025-11-19 22:06:14.506 [warning] sx.bet balance check not implemented - requires Web3 integration
-2025-11-19 22:06:14.506 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
-2025-11-19 22:06:14.506 [info] 💰 Polymarket: Total $31.39 (Cash: $10.01, Positions: $21.39)
-2025-11-19 22:06:14.506 [info] 💰 SX.bet: $0.00
-2025-11-19 22:06:14.688 [error] Error fetching sx.bet markets: AxiosError: Request failed with status code 404
+2025-11-19 22:38:21.460 [info] [Polymarket] Processed 200 markets:
+2025-11-19 22:38:21.460 [info] - Added: 0
+2025-11-19 22:38:21.460 [info] - Skipped (expired/future): 200
+2025-11-19 22:38:21.460 [info] - Skipped (non-binary): 0
+2025-11-19 22:38:21.460 [info] - Skipped (missing tokens): 0
+2025-11-19 22:38:21.470 [error] Error fetching sx.bet markets: AxiosError: Request failed with status code 404
     at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
     at BrotliDecompress.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
     at BrotliDecompress.emit (node:events:519:28)
@@ -47,7 +31,7 @@
     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
     at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async i.getOpenMarkets (/var/task/.next/server/chunks/865.js:5:10679)
+    at async i.getOpenMarkets (/var/task/.next/server/chunks/865.js:5:12654)
     at async Promise.all (index 2)
     at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:4256)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2756)
@@ -79,8 +63,9 @@
       'User-Agent': 'axios/1.13.2',
       'Accept-Encoding': 'gzip, compress, deflate, br'
     },
+    params: { baseToken: '0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B' },
     method: 'get',
-    url: 'https://api.sx.bet/fixtures',
+    url: 'https://api.sx.bet/orders/book',
     allowAbsoluteUrls: true,
     data: undefined
   },
@@ -117,13 +102,13 @@
     finished: true,
     _headerSent: true,
     _closed: true,
-    _header: 'GET /fixtures HTTP/1.1\r\n' +
+    _header: 'GET /orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B HTTP/1.1\r\n' +
       'Accept: application/json, text/plain, */*\r\n' +
       'Content-Type: application/json\r\n' +
       'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
       'User-Agent: axios/1.13.2\r\n' +
       'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-      'x-vercel-id: iad1::gmhxg-1763589974165-d093a48d588a\r\n' +
+      'x-vercel-id: iad1::rfk8l-1763591899996-472816acbed6\r\n' +
       'Host: api.sx.bet\r\n' +
       'Connection: keep-alive\r\n' +
       '\r\n',
@@ -137,7 +122,7 @@
       protocol: 'https:',
       options: [Object: null prototype],
       requests: [Object: null prototype] {},
-      sockets: [Object: null prototype],
+      sockets: [Object: null prototype] {},
       freeSockets: [Object: null prototype],
       keepAliveMsecs: 1000,
       keepAlive: true,
@@ -157,7 +142,7 @@
     maxHeaderSize: undefined,
     insecureHTTPParser: undefined,
     joinDuplicateHeaders: undefined,
-    path: '/fixtures',
+    path: '/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
     _ended: true,
     res: IncomingMessage {
       _events: [Object],
@@ -182,7 +167,7 @@
       _dumped: false,
       req: [Circular *1],
       _eventsCount: 4,
-      responseUrl: 'https://api.sx.bet/fixtures',
+      responseUrl: 'https://api.sx.bet/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
       redirects: [],
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false,
@@ -213,7 +198,7 @@
       _eventsCount: 3,
       _onNativeResponse: [Function (anonymous)],
       _currentRequest: [Circular *1],
-      _currentUrl: 'https://api.sx.bet/fixtures',
+      _currentUrl: 'https://api.sx.bet/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
       _timeout: null,
       [Symbol(shapeMode)]: true,
       [Symbol(kCapture)]: false
@@ -272,15 +257,15 @@
         _idleTimeout: 5000,
         _idlePrev: [TimersList],
         _idleNext: [Timeout],
-        _idleStart: 6513265,
+        _idleStart: 34075,
         _onTimeout: [Function: bound ],
         _timerArgs: undefined,
         _repeat: null,
         _destroyed: false,
         [Symbol(refed)]: false,
         [Symbol(kHasPrimitive)]: false,
-        [Symbol(asyncId)]: 36247,
-        [Symbol(triggerId)]: 36245,
+        [Symbol(asyncId)]: 3655,
+        [Symbol(triggerId)]: 3653,
         [Symbol(kAsyncContextFrame)]: undefined,
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
@@ -318,7 +303,7 @@
     status: 404,
     statusText: 'Not Found',
     headers: Object [AxiosHeaders] {
-      date: 'Wed, 19 Nov 2025 22:06:14 GMT',
+      date: 'Wed, 19 Nov 2025 22:38:21 GMT',
       'content-type': 'application/json; charset=utf-8',
       'transfer-encoding': 'chunked',
       connection: 'keep-alive',
@@ -331,10 +316,10 @@
       'x-content-type-options': 'nosniff',
       'x-xss-protection': '1; mode=block',
       'x-powered-by': 'Express',
-      etag: 'W/"47-WtYGojL0p/jQJHbNORnza+dRyYA"',
+      etag: 'W/"7f-Ju6/lWKT5N2i6zuHBxFRctzPApk"',
       'cf-cache-status': 'DYNAMIC',
       server: 'cloudflare',
-      'cf-ray': '9a13037d8a2fe5f7-IAD',
+      'cf-ray': '9a133287fddce5eb-IAD',
       'alt-svc': 'h3=":443"; ma=86400'
     },
     config: {
@@ -350,8 +335,9 @@
       env: [Object],
       validateStatus: [Function: validateStatus],
       headers: [Object [AxiosHeaders]],
+      params: [Object],
       method: 'get',
-      url: 'https://api.sx.bet/fixtures',
+      url: 'https://api.sx.bet/orders/book',
       allowAbsoluteUrls: true,
       data: undefined
     },
@@ -380,13 +366,13 @@
       finished: true,
       _headerSent: true,
       _closed: true,
-      _header: 'GET /fixtures HTTP/1.1\r\n' +
+      _header: 'GET /orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B HTTP/1.1\r\n' +
         'Accept: application/json, text/plain, */*\r\n' +
         'Content-Type: application/json\r\n' +
         'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
         'User-Agent: axios/1.13.2\r\n' +
         'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-        'x-vercel-id: iad1::gmhxg-1763589974165-d093a48d588a\r\n' +
+        'x-vercel-id: iad1::rfk8l-1763591899996-472816acbed6\r\n' +
         'Host: api.sx.bet\r\n' +
         'Connection: keep-alive\r\n' +
         '\r\n',
@@ -398,7 +384,7 @@
       maxHeaderSize: undefined,
       insecureHTTPParser: undefined,
       joinDuplicateHeaders: undefined,
-      path: '/fixtures',
+      path: '/orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
       _ended: true,
       res: [IncomingMessage],
       aborted: false,
@@ -425,16 +411,16 @@
       [Symbol(kUniqueHeaders)]: null
     },
     data: {
-      message: 'Cannot GET /fixtures',
+      message: 'Cannot GET /orders/book?baseToken=0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
       error: 'Not Found',
       statusCode: 404
     }
   },
   status: 404
 }
-2025-11-19 22:06:14.923 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
-2025-11-19 22:06:14.925 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-19 22:06:14.948 [info] Found 0 matching markets across platforms
-2025-11-19 22:06:14.948 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
-2025-11-19 22:06:14.951 [info] 📊 Standard scanning - every 30 seconds
-2025-11-19 22:06:14.951 [info] [2025-11-19T22:06:14.950Z] Cron scan completed successfully in 714ms
+2025-11-19 22:38:21.470 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
+2025-11-19 22:38:21.472 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-19 22:38:21.491 [info] Found 0 matching markets across platforms
+2025-11-19 22:38:21.491 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-19 22:38:21.500 [info] 📊 Standard scanning - every 30 seconds
+2025-11-19 22:38:21.500 [info] [2025-11-19T22:38:21.499Z] Cron scan completed successfully in 1019ms

@@ -61,10 +61,14 @@ interface SXBetFixture {
 export class SXBetAPI {
   private apiKey: string;
   private baseToken: string; // USDC address on SX Network
+  private walletAddress: string;
+  private privateKey: string;
 
   constructor() {
-    this.apiKey = process.env.SXBET_API_KEY || '';
+    this.apiKey = process.env.SBET_API_KEY || '';
     this.baseToken = '0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B'; // USDC on SX mainnet
+    this.walletAddress = process.env.SBET_WALLET_ADDRESS || '';
+    this.privateKey = process.env.SBET_PRIVATE_KEY || '';
   }
 
   /**
@@ -125,6 +129,7 @@ export class SXBetAPI {
       let fixtureMap = new Map<string, SXBetFixture>();
       
       try {
+        // Try fixtures endpoint without parameters first
         const fixturesResponse = await axios.get(`${BASE_URL}/fixtures`, {
           headers: this.getHeaders(),
         });
@@ -132,23 +137,34 @@ export class SXBetAPI {
         fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
         console.log(`[sx.bet] Retrieved ${fixtures.length} fixtures`);
       } catch (fixtureError: any) {
-        // Fixtures endpoint not available - we'll work without it
-        console.warn(`[sx.bet] Fixtures endpoint not available (${fixtureError.response?.status}), continuing without fixture data`);
+        // If fixtures endpoint fails, try with active status filter
+        try {
+          const fixturesResponse = await axios.get(`${BASE_URL}/fixtures`, {
+            headers: this.getHeaders(),
+            params: { status: 1 }, // Active fixtures
+          });
+          fixtures = fixturesResponse.data.data || [];
+          fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
+          console.log(`[sx.bet] Retrieved ${fixtures.length} fixtures (with status filter)`);
+        } catch (retryError: any) {
+          // Fixtures endpoint not available - we'll work without it
+          console.warn(`[sx.bet] Fixtures endpoint not available (${fixtureError.response?.status}), continuing without fixture data`);
+        }
       }
 
       // Try to get best odds for each market (but make it optional)
       let ordersResponse: any;
       try {
-        ordersResponse = await axios.get(`${BASE_URL}/orders/book`, {
+        ordersResponse = await axios.get(`${BASE_URL}/orders/best-odds`, {
           headers: this.getHeaders(),
           params: {
             baseToken: this.baseToken,
           },
         });
-        console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} orders from order book`);
+        console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} orders from best-odds endpoint`);
       } catch (ordersError: any) {
         // Orders endpoint not available
-        console.warn(`[sx.bet] Orders/book endpoint not available (${ordersError.response?.status}), cannot fetch markets without order data`);
+        console.warn(`[sx.bet] Best-odds endpoint not available (${ordersError.response?.status}), cannot fetch markets without order data`);
         return [];
       }
 
@@ -263,17 +279,21 @@ export class SXBetAPI {
    */
   async getBalance(): Promise<number> {
     try {
+      if (!this.walletAddress) {
+        console.warn('sx.bet balance check requires SBET_WALLET_ADDRESS env var');
+        return 0;
+      }
+
       // sx.bet doesn't provide a direct balance endpoint in their API
       // You would need to query the SX Network blockchain directly
-      // For now, return 0 and implement blockchain query separately
-      
+
       // TODO: Implement Web3 query to SX Network for USDC balance
       // const provider = new ethers.providers.JsonRpcProvider('https://rpc.sx-rollup.gelato.digital');
       // const usdcContract = new ethers.Contract(this.baseToken, erc20ABI, provider);
-      // const balance = await usdcContract.balanceOf(walletAddress);
+      // const balance = await usdcContract.balanceOf(this.walletAddress);
       // return Number(balance) / 1e6; // USDC has 6 decimals
-      
-      console.warn('sx.bet balance check not implemented - requires Web3 integration');
+
+      console.warn('sx.bet balance check requires Web3 integration - wallet configured but Web3 not implemented');
       return 0;
     } catch (error) {
       console.error('Error fetching sx.bet balance:', error);
@@ -326,7 +346,7 @@ export class SXBetAPI {
    */
   async getOrdersForMarket(marketHash: string, side: 'yes' | 'no'): Promise<SXBetOrder[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/orders/book`, {
+      const response = await axios.get(`${BASE_URL}/orders/best-odds`, {
         headers: this.getHeaders(),
         params: {
           baseToken: this.baseToken,
@@ -335,11 +355,11 @@ export class SXBetAPI {
       });
 
       const allOrders: SXBetOrder[] = response.data.data || [];
-      
+
       // Filter by side
       const isBettingOutcomeOne = side === 'yes';
-      return allOrders.filter(order => 
-        order.marketHash === marketHash && 
+      return allOrders.filter(order =>
+        order.marketHash === marketHash &&
         order.isMakerBettingOutcomeOne !== isBettingOutcomeOne // Taker bets opposite of maker
       );
     } catch (error) {
@@ -353,15 +373,15 @@ export class SXBetAPI {
    */
   async getPositions(): Promise<any[]> {
     try {
-      // Requires authenticated wallet address
-      // const walletAddress = process.env.SXBET_WALLET_ADDRESS;
-      // const response = await axios.get(`${BASE_URL}/trades/active/${walletAddress}`, {
-      //   headers: this.getHeaders(),
-      // });
-      // return response.data.data || [];
-      
-      console.warn('sx.bet positions check not implemented - requires wallet address');
-      return [];
+      if (!this.walletAddress) {
+        console.warn('sx.bet positions check not implemented - requires SBET_WALLET_ADDRESS env var');
+        return [];
+      }
+
+      const response = await axios.get(`${BASE_URL}/trades/active/${this.walletAddress}`, {
+        headers: this.getHeaders(),
+      });
+      return response.data.data || [];
     } catch (error) {
       console.error('Error fetching sx.bet positions:', error);
       return [];
