@@ -110,10 +110,21 @@ export default function DashboardPage() {
   const totalProfit = dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0);
   const activeBetsCount = bets.filter((b) => b.status === 'filled' || b.status === 'pending').length;
   const resolvedBetsCount = bets.filter((b) => b.status === 'resolved').length;
-  const kalshiBalance = balances.find((b) => b.platform === 'kalshi')?.balance || 0;
-  const polymarketBalance = balances.find((b) => b.platform === 'polymarket')?.balance || 0;
-  const sxbetBalance = balances.find((b) => b.platform === 'sxbet')?.balance || 0;
+  
+  // Get balance details (total, cash, positions)
+  const kalshiBalanceData = balances.find(b => b.platform === 'kalshi');
+  const polymarketBalanceData = balances.find(b => b.platform === 'polymarket');
+  const sxbetBalanceData = balances.find(b => b.platform === 'sxbet');
+  
+  const kalshiBalance = kalshiBalanceData?.balance || 0;
+  const kalshiCash = kalshiBalanceData?.availableCash ?? kalshiBalance;
+  
+  const polymarketBalance = polymarketBalanceData?.balance || 0;
+  const polymarketCash = polymarketBalanceData?.availableCash ?? polymarketBalance;
+  
+  const sxbetBalance = sxbetBalanceData?.balance || 0;
   const totalBalance = kalshiBalance + polymarketBalance + sxbetBalance;
+  const totalCash = kalshiCash + polymarketCash + sxbetBalance;
 
   const avgDailyProfit = dailyStats.length > 0
     ? dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0) / dailyStats.length
@@ -170,7 +181,7 @@ export default function DashboardPage() {
             <StatsCard
               title="Total Balance"
               value={`$${totalBalance.toFixed(2)}`}
-              change={`K: $${kalshiBalance.toFixed(0)} | P: $${polymarketBalance.toFixed(0)} | S: $${sxbetBalance.toFixed(0)}`}
+              change={`Cash: $${totalCash.toFixed(2)}`}
               icon={Wallet}
               color="yellow"
             />
@@ -179,18 +190,21 @@ export default function DashboardPage() {
             <StatsCard
               title="Kalshi Balance"
               value={`$${kalshiBalance.toFixed(2)}`}
+              change={`Cash: $${kalshiCash.toFixed(2)}`}
               icon={Wallet}
               color="purple"
             />
             <StatsCard
               title="Polymarket Balance"
               value={`$${polymarketBalance.toFixed(2)}`}
+              change={`Cash: $${polymarketCash.toFixed(2)}`}
               icon={Wallet}
               color="blue"
             />
             <StatsCard
               title="SxBet Balance"
               value={`$${sxbetBalance.toFixed(2)}`}
+              change={`Cash: $${sxbetBalance.toFixed(2)}`}
               icon={Wallet}
               color="green"
             />
