@@ -146,28 +146,28 @@ export default function Dashboard() {
               <StatsCard
                 title="Kalshi Balance"
                 value={`$${kalshiBalance.toFixed(2)}`}
-                subtitle={`Cash: $${kalshiCash.toFixed(2)}`}
+                change={`Cash: $${kalshiCash.toFixed(2)}`}
                 icon={DollarSign}
                 color="blue"
               />
               <StatsCard
                 title="Polymarket Balance"
                 value={`$${polymarketBalance.toFixed(2)}`}
-                subtitle={`Cash: $${polymarketCash.toFixed(2)}`}
+                change={`Cash: $${polymarketCash.toFixed(2)}`}
                 icon={DollarSign}
                 color="purple"
               />
               <StatsCard
                 title="SxBet Balance"
                 value={`$${sxbetBalance.toFixed(2)}`}
-                subtitle={`Cash: $${sxbetBalance.toFixed(2)}`}
+                change={`Cash: $${sxbetBalance.toFixed(2)}`}
                 icon={DollarSign}
                 color="yellow"
               />
               <StatsCard
                 title="Total Balance"
                 value={`$${(kalshiBalance + polymarketBalance + sxbetBalance).toFixed(2)}`}
-                subtitle={`Cash: $${(kalshiCash + polymarketCash + sxbetBalance).toFixed(2)}`}
+                change={`Cash: $${(kalshiCash + polymarketCash + sxbetBalance).toFixed(2)}`}
                 icon={DollarSign}
                 color="green"
               />
