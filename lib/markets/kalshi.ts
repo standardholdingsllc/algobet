@@ -282,60 +282,39 @@ export class KalshiAPI {
     }
   }
 
+  async getPortfolioValue(): Promise<number> {
+    try {
+      const path = '/portfolio/balance';
+      const headers = await this.generateAuthHeaders('GET', `${API_SIGNATURE_PREFIX}${path}`);
+      
+      const response = await axios.get(`${BASE_URL}${path}`, { headers });
+      // portfolio_value includes both cash and positions
+      return (response.data.portfolio_value || response.data.balance) / 100; // Convert cents to dollars
+    } catch (error: any) {
+      console.error('Error fetching Kalshi portfolio value:', error.response?.status || error.message);
+      return 0;
+    }
+  }
+
   async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
     try {
-      // Get available cash
+      // Get both cash and portfolio value from the same endpoint
       const cashBalance = await this.getBalance();
+      const portfolioValue = await this.getPortfolioValue();
+      
       console.log(`[Kalshi] ✅ Cash balance: $${cashBalance.toFixed(2)}`);
+      console.log(`[Kalshi] 💼 Portfolio value: $${portfolioValue.toFixed(2)}`);
       
-      // Get positions value
-      const positions = await this.getPositions();
-      console.log(`[Kalshi] 📊 Found ${positions.length} positions`);
-      
-      // Log first position for debugging
-      if (positions.length > 0) {
-        console.log(`[Kalshi] 🔍 Sample position:`, JSON.stringify(positions[0], null, 2));
-      }
-      
-      let positionsValue = 0;
-      
-      for (const position of positions) {
-        // Calculate current value of positions
-        // Kalshi positions have: position_count, side ('yes' or 'no'), market info
-        // Handle potential property name variations
-        const ticker = position.market_ticker || position.ticker;
-        const count = position.position || position.count || position.quantity;
-        const side = position.side;
-        
-        console.log(`[Kalshi] Processing position: ticker=${ticker}, count=${count}, side=${side}`);
-        
-        if (count && ticker) {
-          try {
-            const orderbook = await this.getOrderbook(ticker);
-            const currentPrice = side === 'yes' ? orderbook.bestYesPrice : orderbook.bestNoPrice;
-            const positionCount = Math.abs(count);
-            
-            // Position value = count * current_price / 100
-            const value = (positionCount * currentPrice) / 100;
-            positionsValue += value;
-            
-            console.log(`[Kalshi]   → ${ticker}: ${positionCount} contracts @ $${currentPrice/100} = $${value.toFixed(2)}`);
-          } catch (err: any) {
-            // Skip positions we can't value
-            console.error(`[Kalshi] ❌ Error valuing position ${ticker}:`, err.message);
-          }
-        } else {
-          console.warn(`[Kalshi] ⚠️ Skipping position - missing data:`, { ticker, count, side });
-        }
-      }
+      // Calculate positions value
+      const positionsValue = portfolioValue - cashBalance;
       
       console.log(`[Kalshi] 💰 Positions value: $${positionsValue.toFixed(2)}`);
-      console.log(`[Kalshi] 💵 Total value: $${(cashBalance + positionsValue).toFixed(2)}`);
+      console.log(`[Kalshi] 💵 Total value: $${portfolioValue.toFixed(2)}`);
       
       return {
-        totalValue: cashBalance + positionsValue,
+        totalValue: portfolioValue,
         availableCash: cashBalance,
-        positionsValue: positionsValue
+        positionsValue: Math.max(0, positionsValue) // Ensure non-negative
       };
     } catch (error: any) {
       console.error('[Kalshi] ❌ Error fetching total balance:', error.response?.status || error.message);

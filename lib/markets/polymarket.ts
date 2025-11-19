@@ -228,18 +228,16 @@ export class PolymarketAPI {
 
   async getPositions(): Promise<any[]> {
     try {
-      const response = await axios.get(`${GAMMA_URL}/positions`, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+      // Use Data API instead of Gamma API for positions
+      const response = await axios.get(`${DATA_API_URL}/positions`, {
         params: {
-          user: this.walletAddress, // Changed from 'address' to 'user'
+          user: this.walletAddress,
         },
       });
 
-      return response.data || []; // Gamma API returns array directly
-    } catch (error) {
-      console.error('Error fetching Polymarket positions:', error);
+      return response.data || []; // Data API returns array of positions
+    } catch (error: any) {
+      console.error('Error fetching Polymarket positions:', error.response?.status || error.message);
       return [];
     }
   }
