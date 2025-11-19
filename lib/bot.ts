@@ -4,17 +4,7 @@ import { SXBetAPI } from './markets/sxbet';
 import { findArbitrageOpportunities, calculateBetSizes, validateOpportunity } from './arbitrage';
 import { AdaptiveScanner, detectLiveEvents } from './adaptive-scanner';
 import { HotMarketTracker } from './hot-market-tracker';
-import {
-  getConfig,
-  getBets,
-  addBet,
-  updateBet,
-  addArbitrageGroup,
-  updateArbitrageGroup,
-  getBalances,
-  updateBalances,
-  addOpportunityLog,
-} from './storage';
+import { KVStorage } from './kv-storage';
 import { sendBalanceAlert } from './email';
 import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -82,7 +72,7 @@ export class ArbitrageBotEngine {
     console.log(`[${new Date().toISOString()}] Scanning for arbitrage opportunities...`);
 
     // Get configuration
-    const config = await getConfig();
+    const config = await KVStorage.getConfig();
 
     // Get detailed balance information (total value, available cash, positions)
     const kalshiBalances = await this.kalshi.getTotalBalance();
@@ -95,7 +85,7 @@ export class ArbitrageBotEngine {
     console.log(`💰 SX.bet: $${sxbetBalance.toFixed(2)}`);
 
     // Store detailed balance information (total, cash, positions)
-    await updateBalances([
+    await KVStorage.updateBalances([
       { 
         platform: 'kalshi', 
         balance: kalshiBalances.totalValue,
@@ -256,7 +246,7 @@ export class ArbitrageBotEngine {
     maxBetPercentage: number
   ): Promise<void> {
     // Validate opportunity is still valid
-    const config = await getConfig();
+    const config = await KVStorage.getConfig();
     if (!validateOpportunity(opportunity, config.minProfitMargin)) {
       console.log('Opportunity no longer valid, skipping');
       return;
@@ -329,7 +319,7 @@ export class ArbitrageBotEngine {
     };
 
     // Log opportunity
-    await addOpportunityLog(opportunityLog);
+    await KVStorage.addOpportunityLog(opportunityLog);
 
     // If in simulation mode, log and return without placing bets
     if (config.simulationMode) {
@@ -405,7 +395,7 @@ export class ArbitrageBotEngine {
         arbitrageGroupId: opportunity.id,
       };
 
-      await Promise.all([addBet(bet1), addBet(bet2)]);
+      await Promise.all([KVStorage.addBet(bet1), KVStorage.addBet(bet2)]);
 
       // Create arbitrage group
       const group: ArbitrageGroup = {
@@ -417,7 +407,7 @@ export class ArbitrageBotEngine {
         status: 'active',
       };
 
-      await addArbitrageGroup(group);
+      await KVStorage.addArbitrageGroup(group);
     } else {
       console.error('One or both bets failed');
 

@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getConfig, updateConfig } from '@/lib/storage';
+import { KVStorage } from '@/lib/kv-storage';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // No auth required
 
   if (req.method === 'GET') {
     try {
-      const config = await getConfig();
+      const config = await KVStorage.getConfig();
       return res.status(200).json({ config });
     } catch (error) {
       console.error('Error fetching config:', error);
@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     try {
       const newConfig = req.body;
-      await updateConfig(newConfig);
+      await KVStorage.updateConfig(newConfig);
       return res.status(200).json({ message: 'Config updated successfully' });
     } catch (error) {
       console.error('Error updating config:', error);

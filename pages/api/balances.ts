@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getBalances } from '@/lib/storage';
+import { KVStorage } from '@/lib/kv-storage';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // No auth required
 
   if (req.method === 'GET') {
     try {
-      const balances = await getBalances();
+      const balances = await KVStorage.getBalances();
       return res.status(200).json({ balances });
     } catch (error) {
       console.error('Error fetching balances:', error);

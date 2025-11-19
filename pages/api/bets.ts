@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getBets } from '@/lib/storage';
+import { KVStorage } from '@/lib/kv-storage';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // No auth required
 
   if (req.method === 'GET') {
     try {
-      const bets = await getBets();
+      const bets = await KVStorage.getBets();
       // Sort by placedAt, newest first
       const sortedBets = bets.sort((a, b) => 
         new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime()

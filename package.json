@@ -12,7 +12,8 @@
     "test-fees": "node -r esbuild-register scripts/test-fee-calculations.js",
     "test-matching": "node -r esbuild-register scripts/test-market-matching.js",
     "test-tracking": "node -r esbuild-register scripts/test-hot-market-tracking.ts",
-    "generate-password": "node scripts/generate-password-hash.js"
+    "generate-password": "node scripts/generate-password-hash.js",
+    "migrate-kv": "node -r esbuild-register scripts/migrate-to-kv.ts"
   },
   "dependencies": {
     "next": "^14.0.4",
@@ -26,6 +27,7 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.263.1",
     "@octokit/rest": "^20.0.2",
+    "@upstash/redis": "^1.28.0",
     "uuid": "^9.0.1",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",

@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getDailyStats } from '@/lib/storage';
+import { KVStorage } from '@/lib/kv-storage';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // No auth required
 
   if (req.method === 'GET') {
     try {
-      const stats = await getDailyStats();
+      const stats = await KVStorage.getDailyStats();
       // Sort by date
       const sortedStats = stats.sort((a, b) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
