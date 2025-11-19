@@ -144,9 +144,11 @@ export class PolymarketAPI {
     try {
       // Get total value (includes positions)
       const totalValue = await this.getBalance();
+      console.log(`[Polymarket] Total account value: $${totalValue.toFixed(2)}`);
       
       // Get positions to calculate their value
       const positions = await this.getPositions();
+      console.log(`[Polymarket] Found ${positions.length} positions`);
       let positionsValue = 0;
       
       for (const position of positions) {
@@ -159,8 +161,11 @@ export class PolymarketAPI {
         }
       }
       
+      console.log(`[Polymarket] Positions value: $${positionsValue.toFixed(2)}`);
+      
       // Available cash = total value - positions value
       const availableCash = totalValue - positionsValue;
+      console.log(`[Polymarket] Available cash: $${availableCash.toFixed(2)}`);
       
       return {
         totalValue: totalValue,

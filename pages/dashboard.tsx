@@ -126,8 +126,8 @@ export default function DashboardPage() {
   const totalBalance = kalshiBalance + polymarketBalance + sxbetBalance;
   const totalCash = kalshiCash + polymarketCash + sxbetBalance;
 
-  // Debug logs to verify data flow
-  console.log('Dashboard Balance Data:', {
+  // Debug logs to verify data flow [UPDATED]
+  console.log('Dashboard Balance Data [FIXED]:', {
     kalshi: { total: kalshiBalance, cash: kalshiCash },
     polymarket: { total: polymarketBalance, cash: polymarketCash },
     sxbet: { total: sxbetBalance, cash: sxbetBalance },

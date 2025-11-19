@@ -286,9 +286,11 @@ export class KalshiAPI {
     try {
       // Get available cash
       const cashBalance = await this.getBalance();
+      console.log(`[Kalshi] Cash balance: $${cashBalance.toFixed(2)}`);
       
       // Get positions value
       const positions = await this.getPositions();
+      console.log(`[Kalshi] Found ${positions.length} positions`);
       let positionsValue = 0;
       
       for (const position of positions) {
@@ -312,6 +314,9 @@ export class KalshiAPI {
           }
         }
       }
+      
+      console.log(`[Kalshi] Positions value: $${positionsValue.toFixed(2)}`);
+      console.log(`[Kalshi] Total value: $${(cashBalance + positionsValue).toFixed(2)}`);
       
       return {
         totalValue: cashBalance + positionsValue,
