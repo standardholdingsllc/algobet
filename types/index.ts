@@ -58,7 +58,9 @@ export interface ArbitrageGroup {
 
 export interface AccountBalance {
   platform: 'kalshi' | 'polymarket' | 'sxbet';
-  balance: number;
+  balance: number; // Total value (cash + positions)
+  availableCash?: number; // Cash available for new bets
+  positionsValue?: number; // Current value of open positions
   lastUpdated: Date;
 }
 

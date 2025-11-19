@@ -94,11 +94,29 @@ export class ArbitrageBotEngine {
     console.log(`💰 Polymarket: Total $${polymarketBalances.totalValue.toFixed(2)} (Cash: $${polymarketBalances.availableCash.toFixed(2)}, Positions: $${polymarketBalances.positionsValue.toFixed(2)})`);
     console.log(`💰 SX.bet: $${sxbetBalance.toFixed(2)}`);
 
-    // Store total values in balance records (for display)
+    // Store detailed balance information (total, cash, positions)
     await updateBalances([
-      { platform: 'kalshi', balance: kalshiBalances.totalValue, lastUpdated: new Date() },
-      { platform: 'polymarket', balance: polymarketBalances.totalValue, lastUpdated: new Date() },
-      { platform: 'sxbet', balance: sxbetBalance, lastUpdated: new Date() },
+      { 
+        platform: 'kalshi', 
+        balance: kalshiBalances.totalValue,
+        availableCash: kalshiBalances.availableCash,
+        positionsValue: kalshiBalances.positionsValue,
+        lastUpdated: new Date() 
+      },
+      { 
+        platform: 'polymarket', 
+        balance: polymarketBalances.totalValue,
+        availableCash: polymarketBalances.availableCash,
+        positionsValue: polymarketBalances.positionsValue,
+        lastUpdated: new Date() 
+      },
+      { 
+        platform: 'sxbet', 
+        balance: sxbetBalance,
+        availableCash: sxbetBalance, // sx.bet doesn't track positions yet
+        positionsValue: 0,
+        lastUpdated: new Date() 
+      },
     ]);
 
     // Check balance thresholds and send alerts (use total value for alerts)

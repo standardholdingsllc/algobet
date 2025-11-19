@@ -48,8 +48,19 @@ export default function Dashboard() {
   const todayProfit = dataStore.profits[dataStore.profits.length - 1]?.profit || 0;
   const totalProfit = dataStore.profits.reduce((sum, p) => sum + p.profit, 0);
   const activeBets = dataStore.bets.filter(b => b.status === 'filled').length;
-  const kalshiBalance = dataStore.balances.find(b => b.platform === 'kalshi')?.balance || 0;
-  const polymarketBalance = dataStore.balances.find(b => b.platform === 'polymarket')?.balance || 0;
+  
+  // Get balance details (total, cash, positions)
+  const kalshiBalanceData = dataStore.balances.find(b => b.platform === 'kalshi');
+  const polymarketBalanceData = dataStore.balances.find(b => b.platform === 'polymarket');
+  const sxbetBalanceData = dataStore.balances.find(b => b.platform === 'sxbet');
+  
+  const kalshiBalance = kalshiBalanceData?.balance || 0;
+  const kalshiCash = kalshiBalanceData?.availableCash ?? kalshiBalance;
+  
+  const polymarketBalance = polymarketBalanceData?.balance || 0;
+  const polymarketCash = polymarketBalanceData?.availableCash ?? polymarketBalance;
+  
+  const sxbetBalance = sxbetBalanceData?.balance || 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -125,10 +136,25 @@ export default function Dashboard() {
                 icon={BarChart3}
               />
               <StatsCard
-                title="Total Balance"
-                value={`$${(kalshiBalance + polymarketBalance).toFixed(2)}`}
-                change={`K: $${kalshiBalance.toFixed(0)} | P: $${polymarketBalance.toFixed(0)}`}
+                title="Kalshi Balance"
+                value={`$${kalshiBalance.toFixed(2)}`}
+                subtitle={`Available: $${kalshiCash.toFixed(2)}`}
                 icon={DollarSign}
+                color="blue"
+              />
+              <StatsCard
+                title="Polymarket Balance"
+                value={`$${polymarketBalance.toFixed(2)}`}
+                subtitle={`Available: $${polymarketCash.toFixed(2)}`}
+                icon={DollarSign}
+                color="purple"
+              />
+              <StatsCard
+                title="Total Balance"
+                value={`$${(kalshiBalance + polymarketBalance + sxbetBalance).toFixed(2)}`}
+                subtitle={`Available: $${(kalshiCash + polymarketCash + sxbetBalance).toFixed(2)}`}
+                icon={DollarSign}
+                color="green"
               />
             </div>
 
