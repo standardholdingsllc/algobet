@@ -16,18 +16,18 @@
   "balances": [
     {
       "platform": "kalshi",
-      "balance": 0,
-      "lastUpdated": "2025-11-19T01:06:21.301Z"
+      "balance": 0.83,
+      "lastUpdated": "2025-11-19T01:12:39.179Z"
     },
     {
       "platform": "polymarket",
       "balance": 0,
-      "lastUpdated": "2025-11-19T01:06:21.301Z"
+      "lastUpdated": "2025-11-19T01:12:39.179Z"
     },
     {
       "platform": "sxbet",
       "balance": 0,
-      "lastUpdated": "2025-11-19T01:06:21.301Z"
+      "lastUpdated": "2025-11-19T01:12:39.179Z"
     }
   ]
 }
