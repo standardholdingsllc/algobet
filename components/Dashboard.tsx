@@ -49,6 +49,7 @@ export default function Dashboard() {
   const totalProfit = dataStore.profits.reduce((sum, p) => sum + p.profit, 0);
   const activeBets = dataStore.bets.filter(b => b.status === 'filled').length;
   
+  
   // Get balance details (total, cash, positions)
   const kalshiBalanceData = dataStore.balances.find(b => b.platform === 'kalshi');
   const polymarketBalanceData = dataStore.balances.find(b => b.platform === 'polymarket');
