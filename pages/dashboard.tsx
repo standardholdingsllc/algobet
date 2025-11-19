@@ -5,7 +5,7 @@ import ProfitChart from '@/components/ProfitChart';
 import BetsTable from '@/components/BetsTable';
 import ConfigPanel from '@/components/ConfigPanel';
 import { Bet, DailyStats, AccountBalance } from '@/types';
-import { TrendingUp, Activity, Wallet } from 'lucide-react';
+import { TrendingUp, Activity, Wallet, RefreshCw } from 'lucide-react';
 
 export default function DashboardPage() {
   const [bets, setBets] = useState<Bet[]>([]);
@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [balances, setBalances] = useState<AccountBalance[]>([]);
   const [botRunning, setBotRunning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportPeriod, setExportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
@@ -65,6 +66,28 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Error toggling bot:', error);
+    }
+  };
+
+  const handleRefreshBalances = async () => {
+    setRefreshing(true);
+    try {
+      const response = await fetch('/api/balances/refresh', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Balances refreshed:', data);
+        // Refresh the dashboard data
+        await fetchData();
+      } else {
+        console.error('Failed to refresh balances');
+      }
+    } catch (error) {
+      console.error('Error refreshing balances:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -148,6 +171,14 @@ export default function DashboardPage() {
             <p className="text-gray-600 mt-1">Monitor your arbitrage trading bot</p>
           </div>
           <div className="flex items-center space-x-4">
+            <button
+              onClick={handleRefreshBalances}
+              disabled={refreshing}
+              className="px-4 py-3 rounded-lg font-semibold transition-colors bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>{refreshing ? 'Refreshing...' : 'Refresh Balances'}</span>
+            </button>
             <button
               onClick={handleBotToggle}
               className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
