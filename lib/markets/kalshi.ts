@@ -254,12 +254,16 @@ export class KalshiAPI {
       const response = await axios.get(`${BASE_URL}/markets/${ticker}/orderbook`);
       const orderbook: KalshiOrderbook = response.data.orderbook;
 
-      const bestYesPrice = orderbook.yes.length > 0 ? orderbook.yes[0][0] : 0;
-      const bestNoPrice = orderbook.no.length > 0 ? orderbook.no[0][0] : 0;
+      // Handle null/missing orderbook data safely
+      const bestYesPrice = orderbook?.yes?.length > 0 ? orderbook.yes[0][0] : 0;
+      const bestNoPrice = orderbook?.no?.length > 0 ? orderbook.no[0][0] : 0;
 
       return { bestYesPrice, bestNoPrice };
     } catch (error: any) {
-      console.error(`Error fetching orderbook for ${ticker}:`, error.response?.status || error.message);
+      // Silently return 0 for 429 rate limits to avoid log spam
+      if (error.response?.status !== 429) {
+        console.error(`Error fetching orderbook for ${ticker}:`, error.response?.status || error.message);
+      }
       return { bestYesPrice: 0, bestNoPrice: 0 };
     }
   }
