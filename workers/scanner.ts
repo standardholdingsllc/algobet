@@ -155,6 +155,10 @@ class MarketScanner {
         this.polymarketService.getTotalBalance(),
       ]);
 
+      console.log('Balance Check Results:');
+      console.log('Kalshi:', JSON.stringify(kalshiBalances));
+      console.log('Polymarket:', JSON.stringify(polymarketBalances));
+
       // Update balances in data store
       const now = new Date();
       dataStore.balances = [

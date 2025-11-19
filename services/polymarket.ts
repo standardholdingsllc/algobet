@@ -136,6 +136,7 @@ export class PolymarketService {
         },
       });
 
+      console.log(`[Polymarket] Raw positions response: ${JSON.stringify(response.data)}`);
       return response.data || []; // Gamma API returns array directly, not { positions: [] }
     } catch (error) {
       console.error('Error fetching Polymarket positions:', error);
@@ -155,6 +156,8 @@ export class PolymarketService {
         params: { user: this.walletAddress }
       });
       
+      console.log(`[Polymarket] Value response: ${JSON.stringify(valueResponse.data)}`);
+
       const balanceEntry = Array.isArray(valueResponse.data)
         ? valueResponse.data.find((entry: any) => entry.user?.toLowerCase() === this.walletAddress.toLowerCase())
         : null;
@@ -165,6 +168,8 @@ export class PolymarketService {
       const positions = await this.getPositions();
       let positionsValue = 0;
       
+      console.log(`[Polymarket] Calculating positions value. Count: ${positions.length}`);
+
       for (const position of positions) {
         if (position.value) {
           positionsValue += parseFloat(position.value);
@@ -174,6 +179,8 @@ export class PolymarketService {
       }
       
       const availableCash = totalValue - positionsValue;
+
+      console.log(`[Polymarket] Final values - Total: ${totalValue}, Cash: ${availableCash}, Positions: ${positionsValue}`);
 
       return {
         totalValue,

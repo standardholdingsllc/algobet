@@ -125,6 +125,7 @@ export class KalshiService {
           Authorization: `Bearer ${this.apiKey}`,
         },
       });
+      console.log(`[Kalshi] Raw positions response: ${JSON.stringify(response.data)}`);
       return response.data.positions || [];
     } catch (error) {
       console.error('Error fetching Kalshi positions:', error);
@@ -138,18 +139,28 @@ export class KalshiService {
       const positions = await this.getPositions();
       let positionsValue = 0;
 
+      console.log(`[Kalshi] Calculating total balance. Cash: ${cashBalance}, Positions count: ${positions.length}`);
+
       for (const position of positions) {
         const ticker = position.market_ticker || position.ticker;
         const count = position.position || position.count || position.quantity;
+
+        console.log(`[Kalshi] Processing position: ${ticker}, Count: ${count}, Side: ${position.side}`);
 
         if (count && ticker) {
            const orderbook = await this.getOrderbook(ticker);
            if (orderbook) {
              const currentPrice = position.side === 'yes' ? orderbook.yes : orderbook.no;
-             positionsValue += (Math.abs(count) * currentPrice) / 100;
+             const val = (Math.abs(count) * currentPrice) / 100;
+             positionsValue += val;
+             console.log(`[Kalshi] Position value for ${ticker}: ${val} (Price: ${currentPrice})`);
+           } else {
+             console.log(`[Kalshi] No orderbook found for ${ticker}`);
            }
         }
       }
+
+      console.log(`[Kalshi] Final values - Total: ${cashBalance + positionsValue}, Cash: ${cashBalance}, Positions: ${positionsValue}`);
 
       return {
         totalValue: cashBalance + positionsValue,
