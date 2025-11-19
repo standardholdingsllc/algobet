@@ -7,11 +7,23 @@ import ConfigPanel from '@/components/ConfigPanel';
 import { Bet, DailyStats, AccountBalance } from '@/types';
 import { TrendingUp, Activity, Wallet, RefreshCw } from 'lucide-react';
 
+interface BotHealth {
+  healthy: boolean;
+  running: boolean;
+  lastScan?: string;
+  lastSuccessfulScan?: string;
+  minutesSinceLastScan?: number;
+  consecutiveErrors: number;
+  totalScans: number;
+  totalErrors: number;
+}
+
 export default function DashboardPage() {
   const [bets, setBets] = useState<Bet[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [balances, setBalances] = useState<AccountBalance[]>([]);
   const [botRunning, setBotRunning] = useState(false);
+  const [botHealth, setBotHealth] = useState<BotHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -45,6 +57,7 @@ export default function DashboardPage() {
       setDailyStats(statsData.stats || []);
       setBalances(balancesData.balances || []);
       setBotRunning(statusData.running || false);
+      setBotHealth(statusData);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -169,6 +182,34 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-600 mt-1">Monitor your arbitrage trading bot</p>
+            {botHealth && botRunning && (
+              <div className="mt-2 flex items-center space-x-4 text-sm">
+                <div className={`flex items-center ${botHealth.healthy ? 'text-green-600' : 'text-red-600'}`}>
+                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${botHealth.healthy ? 'bg-green-600' : 'bg-red-600'} animate-pulse`}></span>
+                  {botHealth.healthy ? 'Healthy' : 'Unhealthy'}
+                </div>
+                <span className="text-gray-500">•</span>
+                <span className="text-gray-600">
+                  {botHealth.totalScans} scans
+                </span>
+                {botHealth.minutesSinceLastScan !== undefined && (
+                  <>
+                    <span className="text-gray-500">•</span>
+                    <span className="text-gray-600">
+                      Last scan: {botHealth.minutesSinceLastScan}m ago
+                    </span>
+                  </>
+                )}
+                {botHealth.consecutiveErrors > 0 && (
+                  <>
+                    <span className="text-gray-500">•</span>
+                    <span className="text-orange-600">
+                      {botHealth.consecutiveErrors} errors
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-4">
             <button

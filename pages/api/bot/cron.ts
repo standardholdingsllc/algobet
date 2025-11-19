@@ -1,10 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { ArbitrageBotEngine } from '@/lib/bot';
-import { getBotStatus } from './status';
+import { getBotStatus, updateBotHealth } from './status';
 
 /**
  * Cron endpoint that runs every minute to scan for arbitrage opportunities
  * This is triggered by Vercel Cron and performs ONE scan per invocation
+ * 
+ * Features:
+ * - Health tracking (last scan, error count)
+ * - Graceful error recovery (continues running even if scan fails)
+ * - Auto-restart capability (resets error count on success)
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verify this is a cron job (Vercel sets this header)
@@ -31,24 +36,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Bot is enabled - perform a single scan
+    // Bot is enabled - perform a single scan with error recovery
     console.log(`[${new Date().toISOString()}] Cron scan starting...`);
     
-    const bot = new ArbitrageBotEngine();
-    await bot.scanOnce();
+    let scanSuccess = false;
+    let errorMessage = '';
     
-    console.log(`[${new Date().toISOString()}] Cron scan completed`);
+    try {
+      const bot = new ArbitrageBotEngine();
+      await bot.scanOnce();
+      scanSuccess = true;
+      console.log(`[${new Date().toISOString()}] Cron scan completed successfully`);
+    } catch (scanError: any) {
+      // Log the error but don't throw - we want to continue running
+      console.error(`[${new Date().toISOString()}] Scan error (will retry next cycle):`, scanError.message);
+      errorMessage = scanError.message;
+      scanSuccess = false;
+    }
 
-    return res.status(200).json({
-      message: 'Scan completed successfully',
-      running: true,
-      timestamp: new Date().toISOString(),
-    });
+    // Update health status regardless of success/failure
+    await updateBotHealth(scanSuccess);
+
+    if (scanSuccess) {
+      return res.status(200).json({
+        message: 'Scan completed successfully',
+        running: true,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      // Return 200 (not 500) so cron doesn't think the endpoint is broken
+      return res.status(200).json({
+        message: 'Scan failed but bot is still running',
+        running: true,
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
+      });
+    }
   } catch (error: any) {
-    console.error('Error in cron handler:', error);
-    return res.status(500).json({
-      error: 'Internal server error',
-      message: error.message,
+    // Critical error (e.g., can't read bot status) - update health and return error
+    console.error('Critical error in cron handler:', error);
+    await updateBotHealth(false);
+    
+    // Still return 200 to prevent cron from stopping
+    return res.status(200).json({
+      message: 'Critical error but bot will retry',
+      running: true,
+      error: error.message,
+      timestamp: new Date().toISOString(),
     });
   }
 }

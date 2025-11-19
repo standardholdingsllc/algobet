@@ -9,6 +9,10 @@
     {
       "path": "/api/bot/cron",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/bot/watchdog",
+      "schedule": "*/5 * * * *"
     }
   ],
   "github": {
