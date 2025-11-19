@@ -231,10 +231,17 @@ export class ArbitrageBotEngine {
     this.scanner.setCurrentInterval(nextInterval);
 
     // Execute the best opportunities (prioritize tracked market opportunities)
+    // Use AVAILABLE CASH (not total value) for bet sizing
     for (const opportunity of uniqueOpportunities.slice(0, 5)) {
       // Limit to top 5 per scan
       try {
-        await this.executeBet(opportunity, kalshiBalance, polymarketBalance, sxbetBalance, config.maxBetPercentage);
+        await this.executeBet(
+          opportunity, 
+          kalshiBalances.availableCash,    // Use available cash only
+          polymarketBalances.availableCash, // Use available cash only
+          sxbetBalance,                     // sx.bet balance (already cash)
+          config.maxBetPercentage
+        );
       } catch (error) {
         console.error('Error executing bet:', error);
       }
