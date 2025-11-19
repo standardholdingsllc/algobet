@@ -3,9 +3,9 @@ console.log('🔧 SX.bet Environment Variable Check\n');
 console.log('─'.repeat(50));
 
 const envVars = [
-  'SBET_API_KEY',
-  'SBET_WALLET_ADDRESS',
-  'SBET_PRIVATE_KEY'
+  'SXBET_API_KEY',
+  'SXBET_WALLET_ADDRESS',
+  'SXBET_PRIVATE_KEY'
 ];
 
 let allSet = true;
@@ -33,9 +33,9 @@ if (allSet) {
 } else {
   console.log('❌ Some SX.bet environment variables are missing');
   console.log('\n📋 Required environment variables:');
-  console.log('   SBET_API_KEY - Get from SX.bet Discord');
-  console.log('   SBET_WALLET_ADDRESS - Your SX Network wallet address');
-  console.log('   SBET_PRIVATE_KEY - Private key for signing transactions');
+  console.log('   SXBET_API_KEY - Get from SX.bet Discord');
+  console.log('   SXBET_WALLET_ADDRESS - Your SX Network wallet address');
+  console.log('   SXBET_PRIVATE_KEY - Private key for signing transactions');
   console.log('\n💡 Make sure these are set in your .env file or environment');
 }
 

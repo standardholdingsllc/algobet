@@ -65,10 +65,10 @@ export class SXBetAPI {
   private privateKey: string;
 
   constructor() {
-    this.apiKey = process.env.SBET_API_KEY || '';
+    this.apiKey = process.env.SXBET_API_KEY || '';
     this.baseToken = '0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B'; // USDC on SX mainnet
-    this.walletAddress = process.env.SBET_WALLET_ADDRESS || '';
-    this.privateKey = process.env.SBET_PRIVATE_KEY || '';
+    this.walletAddress = process.env.SXBET_WALLET_ADDRESS || '';
+    this.privateKey = process.env.SXBET_PRIVATE_KEY || '';
   }
 
   /**
@@ -285,7 +285,7 @@ export class SXBetAPI {
   async getBalance(): Promise<number> {
     try {
       if (!this.walletAddress) {
-        console.warn('sx.bet balance check requires SBET_WALLET_ADDRESS env var');
+        console.warn('sx.bet balance check requires SXBET_WALLET_ADDRESS env var');
         return 0;
       }
 
@@ -392,7 +392,7 @@ export class SXBetAPI {
   async getPositions(): Promise<any[]> {
     try {
       if (!this.walletAddress) {
-        console.warn('sx.bet positions check not implemented - requires SBET_WALLET_ADDRESS env var');
+        console.warn('sx.bet positions check not implemented - requires SXBET_WALLET_ADDRESS env var');
         return [];
       }
 
