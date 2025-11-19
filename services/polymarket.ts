@@ -132,11 +132,11 @@ export class PolymarketService {
           Authorization: `Bearer ${this.apiKey}`,
         },
         params: {
-          address: this.walletAddress,
+          user: this.walletAddress, // Changed from 'address' to 'user'
         },
       });
 
-      return response.data.positions || [];
+      return response.data || []; // Gamma API returns array directly, not { positions: [] }
     } catch (error) {
       console.error('Error fetching Polymarket positions:', error);
       return [];

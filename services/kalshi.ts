@@ -52,9 +52,11 @@ export class KalshiService {
       const response = await axios.get(`${this.baseUrl}/markets/${ticker}/orderbook`);
       const orderbook = response.data.orderbook;
 
+      if (!orderbook) return null;
+
       // Get best bid prices
-      const yesBid = orderbook.yes?.[0]?.[0] || 0;
-      const noBid = orderbook.no?.[0]?.[0] || 0;
+      const yesBid = (orderbook.yes && orderbook.yes.length > 0) ? orderbook.yes[0][0] : 0;
+      const noBid = (orderbook.no && orderbook.no.length > 0) ? orderbook.no[0][0] : 0;
 
       return {
         yes: yesBid,

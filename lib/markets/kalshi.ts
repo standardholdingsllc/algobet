@@ -255,8 +255,8 @@ export class KalshiAPI {
       const orderbook: KalshiOrderbook = response.data.orderbook;
 
       // Handle null/missing orderbook data safely
-      const bestYesPrice = orderbook?.yes?.length > 0 ? orderbook.yes[0][0] : 0;
-      const bestNoPrice = orderbook?.no?.length > 0 ? orderbook.no[0][0] : 0;
+      const bestYesPrice = (orderbook?.yes && orderbook.yes.length > 0) ? orderbook.yes[0][0] : 0;
+      const bestNoPrice = (orderbook?.no && orderbook.no.length > 0) ? orderbook.no[0][0] : 0;
 
       return { bestYesPrice, bestNoPrice };
     } catch (error: any) {
