@@ -126,6 +126,14 @@ export default function DashboardPage() {
   const totalBalance = kalshiBalance + polymarketBalance + sxbetBalance;
   const totalCash = kalshiCash + polymarketCash + sxbetBalance;
 
+  // Debug logs to verify data flow
+  console.log('Dashboard Balance Data:', {
+    kalshi: { total: kalshiBalance, cash: kalshiCash },
+    polymarket: { total: polymarketBalance, cash: polymarketCash },
+    sxbet: { total: sxbetBalance, cash: sxbetBalance },
+    total: { total: totalBalance, cash: totalCash }
+  });
+
   const avgDailyProfit = dailyStats.length > 0
     ? dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0) / dailyStats.length
     : 0;
