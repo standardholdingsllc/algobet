@@ -56,10 +56,10 @@ export default function Dashboard() {
   const sxbetBalanceData = dataStore.balances.find(b => b.platform === 'sxbet');
   
   const kalshiBalance = kalshiBalanceData?.balance || 0;
-  const kalshiCash = kalshiBalanceData?.availableCash ?? kalshiBalance;
+  const kalshiCash = kalshiBalanceData?.availableCash ?? 0;
   
   const polymarketBalance = polymarketBalanceData?.balance || 0;
-  const polymarketCash = polymarketBalanceData?.availableCash ?? polymarketBalance;
+  const polymarketCash = polymarketBalanceData?.availableCash ?? 0;
   
   const sxbetBalance = sxbetBalanceData?.balance || 0;
   
