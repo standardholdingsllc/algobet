@@ -35,6 +35,7 @@ export class PolymarketAPI {
 
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
     try {
+      console.log('[Polymarket] Fetching markets from Gamma API...');
       const response = await axios.get(`${GAMMA_URL}/markets`, {
         params: {
           closed: false,
@@ -42,43 +43,140 @@ export class PolymarketAPI {
         },
       });
 
+      console.log(`[Polymarket] API Response: ${response.data?.length || 0} markets received`);
+      
+      if (!response.data || !Array.isArray(response.data)) {
+        console.warn('[Polymarket] Unexpected response format:', typeof response.data);
+        return [];
+      }
+
       const markets: Market[] = [];
       const maxDate = new Date();
       maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
+      
+      let processedCount = 0;
+      let skippedNonBinary = 0;
+      let skippedExpired = 0;
+      let skippedMissingTokens = 0;
 
       for (const market of response.data) {
+        processedCount++;
+        
+        // Debug first market
+        if (processedCount === 1) {
+          console.log('[Polymarket] Sample market structure:', JSON.stringify({
+            condition_id: market.condition_id,
+            question: market.question?.substring(0, 50),
+            end_date_iso: market.end_date_iso,
+            tokens_count: market.tokens?.length,
+            tokens: market.tokens,
+          }, null, 2));
+        }
+        
+        if (!market.end_date_iso) {
+          skippedExpired++;
+          continue;
+        }
+        
         const expiryDate = new Date(market.end_date_iso);
         
-        if (expiryDate <= maxDate && market.tokens.length === 2) {
-          // Binary markets only
-          const yesToken = market.tokens.find((t: any) => t.outcome === 'Yes' || t.outcome === 'YES');
-          const noToken = market.tokens.find((t: any) => t.outcome === 'No' || t.outcome === 'NO');
+        if (expiryDate > maxDate) {
+          skippedExpired++;
+          continue;
+        }
+        
+        if (!market.tokens || market.tokens.length !== 2) {
+          skippedNonBinary++;
+          continue;
+        }
+        
+        // Binary markets only - check for Yes/No tokens
+        const yesToken = market.tokens.find((t: any) => 
+          t.outcome === 'Yes' || t.outcome === 'YES' || t.outcome === 'yes'
+        );
+        const noToken = market.tokens.find((t: any) => 
+          t.outcome === 'No' || t.outcome === 'NO' || t.outcome === 'no'
+        );
 
-          if (yesToken && noToken) {
-            // Get orderbook for better pricing
-            const orderbook = await this.getOrderbook(yesToken.token_id);
+        if (!yesToken || !noToken) {
+          // Try alternative approach - assume first token is Yes, second is No
+          if (market.tokens.length === 2) {
+            const token0 = market.tokens[0];
+            const token1 = market.tokens[1];
             
-            const yesPrice = orderbook.bestBid ? parseFloat(orderbook.bestBid) * 100 : parseFloat(yesToken.price) * 100;
-            const noPrice = orderbook.bestAsk ? (1 - parseFloat(orderbook.bestAsk)) * 100 : parseFloat(noToken.price) * 100;
+            if (token0.price && token1.price && token0.token_id && token1.token_id) {
+              const yesPrice = parseFloat(token0.price) * 100;
+              const noPrice = parseFloat(token1.price) * 100;
 
-            markets.push({
-              id: market.condition_id,
-              platform: 'polymarket',
-              ticker: market.condition_id,
-              marketType: 'prediction',
-              title: market.question,
-              yesPrice,
-              noPrice,
-              expiryDate: expiryDate.toISOString(),
-              volume: parseFloat(market.volume),
-            });
+              markets.push({
+                id: market.condition_id,
+                platform: 'polymarket',
+                ticker: market.condition_id,
+                marketType: 'prediction',
+                title: market.question,
+                yesPrice,
+                noPrice,
+                expiryDate: expiryDate.toISOString(),
+                volume: parseFloat(market.volume || '0'),
+              });
+              continue;
+            }
           }
+          
+          skippedMissingTokens++;
+          continue;
+        }
+
+        // Get orderbook for better pricing (optional, fall back to token price)
+        try {
+          const orderbook = await this.getOrderbook(yesToken.token_id);
+          
+          const yesPrice = orderbook.bestBid ? parseFloat(orderbook.bestBid) * 100 : parseFloat(yesToken.price) * 100;
+          const noPrice = orderbook.bestAsk ? (1 - parseFloat(orderbook.bestAsk)) * 100 : parseFloat(noToken.price) * 100;
+
+          markets.push({
+            id: market.condition_id,
+            platform: 'polymarket',
+            ticker: market.condition_id,
+            marketType: 'prediction',
+            title: market.question,
+            yesPrice,
+            noPrice,
+            expiryDate: expiryDate.toISOString(),
+            volume: parseFloat(market.volume || '0'),
+          });
+        } catch (orderbookError) {
+          // Fallback to token prices if orderbook fails
+          const yesPrice = parseFloat(yesToken.price) * 100;
+          const noPrice = parseFloat(noToken.price) * 100;
+
+          markets.push({
+            id: market.condition_id,
+            platform: 'polymarket',
+            ticker: market.condition_id,
+            marketType: 'prediction',
+            title: market.question,
+            yesPrice,
+            noPrice,
+            expiryDate: expiryDate.toISOString(),
+            volume: parseFloat(market.volume || '0'),
+          });
         }
       }
 
+      console.log(`[Polymarket] Processed ${processedCount} markets:`);
+      console.log(`  - Added: ${markets.length}`);
+      console.log(`  - Skipped (expired/future): ${skippedExpired}`);
+      console.log(`  - Skipped (non-binary): ${skippedNonBinary}`);
+      console.log(`  - Skipped (missing tokens): ${skippedMissingTokens}`);
+
       return markets;
-    } catch (error) {
-      console.error('Error fetching Polymarket markets:', error);
+    } catch (error: any) {
+      console.error('[Polymarket] Error fetching markets:', error.message);
+      if (error.response) {
+        console.error(`[Polymarket] Response status: ${error.response.status}`);
+        console.error(`[Polymarket] Response data:`, error.response.data);
+      }
       return [];
     }
   }

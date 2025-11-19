@@ -120,13 +120,21 @@ export class SXBetAPI {
         },
       });
 
-      // Get active fixtures to get event details
-      const fixturesResponse = await axios.get(`${BASE_URL}/fixtures`, {
-        headers: this.getHeaders(),
-      });
-
-      const fixtures: SXBetFixture[] = fixturesResponse.data.data || [];
-      const fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
+      // Try to get fixtures for event details (but make it optional)
+      let fixtures: SXBetFixture[] = [];
+      let fixtureMap = new Map<string, SXBetFixture>();
+      
+      try {
+        const fixturesResponse = await axios.get(`${BASE_URL}/fixtures`, {
+          headers: this.getHeaders(),
+        });
+        fixtures = fixturesResponse.data.data || [];
+        fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
+        console.log(`[sx.bet] Retrieved ${fixtures.length} fixtures`);
+      } catch (fixtureError: any) {
+        // Fixtures endpoint not available - we'll work without it
+        console.warn(`[sx.bet] Fixtures endpoint not available (${fixtureError.response?.status}), continuing without fixture data`);
+      }
 
       // Get best odds for each market
       const ordersResponse = await axios.get(`${BASE_URL}/orders/book`, {
@@ -141,11 +149,19 @@ export class SXBetAPI {
       maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
 
       for (const market of marketsResponse.data.data || []) {
-        // Get fixture details
+        // Get fixture details (optional)
         const fixture = fixtureMap.get(market.sportXeventId);
-        if (!fixture) continue;
-
-        const expiryDate = new Date(fixture.startDate);
+        
+        // Determine expiry date
+        let expiryDate: Date;
+        if (fixture && fixture.startDate) {
+          expiryDate = new Date(fixture.startDate);
+        } else {
+          // If no fixture data, skip markets without expiry info
+          // Or use a far future date if we want to include them
+          console.warn(`[sx.bet] Skipping market ${market.marketHash} - no fixture data`);
+          continue;
+        }
         
         // Only include markets within expiry window and not started
         if (expiryDate > maxDate || expiryDate < new Date()) continue;
@@ -177,7 +193,7 @@ export class SXBetAPI {
         const outcomeTwoOdds = this.convertToDecimalOdds(bestOutcomeTwo.percentageOdds, true);
 
         // Create market title
-        const title = this.createMarketTitle(market, fixture);
+        const title = fixture ? this.createMarketTitle(market, fixture) : this.createFallbackTitle(market);
 
         markets.push({
           id: market.marketHash,
@@ -197,6 +213,13 @@ export class SXBetAPI {
       console.error('Error fetching sx.bet markets:', error);
       return [];
     }
+  }
+
+  /**
+   * Create fallback title when fixture data is not available
+   */
+  private createFallbackTitle(market: SXBetMarket): string {
+    return `${market.leagueLabel || 'Sports'} - ${market.gameLabel || market.outcomeOneName + ' vs ' + market.outcomeTwoName}`;
   }
 
   /**

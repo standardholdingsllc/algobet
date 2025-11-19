@@ -1,49 +1,45 @@
-2025-11-19 06:12:39.707 [info] [2025-11-19T06:12:39.706Z] Cron scan starting...
-2025-11-19 06:12:39.709 [info] [2025-11-19T06:12:39.708Z] Scanning for arbitrage opportunities...
-2025-11-19 06:12:39.871 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-19 06:12:39.871 [info] [Kalshi] 💼 Portfolio value: $27.77
-2025-11-19 06:12:39.871 [info] [Kalshi] 💰 Positions value: $26.94
-2025-11-19 06:12:39.871 [info] [Kalshi] 💵 Total value: $27.77
-2025-11-19 06:12:39.984 [info] [Polymarket] ✅ Total account value: $26.65
-2025-11-19 06:12:40.106 [warning] [Polymarket] CLOB balance endpoint failed: 404
-2025-11-19 06:12:40.106 [info] [Polymarket] ⚠️ CLOB API unavailable, calculating from positions...
-2025-11-19 06:12:40.208 [info] [Polymarket] 📊 Found 1 positions
-2025-11-19 06:12:40.208 [info] [Polymarket] 🔍 Sample position: {
-  "proxyWallet": "0xb2e64b103d94fed4e1bec606daf191219497a230",
-  "asset": "44305836174662659056360031599221289950024907383706896555756948878751959775782",
-  "conditionId": "0xf4f51e9e4e8439e32f64dc0e659828af7564f9cbc323d4f7442f2c590a2ea07d",
-  "size": 658,
-  "avgPrice": 0.12,
-  "initialValue": 78.96,
-  "currentValue": 26.649,
-  "cashPnl": -52.311,
-  "percentPnl": -66.25,
-  "totalBought": 658,
-  "realizedPnl": 0,
-  "percentRealizedPnl": -66.25,
-  "curPrice": 0.0405,
-  "redeemable": false,
-  "mergeable": false,
-  "title": "Taylor Swift pregnant in 2025?",
-  "slug": "taylor-swift-pregnant-in-2025",
-  "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/taylor-swift-pregnant-in-2025-5cpC3Ir4u5Pd.jpg",
-  "eventId": "22448",
-  "eventSlug": "taylor-swift-pregnant-in-2025",
-  "outcome": "Yes",
-  "outcomeIndex": 0,
-  "oppositeOutcome": "No",
-  "oppositeAsset": "72122482770569588499506755542531317316214547923366033552728295449545343415738",
-  "endDate": "2025-12-31",
-  "negativeRisk": false
+2025-11-19 22:06:14.207 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
 }
-2025-11-19 06:12:40.208 [info] [Polymarket]   → Position value: $26.65
-2025-11-19 06:12:40.208 [info] [Polymarket] 💰 Positions value: $26.65
-2025-11-19 06:12:40.208 [info] [Polymarket] 💵 Available cash (calculated): $0.00
-2025-11-19 06:12:40.208 [warning] sx.bet balance check not implemented - requires Web3 integration
-2025-11-19 06:12:40.208 [info] 💰 Kalshi: Total $27.77 (Cash: $0.83, Positions: $26.94)
-2025-11-19 06:12:40.208 [info] 💰 Polymarket: Total $26.65 (Cash: $0.00, Positions: $26.65)
-2025-11-19 06:12:40.208 [info] 💰 SX.bet: $0.00
-2025-11-19 06:12:40.539 [error] Error fetching sx.bet markets: AxiosError: Request failed with status code 404
+2025-11-19 22:06:14.208 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
+}
+2025-11-19 22:06:14.208 [error] Error sending balance alert email: Error: Greeting never received
+    at SMTPConnection._formatError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:809:19)
+    at SMTPConnection._onError (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:795:20)
+    at Timeout.<anonymous> (/var/task/node_modules/nodemailer/lib/smtp-connection/index.js:729:22)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7) {
+  code: 'ETIMEDOUT',
+  command: 'CONN'
+}
+2025-11-19 22:06:14.236 [info] [2025-11-19T22:06:14.235Z] Cron scan starting...
+2025-11-19 22:06:14.237 [info] [2025-11-19T22:06:14.236Z] Scanning for arbitrage opportunities...
+2025-11-19 22:06:14.356 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-19 22:06:14.356 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-19 22:06:14.356 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-19 22:06:14.356 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-19 22:06:14.470 [info] [Polymarket] 📊 Positions value (from /value): $21.39
+2025-11-19 22:06:14.506 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 22:06:14.506 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 22:06:14.506 [info] [Polymarket] ✅ Total account value: $31.39
+2025-11-19 22:06:14.506 [warning] sx.bet balance check not implemented - requires Web3 integration
+2025-11-19 22:06:14.506 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-19 22:06:14.506 [info] 💰 Polymarket: Total $31.39 (Cash: $10.01, Positions: $21.39)
+2025-11-19 22:06:14.506 [info] 💰 SX.bet: $0.00
+2025-11-19 22:06:14.688 [error] Error fetching sx.bet markets: AxiosError: Request failed with status code 404
     at settle (file:///var/task/node_modules/axios/lib/core/settle.js:19:12)
     at BrotliDecompress.handleStreamEnd (file:///var/task/node_modules/axios/lib/adapters/http.js:793:11)
     at BrotliDecompress.emit (node:events:519:28)
@@ -51,11 +47,11 @@
     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
     at Axios.request (file:///var/task/node_modules/axios/lib/core/Axios.js:45:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async n.getOpenMarkets (/var/task/.next/server/chunks/865.js:5:9965)
+    at async i.getOpenMarkets (/var/task/.next/server/chunks/865.js:5:10679)
     at async Promise.all (index 2)
     at async g.scanAndExecute (/var/task/.next/server/pages/api/bot/cron.js:3:4256)
     at async g.scanOnce (/var/task/.next/server/pages/api/bot/cron.js:3:2756)
-    at async s (/var/task/.next/server/pages/api/bot/cron.js:28:8040)
+    at async n (/var/task/.next/server/pages/api/bot/cron.js:28:8064)
     at async K (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
     at async U.render (/var/task/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
     at async r9.runApi (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:17:44515) {
@@ -127,7 +123,7 @@
       'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
       'User-Agent: axios/1.13.2\r\n' +
       'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-      'x-vercel-id: iad1::gchg8-1763532759151-06d95dc06f17\r\n' +
+      'x-vercel-id: iad1::gmhxg-1763589974165-d093a48d588a\r\n' +
       'Host: api.sx.bet\r\n' +
       'Connection: keep-alive\r\n' +
       '\r\n',
@@ -276,15 +272,15 @@
         _idleTimeout: 5000,
         _idlePrev: [TimersList],
         _idleNext: [Timeout],
-        _idleStart: 42925,
+        _idleStart: 6513265,
         _onTimeout: [Function: bound ],
         _timerArgs: undefined,
         _repeat: null,
         _destroyed: false,
         [Symbol(refed)]: false,
         [Symbol(kHasPrimitive)]: false,
-        [Symbol(asyncId)]: 3465,
-        [Symbol(triggerId)]: 3463,
+        [Symbol(asyncId)]: 36247,
+        [Symbol(triggerId)]: 36245,
         [Symbol(kAsyncContextFrame)]: undefined,
         [Symbol(kResourceStore)]: [Object],
         [Symbol(kResourceStore)]: [Object],
@@ -322,7 +318,7 @@
     status: 404,
     statusText: 'Not Found',
     headers: Object [AxiosHeaders] {
-      date: 'Wed, 19 Nov 2025 06:12:40 GMT',
+      date: 'Wed, 19 Nov 2025 22:06:14 GMT',
       'content-type': 'application/json; charset=utf-8',
       'transfer-encoding': 'chunked',
       connection: 'keep-alive',
@@ -338,7 +334,7 @@
       etag: 'W/"47-WtYGojL0p/jQJHbNORnza+dRyYA"',
       'cf-cache-status': 'DYNAMIC',
       server: 'cloudflare',
-      'cf-ray': '9a0d8ea92971d62d-IAD',
+      'cf-ray': '9a13037d8a2fe5f7-IAD',
       'alt-svc': 'h3=":443"; ma=86400'
     },
     config: {
@@ -390,7 +386,7 @@
         'X-Api-Key: c3df9063-8564-44f2-92b5-413b5b30ffa2\r\n' +
         'User-Agent: axios/1.13.2\r\n' +
         'Accept-Encoding: gzip, compress, deflate, br\r\n' +
-        'x-vercel-id: iad1::gchg8-1763532759151-06d95dc06f17\r\n' +
+        'x-vercel-id: iad1::gmhxg-1763589974165-d093a48d588a\r\n' +
         'Host: api.sx.bet\r\n' +
         'Connection: keep-alive\r\n' +
         '\r\n',
@@ -436,9 +432,9 @@
   },
   status: 404
 }
-2025-11-19 06:12:40.702 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
-2025-11-19 06:12:40.704 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-19 06:12:40.729 [info] Found 0 matching markets across platforms
-2025-11-19 06:12:40.730 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
-2025-11-19 06:12:40.731 [info] 📊 Standard scanning - every 30 seconds
-2025-11-19 06:12:40.731 [info] [2025-11-19T06:12:40.730Z] Cron scan completed
+2025-11-19 22:06:14.923 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
+2025-11-19 22:06:14.925 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-19 22:06:14.948 [info] Found 0 matching markets across platforms
+2025-11-19 22:06:14.948 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-19 22:06:14.951 [info] 📊 Standard scanning - every 30 seconds
+2025-11-19 22:06:14.951 [info] [2025-11-19T22:06:14.950Z] Cron scan completed successfully in 714ms
