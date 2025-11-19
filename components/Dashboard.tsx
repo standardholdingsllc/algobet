@@ -63,11 +63,16 @@ export default function Dashboard() {
   
   const sxbetBalance = sxbetBalanceData?.balance || 0;
   
-  // Debug: Log balance data
-  console.log('Balance Data:', {
+  // Debug: Log balance data [DATA BRANCH DEPLOY v3]
+  console.log('Balance Data [v3]:', {
     kalshi: { balance: kalshiBalance, cash: kalshiCash, data: kalshiBalanceData },
     polymarket: { balance: polymarketBalance, cash: polymarketCash, data: polymarketBalanceData },
     sxbet: { balance: sxbetBalance, data: sxbetBalanceData }
+  });
+  console.log('CHANGE VALUES:', {
+    kalshiChange: `Cash: $${kalshiCash.toFixed(2)}`,
+    polyChange: `Cash: $${polymarketCash.toFixed(2)}`,
+    sxbetChange: `Cash: $${sxbetBalance.toFixed(2)}`
   });
 
   return (
