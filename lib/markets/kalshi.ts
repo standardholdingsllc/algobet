@@ -294,17 +294,21 @@ export class KalshiAPI {
       for (const position of positions) {
         // Calculate current value of positions
         // Kalshi positions have: position_count, side ('yes' or 'no'), market info
-        if (position.position && position.market_ticker) {
+        // Handle potential property name variations
+        const ticker = position.market_ticker || position.ticker;
+        const count = position.position || position.count || position.quantity;
+        
+        if (count && ticker) {
           try {
-            const orderbook = await this.getOrderbook(position.market_ticker);
+            const orderbook = await this.getOrderbook(ticker);
             const currentPrice = position.side === 'yes' ? orderbook.bestYesPrice : orderbook.bestNoPrice;
-            const positionCount = Math.abs(position.position);
+            const positionCount = Math.abs(count);
             
             // Position value = count * current_price / 100
             positionsValue += (positionCount * currentPrice) / 100;
           } catch (err) {
             // Skip positions we can't value
-            console.error(`Error valuing position ${position.market_ticker}:`, err);
+            console.error(`Error valuing position ${ticker}:`, err);
           }
         }
       }

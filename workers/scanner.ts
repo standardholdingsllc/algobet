@@ -150,32 +150,44 @@ class MarketScanner {
     console.log('Checking account balances...');
 
     try {
-      const [kalshiBalance, polymarketBalance] = await Promise.all([
-        this.kalshiService.getBalance(),
-        this.polymarketService.getBalance(),
+      const [kalshiBalances, polymarketBalances] = await Promise.all([
+        this.kalshiService.getTotalBalance(),
+        this.polymarketService.getTotalBalance(),
       ]);
 
       // Update balances in data store
       const now = new Date();
       dataStore.balances = [
-        { platform: 'kalshi', balance: kalshiBalance, lastUpdated: now },
-        { platform: 'polymarket', balance: polymarketBalance, lastUpdated: now },
+        { 
+          platform: 'kalshi', 
+          balance: kalshiBalances.totalValue, 
+          availableCash: kalshiBalances.availableCash,
+          positionsValue: kalshiBalances.positionsValue,
+          lastUpdated: now 
+        },
+        { 
+          platform: 'polymarket', 
+          balance: polymarketBalances.totalValue, 
+          availableCash: polymarketBalances.availableCash,
+          positionsValue: polymarketBalances.positionsValue,
+          lastUpdated: now 
+        },
       ];
 
       // Check for low balance alerts
       if (dataStore.config.emailAlerts.lowBalanceAlert) {
-        if (kalshiBalance < dataStore.config.balanceThresholds.kalshi) {
+        if (kalshiBalances.totalValue < dataStore.config.balanceThresholds.kalshi) {
           await sendBalanceAlert(
             'kalshi',
-            kalshiBalance,
+            kalshiBalances.totalValue,
             dataStore.config.balanceThresholds.kalshi
           );
         }
 
-        if (polymarketBalance < dataStore.config.balanceThresholds.polymarket) {
+        if (polymarketBalances.totalValue < dataStore.config.balanceThresholds.polymarket) {
           await sendBalanceAlert(
             'polymarket',
-            polymarketBalance,
+            polymarketBalances.totalValue,
             dataStore.config.balanceThresholds.polymarket
           );
         }

@@ -116,6 +116,50 @@ export class KalshiService {
     }
   }
 
+  async getPositions(): Promise<any[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/portfolio/positions`, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      });
+      return response.data.positions || [];
+    } catch (error) {
+      console.error('Error fetching Kalshi positions:', error);
+      return [];
+    }
+  }
+
+  async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
+    try {
+      const cashBalance = await this.getBalance();
+      const positions = await this.getPositions();
+      let positionsValue = 0;
+
+      for (const position of positions) {
+        const ticker = position.market_ticker || position.ticker;
+        const count = position.position || position.count || position.quantity;
+
+        if (count && ticker) {
+           const orderbook = await this.getOrderbook(ticker);
+           if (orderbook) {
+             const currentPrice = position.side === 'yes' ? orderbook.yes : orderbook.no;
+             positionsValue += (Math.abs(count) * currentPrice) / 100;
+           }
+        }
+      }
+
+      return {
+        totalValue: cashBalance + positionsValue,
+        availableCash: cashBalance,
+        positionsValue
+      };
+    } catch (error) {
+      console.error('Error calculating total balance:', error);
+      return { totalValue: 0, availableCash: 0, positionsValue: 0 };
+    }
+  }
+
   private transformMarket(kalshiMarket: KalshiMarket): Market {
     return {
       id: kalshiMarket.ticker,

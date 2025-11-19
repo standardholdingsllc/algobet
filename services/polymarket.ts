@@ -17,10 +17,12 @@ interface PolymarketMarket {
 export class PolymarketService {
   private apiKey: string;
   private baseUrl: string;
+  private walletAddress: string;
 
   constructor() {
     this.apiKey = process.env.POLYMARKET_API_KEY || '';
     this.baseUrl = POLYMARKET_DATA_API;
+    this.walletAddress = process.env.POLYMARKET_WALLET_ADDRESS || '';
   }
 
   async getOpenMarkets(): Promise<Market[]> {
@@ -120,6 +122,67 @@ export class PolymarketService {
     } catch (error) {
       console.error('Error fetching Polymarket balance:', error);
       return 0;
+    }
+  }
+
+  async getPositions(): Promise<any[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/positions`, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        params: {
+          address: this.walletAddress,
+        },
+      });
+
+      return response.data.positions || [];
+    } catch (error) {
+      console.error('Error fetching Polymarket positions:', error);
+      return [];
+    }
+  }
+
+  async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
+    if (!this.walletAddress) {
+      const balance = await this.getBalance();
+      return { totalValue: balance, availableCash: balance, positionsValue: 0 };
+    }
+
+    try {
+      // Get total value (includes positions) from data-api
+      const valueResponse = await axios.get(`https://data-api.polymarket.com/value`, {
+        params: { user: this.walletAddress }
+      });
+      
+      const balanceEntry = Array.isArray(valueResponse.data)
+        ? valueResponse.data.find((entry: any) => entry.user?.toLowerCase() === this.walletAddress.toLowerCase())
+        : null;
+        
+      const totalValue = balanceEntry ? parseFloat(balanceEntry.value) : await this.getBalance();
+
+      // Get positions to calculate their value
+      const positions = await this.getPositions();
+      let positionsValue = 0;
+      
+      for (const position of positions) {
+        if (position.value) {
+          positionsValue += parseFloat(position.value);
+        } else if (position.size && position.outcome_price) {
+          positionsValue += parseFloat(position.size) * parseFloat(position.outcome_price);
+        }
+      }
+      
+      const availableCash = totalValue - positionsValue;
+
+      return {
+        totalValue,
+        availableCash: Math.max(0, availableCash),
+        positionsValue
+      };
+    } catch (error) {
+      console.error('Error fetching Polymarket total balance:', error);
+      return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
   }
 
