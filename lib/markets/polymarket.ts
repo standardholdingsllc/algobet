@@ -64,7 +64,7 @@ export class PolymarketAPI {
         
         // Debug first few markets to understand expiry dates
         if (processedCount <= 3) {
-          const expiryDate = market.end_date_iso ? new Date(market.end_date_iso) : null;
+          const expiryDate = market.endDateIso ? new Date(market.endDateIso + 'T23:59:59Z') : null;
           const now = new Date();
           const daysFromNow = expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : null;
 
@@ -89,7 +89,7 @@ export class PolymarketAPI {
           continue;
         }
 
-        const expiryDate = new Date(market.endDateIso);
+        const expiryDate = new Date(market.endDateIso + 'T23:59:59Z');
         const now = new Date();
 
         // Skip if market has expired OR is too far in the future
@@ -104,14 +104,23 @@ export class PolymarketAPI {
           continue;
         }
         
-        if (!market.outcomes || market.outcomes.length !== 2 || !market.outcomePrices || market.outcomePrices.length !== 2) {
+        // Parse outcomes and outcomePrices (they come as JSON strings)
+        let outcomes: string[];
+        let prices: string[];
+
+        try {
+          outcomes = typeof market.outcomes === 'string' ? JSON.parse(market.outcomes) : market.outcomes;
+          prices = typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : market.outcomePrices;
+        } catch (error) {
+          console.warn(`[Polymarket] Failed to parse outcomes/prices for market ${market.conditionId}:`, error);
           skippedNonBinary++;
           continue;
         }
 
-        // Binary markets - outcomes and prices are in separate arrays
-        const outcomes = market.outcomes;
-        const prices = market.outcomePrices;
+        if (!outcomes || outcomes.length !== 2 || !prices || prices.length !== 2) {
+          skippedNonBinary++;
+          continue;
+        }
 
         // Assume first outcome is "Yes" and second is "No" (common pattern)
         const yesPrice = parseFloat(prices[0]) * 100;
