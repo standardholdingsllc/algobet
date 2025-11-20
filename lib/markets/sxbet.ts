@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import { Market } from '@/types';
 
 const BASE_URL = 'https://api.sx.bet';
+const SXBET_BEST_ODDS_CHUNK = 25;
 
 // ERC20 ABI for balance queries
 const erc20ABI = [
@@ -46,6 +47,18 @@ interface SXBetOrder {
   baseToken: string;
   expiry: number;
   fillAmount: string;
+}
+
+interface SXBetBestOddsOutcome {
+  percentageOdds: string | null;
+  updatedAt: number | null;
+}
+
+interface SXBetBestOddsEntry {
+  marketHash: string;
+  baseToken: string;
+  outcomeOne: SXBetBestOddsOutcome;
+  outcomeTwo: SXBetBestOddsOutcome;
 }
 
 interface SXBetFixture {
@@ -135,12 +148,44 @@ export class SXBetAPI {
     return Math.max(1.01, decimalOdds); // Ensure odds are at least 1.01
   }
 
+  private async fetchBestOddsMap(
+    marketHashes: string[]
+  ): Promise<Map<string, SXBetBestOddsEntry>> {
+    const bestOddsMap = new Map<string, SXBetBestOddsEntry>();
+    if (marketHashes.length === 0) {
+      return bestOddsMap;
+    }
+
+    for (let i = 0; i < marketHashes.length; i += SXBET_BEST_ODDS_CHUNK) {
+      const chunk = marketHashes.slice(i, i + SXBET_BEST_ODDS_CHUNK);
+      try {
+        const response = await axios.get(`${BASE_URL}/orders/odds/best`, {
+          headers: this.getHeaders(),
+          params: {
+            marketHashes: chunk.join(','),
+            baseToken: this.baseToken,
+          },
+        });
+
+        const bestOdds: SXBetBestOddsEntry[] = response.data?.data?.bestOdds || [];
+        for (const entry of bestOdds) {
+          bestOddsMap.set(entry.marketHash, entry);
+        }
+      } catch (error: any) {
+        console.warn(
+          `[sx.bet] Best odds chunk failed (${error.response?.status}) for ${chunk.length} market(s)`
+        );
+      }
+    }
+
+    return bestOddsMap;
+  }
+
   /**
    * Get active markets within expiry window
    */
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
     try {
-      // Get active markets
       const marketsResponse = await axios.get(`${BASE_URL}/markets/active`, {
         headers: this.getHeaders(),
         params: {
@@ -148,40 +193,35 @@ export class SXBetAPI {
         },
       });
 
-      // Fixture endpoint currently requires elevated permissions; rely on market metadata
       const fixtureMap = new Map<string, SXBetFixture>();
+      const marketsData = marketsResponse.data.data?.markets || [];
+      console.log(`[sx.bet] Retrieved ${marketsData.length} active markets`);
 
-      // Get best odds for order data
-      let ordersResponse: any;
-      try {
-        ordersResponse = await axios.get(`${BASE_URL}/orders/odds/best`, {
-          headers: this.getHeaders(),
-          params: {
-            baseToken: this.baseToken,
-          },
-        });
-        console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} best odds`);
-      } catch (bestOddsError: any) {
-        console.warn(`[sx.bet] Best odds endpoint failed (${bestOddsError.response?.status}), trying active orders...`);
+      const marketHashes = marketsData.map((market) => market.marketHash);
+      const bestOddsMap = await this.fetchBestOddsMap(marketHashes);
 
+      let fallbackOrders: SXBetOrder[] | null = null;
+      const loadFallbackOrders = async (): Promise<SXBetOrder[]> => {
+        if (fallbackOrders) {
+          return fallbackOrders;
+        }
         try {
-          // Fallback to active orders endpoint
-          ordersResponse = await axios.get(`${BASE_URL}/orders`, {
+          const response = await axios.get(`${BASE_URL}/orders`, {
             headers: this.getHeaders(),
             params: {
               baseToken: this.baseToken,
             },
           });
-          console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} active orders`);
-        } catch (activeOrdersError: any) {
-          console.warn(`[sx.bet] Orders endpoint also failed (${activeOrdersError.response?.status}), cannot fetch markets without order data`);
-          return [];
+          fallbackOrders = response.data?.data || [];
+          console.log(`[sx.bet] Retrieved ${fallbackOrders.length} active orders (fallback)`);
+        } catch (error: any) {
+          console.warn(
+            `[sx.bet] Orders endpoint failed (${error.response?.status}) - no fallback order data available`
+          );
+          fallbackOrders = [];
         }
-      }
-
-      // The API returns { status, data: { markets, nextKey } }
-      const marketsData = marketsResponse.data.data?.markets || [];
-      console.log(`[sx.bet] Retrieved ${marketsData.length} active markets`);
+        return fallbackOrders;
+      };
 
       const markets: Market[] = [];
       const maxDate = new Date();
@@ -196,36 +236,52 @@ export class SXBetAPI {
           continue;
         }
 
-        // Only include markets within expiry window and not started
         if (expiryDate > maxDate || expiryDate < new Date()) continue;
 
-        // Get best odds for this market
-        const marketOrders = (ordersResponse.data.data || []).filter(
-          (order: SXBetOrder) => order.marketHash === market.marketHash
-        );
+        const bestOdds = bestOddsMap.get(market.marketHash);
 
-        if (marketOrders.length === 0) continue;
+        let outcomeOneOdds =
+          bestOdds?.outcomeOne?.percentageOdds !== null && bestOdds?.outcomeOne?.percentageOdds
+            ? this.convertToDecimalOdds(bestOdds.outcomeOne.percentageOdds, false)
+            : null;
+        let outcomeTwoOdds =
+          bestOdds?.outcomeTwo?.percentageOdds !== null && bestOdds?.outcomeTwo?.percentageOdds
+            ? this.convertToDecimalOdds(bestOdds.outcomeTwo.percentageOdds, false)
+            : null;
 
-        // Separate by outcome
-        const outcomeOneOrders = marketOrders.filter((o: SXBetOrder) => o.isMakerBettingOutcomeOne);
-        const outcomeTwoOrders = marketOrders.filter((o: SXBetOrder) => !o.isMakerBettingOutcomeOne);
+        if (!outcomeOneOdds || !outcomeTwoOdds) {
+          const allOrders = await loadFallbackOrders();
+          if (!allOrders.length) continue;
 
-        // Get best odds (lowest maker odds = highest taker odds)
-        const bestOutcomeOne = outcomeOneOrders.sort((a: SXBetOrder, b: SXBetOrder) =>
-          Number(a.percentageOdds) - Number(b.percentageOdds)
-        )[0];
+          const marketOrders = allOrders.filter(
+            (order: SXBetOrder) => order.marketHash === market.marketHash
+          );
 
-        const bestOutcomeTwo = outcomeTwoOrders.sort((a: SXBetOrder, b: SXBetOrder) =>
-          Number(a.percentageOdds) - Number(b.percentageOdds)
-        )[0];
+          if (marketOrders.length === 0) continue;
 
-        if (!bestOutcomeOne || !bestOutcomeTwo) continue;
+          const outcomeOneOrders = marketOrders.filter(
+            (o: SXBetOrder) => o.isMakerBettingOutcomeOne
+          );
+          const outcomeTwoOrders = marketOrders.filter(
+            (o: SXBetOrder) => !o.isMakerBettingOutcomeOne
+          );
 
-        // Convert to decimal odds (taker perspective)
-        const outcomeOneOdds = this.convertToDecimalOdds(bestOutcomeOne.percentageOdds, true);
-        const outcomeTwoOdds = this.convertToDecimalOdds(bestOutcomeTwo.percentageOdds, true);
+          const bestOutcomeOne = outcomeOneOrders.sort(
+            (a: SXBetOrder, b: SXBetOrder) => Number(a.percentageOdds) - Number(b.percentageOdds)
+          )[0];
 
-        // Create market title
+          const bestOutcomeTwo = outcomeTwoOrders.sort(
+            (a: SXBetOrder, b: SXBetOrder) => Number(a.percentageOdds) - Number(b.percentageOdds)
+          )[0];
+
+          if (!bestOutcomeOne || !bestOutcomeTwo) continue;
+
+          outcomeOneOdds = this.convertToDecimalOdds(bestOutcomeOne.percentageOdds, true);
+          outcomeTwoOdds = this.convertToDecimalOdds(bestOutcomeTwo.percentageOdds, true);
+        }
+
+        if (!outcomeOneOdds || !outcomeTwoOdds) continue;
+
         const title = fixture
           ? this.createMarketTitle(market, fixture)
           : this.createFallbackTitle(market);

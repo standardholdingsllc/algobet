@@ -33,7 +33,7 @@ Both the cron bot and the worker import the same market clients, arbitrage engin
 ### SX.bet (`lib/markets/sxbet.ts`, `services/sxbet.ts`)
 - **Market ingestion**: Pulls `/markets/active` (filtered by USDC base token) and derives expiry from each market's `gameTime`, so the bot no longer depends on the flaky fixtures endpoint.
 - REST-only for now; fixtures are optional and missing data is logged but non-fatal.
-- Odds come from `/orders/odds/best` with an automatic fallback to `/orders` if the best-odds endpoint rate-limits.
+- **Odds**: Calls `/orders/odds/best` with chunked `marketHashes` per the API docs, and only falls back to `/orders` if a market is missing either side of the book.
 - Order placement remains a TODO until the account receives the necessary permissions.
 
 All integrations return the shared `Market` interface so that `lib/arbitrage.ts` operates platform-agnostically.
