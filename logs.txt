@@ -1,37 +1,33 @@
-2025-11-19 23:01:19.286 [info] [2025-11-19T23:01:19.286Z] Cron scan starting...
-2025-11-19 23:01:19.288 [info] [2025-11-19T23:01:19.288Z] Scanning for arbitrage opportunities...
-2025-11-19 23:01:19.440 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-19 23:01:19.440 [info] [Kalshi] 💼 Portfolio value: $27.97
-2025-11-19 23:01:19.440 [info] [Kalshi] 💰 Positions value: $27.14
-2025-11-19 23:01:19.440 [info] [Kalshi] 💵 Total value: $27.97
-2025-11-19 23:01:19.600 [info] [Polymarket] 📊 Positions value (from /value): $21.06
-2025-11-19 23:01:19.661 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-19 23:01:19.661 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-19 23:01:19.661 [info] [Polymarket] ✅ Total account value: $31.06
-2025-11-19 23:01:19.661 [warning] sx.bet balance check requires SBET_WALLET_ADDRESS env var
-2025-11-19 23:01:19.661 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
-2025-11-19 23:01:19.661 [info] 💰 Polymarket: Total $31.06 (Cash: $10.01, Positions: $21.06)
-2025-11-19 23:01:19.661 [info] 💰 SX.bet: $0.00
-2025-11-19 23:01:19.743 [info] [Polymarket] Fetching markets from Gamma API...
-2025-11-19 23:01:19.743 [warning] [sx.bet] No API key configured - endpoints will fail
-2025-11-19 23:01:19.879 [warning] [sx.bet] No API key configured - endpoints will fail
-2025-11-19 23:01:19.926 [warning] [sx.bet] Fixtures endpoint not available (404), continuing without fixture data
-2025-11-19 23:01:19.926 [warning] [sx.bet] No API key configured - endpoints will fail
-2025-11-19 23:01:19.965 [warning] [sx.bet] Best-odds endpoint failed (404), trying active orders...
-2025-11-19 23:01:19.965 [warning] [sx.bet] No API key configured - endpoints will fail
-2025-11-19 23:01:20.009 [warning] [sx.bet] Active orders endpoint also failed (404), cannot fetch markets without order data
-2025-11-19 23:01:20.142 [info] [Polymarket] API Response: 200 markets received
-2025-11-19 23:01:20.142 [info] [Polymarket] Sample market structure: {
+2025-11-19 23:42:38.566 [info] [2025-11-19T23:42:38.564Z] Cron scan starting...
+2025-11-19 23:42:38.567 [info] [2025-11-19T23:42:38.567Z] Scanning for arbitrage opportunities...
+2025-11-19 23:42:38.705 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-19 23:42:38.705 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-19 23:42:38.705 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-19 23:42:38.705 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-19 23:42:38.866 [info] [Polymarket] 📊 Positions value (from /value): $21.71
+2025-11-19 23:42:38.915 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 23:42:38.915 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-19 23:42:38.915 [info] [Polymarket] ✅ Total account value: $31.72
+2025-11-19 23:42:38.915 [warning] sx.bet balance check requires Web3 integration - wallet configured but Web3 not implemented
+2025-11-19 23:42:38.915 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-19 23:42:38.915 [info] 💰 Polymarket: Total $31.72 (Cash: $10.01, Positions: $21.71)
+2025-11-19 23:42:38.915 [info] 💰 SX.bet: $0.00
+2025-11-19 23:42:39.005 [info] [Polymarket] Fetching markets from Gamma API...
+2025-11-19 23:42:39.289 [warning] [sx.bet] Fixtures endpoint not available (404), continuing without fixture data
+2025-11-19 23:42:39.331 [warning] [sx.bet] Best-odds endpoint failed (404), trying active orders...
+2025-11-19 23:42:39.371 [warning] [sx.bet] Active orders endpoint also failed (404), cannot fetch markets without order data
+2025-11-19 23:42:39.498 [info] [Polymarket] API Response: 200 markets received
+2025-11-19 23:42:39.498 [info] [Polymarket] Sample market structure: {
   "question": "ARCH Will the match be a draw?"
 }
-2025-11-19 23:01:20.143 [info] [Polymarket] Processed 200 markets:
-2025-11-19 23:01:20.143 [info] - Added: 0
-2025-11-19 23:01:20.143 [info] - Skipped (expired/future): 200
-2025-11-19 23:01:20.143 [info] - Skipped (non-binary): 0
-2025-11-19 23:01:20.143 [info] - Skipped (missing tokens): 0
-2025-11-19 23:01:20.378 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
-2025-11-19 23:01:20.380 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-19 23:01:20.406 [info] Found 0 matching markets across platforms
-2025-11-19 23:01:20.406 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
-2025-11-19 23:01:20.407 [info] 📊 Standard scanning - every 30 seconds
-2025-11-19 23:01:20.407 [info] [2025-11-19T23:01:20.406Z] Cron scan completed successfully in 1120ms
+2025-11-19 23:42:39.498 [info] [Polymarket] Processed 200 markets:
+2025-11-19 23:42:39.498 [info] - Added: 0
+2025-11-19 23:42:39.498 [info] - Skipped (expired/future): 200
+2025-11-19 23:42:39.499 [info] - Skipped (non-binary): 0
+2025-11-19 23:42:39.499 [info] - Skipped (missing tokens): 0
+2025-11-19 23:42:39.499 [info] Found 200 Kalshi, 0 Polymarket, and 0 sx.bet markets
+2025-11-19 23:42:39.504 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-19 23:42:39.535 [info] Found 0 matching markets across platforms
+2025-11-19 23:42:39.535 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-19 23:42:39.535 [info] 📊 Standard scanning - every 30 seconds
+2025-11-19 23:42:39.535 [info] [2025-11-19T23:42:39.530Z] Cron scan completed successfully in 965ms
