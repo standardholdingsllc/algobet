@@ -5,6 +5,9 @@ const BASE_URL = 'https://clob.polymarket.com';
 const GAMMA_URL = 'https://gamma-api.polymarket.com';
 const DATA_API_URL = 'https://data-api.polymarket.com';
 
+// Try sports-specific endpoint if available
+const SPORTS_URL = 'https://sports-api.polymarket.com';
+
 interface PolymarketMarket {
   condition_id: string;
   question: string;
@@ -36,12 +39,29 @@ export class PolymarketAPI {
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
     try {
       console.log('[Polymarket] Fetching markets from Gamma API...');
-      const response = await axios.get(`${GAMMA_URL}/markets`, {
-        params: {
-          closed: false,
-          limit: 200,
-        },
-      });
+      // Try different approaches to get sports markets
+      let response;
+
+      try {
+        // First try: Get markets without restrictive filters
+        response = await axios.get(`${GAMMA_URL}/markets`, {
+          params: {
+            limit: 500, // Increase limit significantly
+            // Remove closed/active filters to get everything
+          },
+        });
+        console.log(`[Polymarket] Attempt 1 - No filters: ${response.data?.length || 0} markets`);
+      } catch (error) {
+        console.warn('[Polymarket] Attempt 1 failed, trying with active filter:', error.message);
+        // Fallback: Try with active filter
+        response = await axios.get(`${GAMMA_URL}/markets`, {
+          params: {
+            active: true,
+            limit: 500,
+          },
+        });
+        console.log(`[Polymarket] Attempt 2 - Active filter: ${response.data?.length || 0} markets`);
+      }
 
       console.log(`[Polymarket] API Response: ${response.data?.length || 0} markets received`);
       
@@ -58,10 +78,31 @@ export class PolymarketAPI {
       let skippedNonBinary = 0;
       let skippedExpired = 0;
       let skippedMissingTokens = 0;
+      let sportsMarketsFound = 0;
+      let predictionMarketsFound = 0;
 
       for (const market of response.data) {
         processedCount++;
-        
+
+        // Categorize markets by type
+        const isSportsRelated = market.question?.toLowerCase().includes('match') ||
+                               market.question?.toLowerCase().includes('game') ||
+                               market.question?.toLowerCase().includes('win') ||
+                               market.question?.toLowerCase().includes('vs') ||
+                               market.question?.toLowerCase().includes('draw') ||
+                               market.question?.toLowerCase().includes('score') ||
+                               market.question?.toLowerCase().includes('football') ||
+                               market.question?.toLowerCase().includes('soccer') ||
+                               market.question?.toLowerCase().includes('basketball') ||
+                               market.question?.toLowerCase().includes('baseball') ||
+                               market.question?.toLowerCase().includes('hockey');
+
+        if (isSportsRelated) {
+          sportsMarketsFound++;
+        } else {
+          predictionMarketsFound++;
+        }
+
         // Debug first few markets to understand expiry dates
         if (processedCount <= 3) {
           const expiryDate = market.endDateIso ? new Date(market.endDateIso + 'T23:59:59Z') : null;
@@ -95,14 +136,21 @@ export class PolymarketAPI {
         // Skip if market has expired OR is too far in the future
         if (expiryDate < now || expiryDate > maxDate) {
           // Log details about skipped markets for better debugging
-          if (processedCount <= 10) { // Log first 10 skipped markets
-            console.log(`[Polymarket] Skipping market ${processedCount} (${market.conditionId?.substring(0, 10)}...):`, {
-              question: market.question?.substring(0, 50),
+          // Focus on markets that might be sports-related or near-term
+          const isSportsRelated = market.question?.toLowerCase().includes('match') ||
+                                 market.question?.toLowerCase().includes('game') ||
+                                 market.question?.toLowerCase().includes('win') ||
+                                 market.question?.toLowerCase().includes('vs') ||
+                                 market.question?.toLowerCase().includes('draw');
+
+          if (processedCount <= 15 && (isSportsRelated || processedCount <= 5)) { // Log sports markets and first 5
+            console.log(`[Polymarket] Skipping market ${processedCount} (${isSportsRelated ? 'SPORTS' : 'OTHER'}):`, {
+              question: market.question?.substring(0, 60),
               expiry: expiryDate?.toISOString(),
               days_from_now: expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : 'N/A',
               is_expired: expiryDate < now,
               is_too_far: expiryDate > maxDate,
-              max_days_allowed: maxDaysToExpiry
+              reason: expiryDate < now ? 'EXPIRED' : 'TOO_FAR'
             });
           }
           skippedExpired++;
@@ -170,7 +218,12 @@ export class PolymarketAPI {
       const maxExpiryDate = new Date(now.getTime() + maxDaysToExpiry * 24 * 60 * 60 * 1000);
       console.log(`[Polymarket] Processing window: ${now.toISOString()} to ${maxExpiryDate.toISOString()} (${maxDaysToExpiry} days)`);
 
-      console.log(`[Polymarket] Processed ${processedCount} markets:`);
+      console.log(`[Polymarket] Market type breakdown:`);
+      console.log(`  - Total markets found: ${processedCount}`);
+      console.log(`  - Sports-related markets: ${sportsMarketsFound}`);
+      console.log(`  - Prediction/other markets: ${predictionMarketsFound}`);
+
+      console.log(`[Polymarket] Processing results:`);
       console.log(`  - Added: ${markets.length}`);
       console.log(`  - Skipped (expired/future): ${skippedExpired}`);
       console.log(`  - Skipped (non-binary): ${skippedNonBinary}`);
