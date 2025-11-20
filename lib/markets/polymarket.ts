@@ -5,8 +5,9 @@ const BASE_URL = 'https://clob.polymarket.com';
 const GAMMA_URL = 'https://gamma-api.polymarket.com';
 const DATA_API_URL = 'https://data-api.polymarket.com';
 
-// Try sports-specific endpoint if available
-const SPORTS_URL = 'https://sports-api.polymarket.com';
+// Alternative API endpoints to try
+const MAIN_API_URL = 'https://api.polymarket.com';
+const SPORTS_API_URL = 'https://sports-api.polymarket.com';
 
 interface PolymarketMarket {
   condition_id: string;
@@ -55,7 +56,7 @@ export class PolymarketAPI {
         });
         console.log(`[Polymarket] Attempt 1 - Active & not archived: ${response.data?.length || 0} markets`);
       } catch (error) {
-        console.warn('[Polymarket] Attempt 1 failed, trying different approach:', error instanceof Error ? error.message : String(error));
+        console.warn('[Polymarket] Attempt 1 failed, trying funded markets:', error instanceof Error ? error.message : String(error));
 
         try {
           // Attempt 2: Try filtering by funded and ready markets (active trading)
@@ -73,26 +74,51 @@ export class PolymarketAPI {
           console.warn('[Polymarket] Attempt 2 failed, trying different endpoint:', error2 instanceof Error ? error2.message : String(error2));
 
           try {
-            // Attempt 3: Try using a different endpoint or different base URL
-            // Maybe there's a different API for live markets
-            const alternativeUrl = 'https://api.polymarket.com'; // Try main API
-            response = await axios.get(`${alternativeUrl}/markets`, {
+            // Attempt 3: Try Polymarket's main API endpoint
+            response = await axios.get(`${MAIN_API_URL}/markets`, {
               params: {
                 limit: 500,
                 active: true,
+                closed: false,
               },
             });
-            console.log(`[Polymarket] Attempt 3 - Alternative API endpoint: ${response.data?.length || 0} markets`);
+            console.log(`[Polymarket] Attempt 3 - Main API endpoint: ${response.data?.length || 0} markets`);
           } catch (error3) {
-            console.warn('[Polymarket] Attempt 3 failed, falling back to basic call:', error3 instanceof Error ? error3.message : String(error3));
+            console.warn('[Polymarket] Attempt 3 failed, trying sports API:', error3 instanceof Error ? error3.message : String(error3));
 
-            // Attempt 4: Basic call with just limit (what we know works)
-            response = await axios.get(`${GAMMA_URL}/markets`, {
-              params: {
-                limit: 500,
-              },
-            });
-            console.log(`[Polymarket] Attempt 4 - Basic fallback: ${response.data?.length || 0} markets`);
+            try {
+              // Attempt 4: Try sports API endpoint
+              response = await axios.get(`${SPORTS_API_URL}/markets`, {
+                params: {
+                  limit: 500,
+                  active: true,
+                },
+              });
+              console.log(`[Polymarket] Attempt 4 - Sports API endpoint: ${response.data?.length || 0} markets`);
+            } catch (error4) {
+              console.warn('[Polymarket] Attempt 4 failed, trying data API:', error4 instanceof Error ? error4.message : String(error4));
+
+              try {
+                // Attempt 5: Try data API endpoint
+                response = await axios.get(`${DATA_API_URL}/markets`, {
+                  params: {
+                    limit: 500,
+                    active: true,
+                  },
+                });
+                console.log(`[Polymarket] Attempt 5 - Data API endpoint: ${response.data?.length || 0} markets`);
+              } catch (error5) {
+                console.warn('[Polymarket] All API endpoints failed, using basic Gamma call:', error5 instanceof Error ? error5.message : String(error5));
+
+                // Final fallback: Basic call with just limit (what we know works)
+                response = await axios.get(`${GAMMA_URL}/markets`, {
+                  params: {
+                    limit: 500,
+                  },
+                });
+                console.log(`[Polymarket] Final fallback - Basic call: ${response.data?.length || 0} markets`);
+              }
+            }
           }
         }
       }
@@ -281,11 +307,29 @@ export class PolymarketAPI {
       const maxExpiryDate = new Date(now.getTime() + maxDaysToExpiry * 24 * 60 * 60 * 1000);
       console.log(`[Polymarket] Processing window: ${now.toISOString()} to ${maxExpiryDate.toISOString()} (${maxDaysToExpiry} days)`);
 
+      // Analyze market freshness
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      let marketsLast30Days = 0;
+      let marketsLast7Days = 0;
+
+      if (response?.data && Array.isArray(response.data)) {
+        for (const market of response.data.slice(0, 100)) { // Sample first 100
+          const createdAt = market.createdAt ? new Date(market.createdAt) : null;
+          if (createdAt) {
+            if (createdAt > thirtyDaysAgo) marketsLast30Days++;
+            if (createdAt > sevenDaysAgo) marketsLast7Days++;
+          }
+        }
+      }
+
       console.log(`[Polymarket] Market analysis:`);
       console.log(`  - Total markets found: ${processedCount}`);
       console.log(`  - Sports-related markets: ${sportsMarketsFound}`);
       console.log(`  - Prediction/other markets: ${predictionMarketsFound}`);
       console.log(`  - Recently created (≤90 days): ${recentMarketsFound}`);
+      console.log(`  - Markets created ≤30 days: ${marketsLast30Days}`);
+      console.log(`  - Markets created ≤7 days: ${marketsLast7Days}`);
       console.log(`  - Old markets (>90 days): ${oldMarketsFound}`);
 
       console.log(`[Polymarket] Processing results:`);
