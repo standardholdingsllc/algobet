@@ -13,6 +13,68 @@ export interface Market {
   liquidity?: number;
 }
 
+export type MarketPlatform = Market['platform'];
+
+export interface MarketFilterPreferences {
+  sportsOnly?: boolean;
+  categories?: string[];
+  eventTypes?: string[];
+  leagueTickers?: string[];
+}
+
+export interface MarketFilterInput {
+  windowStart: string;
+  windowEnd: string;
+  maxMarkets?: number;
+  sportsOnly?: boolean;
+  categories?: string[];
+  eventTypes?: string[];
+  leagueTickers?: string[];
+}
+
+export type MarketFilterToken = keyof MarketFilterInput;
+
+export interface FilterBinding {
+  param: string;
+  strategy?: 'direct' | 'boolean' | 'csv' | 'repeat';
+  trueValue?: string | number | boolean;
+  falseValue?: string | number | boolean;
+  omitIfFalse?: boolean;
+  joinWith?: string;
+  format?: 'iso8601';
+}
+
+export interface AdapterPaginationConfig {
+  cursorParam?: string;
+  nextCursorPath?: string;
+  maxPages?: number;
+  limitParam?: string;
+  limit?: number;
+}
+
+export interface MarketAdapterConfig {
+  id: string;
+  name: string;
+  description?: string;
+  adapterType: string;
+  endpoint: string;
+  method?: 'GET' | 'POST';
+  staticParams?: Record<string, string | number | boolean>;
+  filterBindings?: Partial<Record<MarketFilterToken, FilterBinding>>;
+  pagination?: AdapterPaginationConfig;
+  notes?: string;
+}
+
+export interface PlatformSourceConfig {
+  platform: MarketPlatform;
+  docUrl?: string;
+  defaultAdapter: string;
+  supportedFilters: MarketFilterToken[];
+  adapters: Record<string, MarketAdapterConfig>;
+}
+
+export type MarketSourceConfig = Record<MarketPlatform, PlatformSourceConfig>;
+
 export interface ArbitrageOpportunity {
   id: string;
   market1: Market;
@@ -78,6 +140,7 @@ export interface BotConfig {
     lowBalanceAlert: boolean;
   };
   simulationMode: boolean;   // When true, logs opportunities without placing bets (default: false)
+  marketFilters?: MarketFilterPreferences;
 }
 
 export interface DailyStats {
@@ -161,4 +224,15 @@ export interface DataStore {
 export interface ProfitData {
   date: string;
   profit: number;
+}
+
+export interface MarketSnapshot {
+  schemaVersion: number;
+  platform: MarketPlatform;
+  fetchedAt: string;
+  maxDaysToExpiry?: number;
+  adapterId?: string;
+  filters?: MarketFilterInput;
+  totalMarkets: number;
+  markets: Market[];
 }

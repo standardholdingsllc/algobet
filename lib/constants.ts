@@ -15,6 +15,7 @@ export const MIN_PROFIT_THRESHOLD = 0.5; // 0.5% minimum profit after fees
 // Refresh intervals
 export const MARKET_SCAN_INTERVAL = 30000; // 30 seconds
 export const BALANCE_CHECK_INTERVAL = 300000; // 5 minutes
+export const SNAPSHOT_REFRESH_INTERVAL_MS = 20000; // 20 seconds default snapshot refresh
 
 // Market snapshot settings
 export const MARKET_SNAPSHOT_TTL_SECONDS = 300; // 5 minutes

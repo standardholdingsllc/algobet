@@ -5,7 +5,8 @@ import { findArbitrageOpportunities, calculateBetSizes, validateOpportunity } fr
 import { AdaptiveScanner, detectLiveEvents } from './adaptive-scanner';
 import { HotMarketTracker } from './hot-market-tracker';
 import { KVStorage } from './kv-storage';
-import { saveMarketSnapshots } from './market-snapshots';
+import { MarketFeedService } from './market-feed-service';
+import { MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { sendBalanceAlert } from './email';
 import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,6 +17,7 @@ export class ArbitrageBotEngine {
   private sxbet: SXBetAPI;
   private scanner: AdaptiveScanner;
   private hotMarketTracker: HotMarketTracker;
+  private marketFeedService: MarketFeedService;
   private isRunning: boolean = false;
   private isScanning: boolean = false;
 
@@ -23,6 +25,7 @@ export class ArbitrageBotEngine {
     this.kalshi = new KalshiAPI();
     this.polymarket = new PolymarketAPI();
     this.sxbet = new SXBetAPI();
+    this.marketFeedService = new MarketFeedService();
     this.scanner = new AdaptiveScanner({
       defaultInterval: 30000,      // 30 seconds (normal)
       liveEventInterval: 5000,     // 5 seconds (LIVE EVENTS)
@@ -155,25 +158,29 @@ export class ArbitrageBotEngine {
     // Fetch open markets from all platforms
     // Note: We fetch more markets than we'll execute on to find opportunities
     // Execution is filtered by maxDaysToExpiry in executeBet()
-    const [kalshiMarkets, polymarketMarkets, sxbetMarkets] = await Promise.all([
-      this.kalshi.getOpenMarkets(config.maxDaysToExpiry),
-      this.polymarket.getOpenMarkets(config.maxDaysToExpiry),
-      this.sxbet.getOpenMarkets(config.maxDaysToExpiry),
-    ]);
+    const filters = this.marketFeedService.buildFiltersFromConfig(config);
+    const cachedMarkets = await this.marketFeedService.loadCachedMarkets(filters, {
+      maxAgeMs: MARKET_SNAPSHOT_TTL_SECONDS * 1000,
+      fallbackToLiveFetch: true,
+    });
 
-    try {
-      await saveMarketSnapshots(
-        {
-          kalshi: kalshiMarkets,
-          polymarket: polymarketMarkets,
-          sxbet: sxbetMarkets,
-        },
-        { maxDaysToExpiry: config.maxDaysToExpiry }
-      );
-    } catch (snapshotError: any) {
+    const kalshiMarkets = cachedMarkets.kalshi || [];
+    const polymarketMarkets = cachedMarkets.polymarket || [];
+    const sxbetMarkets = cachedMarkets.sxbet || [];
+
+    if (!kalshiMarkets.length) {
       console.warn(
-        '[Snapshots] Failed to persist market snapshots:',
-        snapshotError?.message || snapshotError
+        '[Bot] No Kalshi markets available from snapshots. Ensure snapshot worker is running.'
+      );
+    }
+    if (!polymarketMarkets.length) {
+      console.warn(
+        '[Bot] No Polymarket markets available from snapshots. Ensure snapshot worker is running.'
+      );
+    }
+    if (!sxbetMarkets.length) {
+      console.warn(
+        '[Bot] No sx.bet markets available from snapshots. Ensure snapshot worker is running.'
       );
     }
 

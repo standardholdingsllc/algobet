@@ -31,6 +31,12 @@ const DEFAULT_CONFIG: BotConfig = {
     lowBalanceAlert: true,
   },
   simulationMode: false,
+  marketFilters: {
+    sportsOnly: false,
+    categories: [],
+    eventTypes: [],
+    leagueTickers: [],
+  },
 };
 
 const DEFAULT_DATA: StorageData = {

@@ -302,8 +302,8 @@ export class KalshiAPI {
       limit: KALSHI_PAGE_LIMIT,
       sort_by: 'close_time',
       sort_dir: 'asc',
-      close_time_min: window.startISO,
-      close_time_max: window.endISO,
+      close_time_start: window.startISO,
+      close_time_end: window.endISO,
     };
 
     if (cursor) {

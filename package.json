@@ -18,7 +18,8 @@
     "test-tracking": "node -r esbuild-register scripts/test-hot-market-tracking.ts",
     "test-clob": "node -r esbuild-register scripts/test-clob-integration.js",
     "generate-password": "node scripts/generate-password-hash.js",
-    "migrate-kv": "node -r esbuild-register scripts/migrate-to-kv.ts"
+    "migrate-kv": "node -r esbuild-register scripts/migrate-to-kv.ts",
+    "snapshot-worker": "node -r esbuild-register workers/snapshot-worker.ts"
   },
   "dependencies": {
     "next": "^14.0.4",
