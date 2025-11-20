@@ -194,7 +194,7 @@ export class SXBetAPI {
       });
 
       const fixtureMap = new Map<string, SXBetFixture>();
-      const marketsData = marketsResponse.data.data?.markets || [];
+      const marketsData: SXBetMarket[] = marketsResponse.data.data?.markets || [];
       console.log(`[sx.bet] Retrieved ${marketsData.length} active markets`);
 
       const marketHashes = marketsData.map((market) => market.marketHash);
