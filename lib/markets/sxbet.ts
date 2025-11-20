@@ -141,11 +141,15 @@ export class SXBetAPI {
       // Skip orders for now (API permissions issue)
       console.warn(`[sx.bet] Skipping order data - API permissions needed for live odds`);
 
+      // The API returns { status, data: { markets, nextKey } }
+      const marketsData = marketsResponse.data.data?.markets || [];
+      console.log(`[sx.bet] Retrieved ${marketsData.length} active markets`);
+
       const markets: Market[] = [];
       const maxDate = new Date();
       maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
 
-      for (const market of marketsResponse.data.data || []) {
+      for (const market of marketsData) {
         // Create a default expiry date (30 days from now) since we don't have fixture data
         const defaultExpiryDate = new Date();
         defaultExpiryDate.setDate(defaultExpiryDate.getDate() + 30);
