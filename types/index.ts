@@ -41,7 +41,7 @@ export interface FilterBinding {
   falseValue?: string | number | boolean;
   omitIfFalse?: boolean;
   joinWith?: string;
-  format?: 'iso8601' | 'unixSeconds' | 'unixMilliseconds';
+  format?: 'iso8601' | 'unixSeconds';
   extraParams?: string[];
 }
 

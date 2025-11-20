@@ -29,7 +29,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
   - `adapters`: `Record<string, MarketAdapterConfig>` describing endpoint, method, pagination, and filter bindings.
   - `supportedFilters`: whitelist of normalized filter tokens (`windowStart`, `windowEnd`, `sportsOnly`, `leagueTickers`, etc.).
 - Defaults live in code and are merged with any remote overrides so we never regress if the Upstash entry is partial.
-- Primary goal: filters (e.g., Kalshi `close_time_start`) are defined once, referenced by docs URL, and cannot silently drift—misnamed params become impossible without updating the shared schema.
+- Primary goal: filters (e.g., Kalshi `min_close_ts` / `max_close_ts`) are defined once, referenced by docs URL, and cannot silently drift—misnamed params become impossible without updating the shared schema.
 
 ### 2.2 MarketFeedService (`lib/market-feed-service.ts`)
 - Builds normalized filters from `BotConfig` (including the new `marketFilters` preferences).
@@ -46,7 +46,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 
 ### 2.3 Platform-specific behavior
 - **Kalshi**
-  - `close_time_start` / `close_time_end` are the only time filters we send now. This matches the docs and fixes the bug where the API ignored our unpublished `close_time_min/max` params, forcing us to sift through 1,600+ long-dated contracts.
+  - Requests now use the documented `min_close_ts` / `max_close_ts` query parameters (Unix timestamps in seconds) so the exchange trims the feed server-side. The adapter enforces the timestamp-family compatibility rules from the Kalshi docs, so we never mix close-time filters with incompatible statuses.
   - Pagination obeys adapter config (`limit=200`, `maxPages=8`, cursor field `meta.next_cursor`).
   - A secondary `kalshi:events` adapter targets `/events/{ticker}/markets` for league-specific feeds (driven by `leagueTickers` filter tokens).
 - **Polymarket**
@@ -117,7 +117,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 ### Kalshi (`lib/markets/kalshi.ts`, `services/kalshi.ts`)
 - Authenticated requests use RSA-PSS signatures (`generateAuthHeaders`), and markets/orderbooks are public.
 - Market fetch fixes:
-  - Query params now use the documented `close_time_start`/`close_time_end` names plus `sort_by=close_time`.
+  - Query params now use the documented `min_close_ts`/`max_close_ts` names (Unix seconds) plus `sort_by=close_time`.
   - Pagination matches adapter config (limit 200, 8 pages max).
 - Balance helper consolidates cash + portfolio value, logging breakdowns for observability.
 - Order placement supports FOK limit orders, using `buy_max_cost` and 10s expirations.
