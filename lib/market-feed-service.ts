@@ -417,6 +417,13 @@ export class MarketFeedService {
       }
       return Math.floor(date.getTime() / 1000);
     }
+    if (format === 'unixMilliseconds') {
+      const date = new Date(value as string);
+      if (Number.isNaN(date.getTime())) {
+        return value as string | number | boolean;
+      }
+      return date.getTime();
+    }
     return value as string | number | boolean;
   }
 

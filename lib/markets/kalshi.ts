@@ -299,8 +299,8 @@ export class KalshiAPI {
   ): Promise<{ entries: KalshiMarket[]; nextCursor?: string }> {
     const startDate = new Date(window.startISO);
     const endDate = new Date(window.endISO);
-    const startUnix = Math.floor(startDate.getTime() / 1000);
-    const endUnix = Math.floor(endDate.getTime() / 1000);
+    const startUnix = startDate.getTime();
+    const endUnix = endDate.getTime();
 
     const params: Record<string, string | number> = {
       status: 'open',
