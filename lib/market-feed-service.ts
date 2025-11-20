@@ -31,8 +31,11 @@ interface LoadOptions {
 interface KalshiMarket {
   ticker: string;
   title: string;
-  yes_price: number;
-  no_price: number;
+  yes_bid?: number | null;
+  yes_ask?: number | null;
+  no_bid?: number | null;
+  no_ask?: number | null;
+  last_price?: number | null;
   volume: number;
   event_ticker: string;
   close_time: string;
@@ -519,10 +522,8 @@ export class MarketFeedService {
         skippedInvalidClose += 1;
         continue;
       }
-      if (
-        typeof market.yes_price !== 'number' ||
-        typeof market.no_price !== 'number'
-      ) {
+      const { yesPrice, noPrice } = this.deriveKalshiPrices(market);
+      if (yesPrice == null || noPrice == null) {
         skippedMissingPrices += 1;
         continue;
       }
@@ -533,8 +534,8 @@ export class MarketFeedService {
         platform: 'kalshi',
         marketType: 'prediction',
         title: market.title,
-        yesPrice: market.yes_price,
-        noPrice: market.no_price,
+        yesPrice,
+        noPrice,
         expiryDate: closeTime.toISOString(),
         volume: market.volume,
       });
@@ -551,6 +552,38 @@ export class MarketFeedService {
     );
 
     return normalized;
+  }
+
+  private deriveKalshiPrices(
+    market: KalshiMarket
+  ): { yesPrice: number | null; noPrice: number | null } {
+    const normalize = (value?: number | null) =>
+      typeof value === 'number' && Number.isFinite(value) && value > 0
+        ? value
+        : null;
+
+    const yesBid = normalize(market.yes_bid);
+    const yesAsk = normalize(market.yes_ask);
+    const noBid = normalize(market.no_bid);
+    const noAsk = normalize(market.no_ask);
+    const lastPrice = normalize(market.last_price);
+
+    const derivedYes =
+      yesAsk ??
+      (noBid != null ? 100 - noBid : null) ??
+      yesBid ??
+      lastPrice;
+
+    const derivedNo =
+      noAsk ??
+      (yesBid != null ? 100 - yesBid : null) ??
+      noBid ??
+      (derivedYes != null ? 100 - derivedYes : null);
+
+    return {
+      yesPrice: derivedYes,
+      noPrice: derivedNo,
+    };
   }
 
   private applyExpiryFilter(
