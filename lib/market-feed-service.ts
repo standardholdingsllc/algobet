@@ -507,28 +507,23 @@ export class MarketFeedService {
 
   private normalizeKalshiMarkets(
     entries: KalshiMarket[],
-    filters: MarketFilterInput
+    _filters: MarketFilterInput
   ): Market[] {
-    const startMs = Date.parse(filters.windowStart);
-    const endMs = Date.parse(filters.windowEnd);
-
     const normalized: Market[] = [];
+    let skippedInvalidClose = 0;
+    let skippedMissingPrices = 0;
 
     for (const market of entries) {
-      const expiry = new Date(market.close_time);
-      if (Number.isNaN(expiry.getTime())) {
-        continue;
-      }
-      if (!Number.isNaN(startMs) && expiry.getTime() < startMs) {
-        continue;
-      }
-      if (!Number.isNaN(endMs) && expiry.getTime() > endMs) {
+      const closeTime = new Date(market.close_time);
+      if (Number.isNaN(closeTime.getTime())) {
+        skippedInvalidClose += 1;
         continue;
       }
       if (
         typeof market.yes_price !== 'number' ||
         typeof market.no_price !== 'number'
       ) {
+        skippedMissingPrices += 1;
         continue;
       }
 
@@ -540,10 +535,20 @@ export class MarketFeedService {
         title: market.title,
         yesPrice: market.yes_price,
         noPrice: market.no_price,
-        expiryDate: expiry.toISOString(),
+        expiryDate: closeTime.toISOString(),
         volume: market.volume,
       });
     }
+
+    normalized.sort(
+      (a, b) =>
+        new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime()
+    );
+
+    console.info(
+      `[Kalshi Adapter] Normalized ${entries.length} raw markets into ${normalized.length} tradable entries ` +
+        `(skipped ${skippedInvalidClose} by invalid close_time, ${skippedMissingPrices} by missing prices)`
+    );
 
     return normalized;
   }
