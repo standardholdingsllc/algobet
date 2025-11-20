@@ -362,6 +362,12 @@ export class MarketFeedService {
             value,
             binding.format
           );
+          if (binding.extraParams?.length) {
+            const formatted = params[binding.param];
+            for (const extra of binding.extraParams) {
+              params[extra] = formatted;
+            }
+          }
       }
     }
 
@@ -375,6 +381,13 @@ export class MarketFeedService {
     if (format === 'iso8601') {
       const date = new Date(value as string);
       return Number.isNaN(date.getTime()) ? (value as string) : date.toISOString();
+    }
+    if (format === 'unixSeconds') {
+      const date = new Date(value as string);
+      if (Number.isNaN(date.getTime())) {
+        return value as string | number | boolean;
+      }
+      return Math.floor(date.getTime() / 1000);
     }
     return value as string | number | boolean;
   }

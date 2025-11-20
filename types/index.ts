@@ -41,7 +41,8 @@ export interface FilterBinding {
   falseValue?: string | number | boolean;
   omitIfFalse?: boolean;
   joinWith?: string;
-  format?: 'iso8601';
+  format?: 'iso8601' | 'unixSeconds';
+  extraParams?: string[];
 }
 
 export interface AdapterPaginationConfig {

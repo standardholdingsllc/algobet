@@ -297,13 +297,20 @@ export class KalshiAPI {
     cursor: string | undefined,
     window: { startISO: string; endISO: string }
   ): Promise<{ entries: KalshiMarket[]; nextCursor?: string }> {
+    const startDate = new Date(window.startISO);
+    const endDate = new Date(window.endISO);
+    const startUnix = Math.floor(startDate.getTime() / 1000);
+    const endUnix = Math.floor(endDate.getTime() / 1000);
+
     const params: Record<string, string | number> = {
       status: 'open',
       limit: KALSHI_PAGE_LIMIT,
       sort_by: 'close_time',
       sort_dir: 'asc',
-      close_time_start: window.startISO,
-      close_time_end: window.endISO,
+      close_time_start: startUnix,
+      close_time_end: endUnix,
+      close_time_after: startUnix,
+      close_time_before: endUnix,
     };
 
     if (cursor) {

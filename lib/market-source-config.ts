@@ -26,12 +26,14 @@ const defaultKalshiAdapters: Record<string, MarketAdapterConfig> = {
       windowStart: {
         param: 'close_time_start',
         strategy: 'direct',
-        format: 'iso8601',
+        format: 'unixSeconds',
+        extraParams: ['close_time_after'],
       },
       windowEnd: {
         param: 'close_time_end',
         strategy: 'direct',
-        format: 'iso8601',
+        format: 'unixSeconds',
+        extraParams: ['close_time_before'],
       },
       sportsOnly: {
         param: 'category',
@@ -78,12 +80,14 @@ const defaultKalshiAdapters: Record<string, MarketAdapterConfig> = {
       windowStart: {
         param: 'close_time_start',
         strategy: 'direct',
-        format: 'iso8601',
+        format: 'unixSeconds',
+        extraParams: ['close_time_after'],
       },
       windowEnd: {
         param: 'close_time_end',
         strategy: 'direct',
-        format: 'iso8601',
+        format: 'unixSeconds',
+        extraParams: ['close_time_before'],
       },
     },
     notes:
