@@ -161,13 +161,37 @@ export interface NormalizedPolymarketMarket {
   slug: string;
   question: string;
   endDate: string | null;         // ISO string or null
+  endDateIso?: string | null;
+  umaEndDate?: string | null;
+  umaEndDateIso?: string | null;
+  startDate?: string | null;
+  startDateIso?: string | null;
+  eventStartTime?: string | null;
   gameStartTime?: string | null;  // ISO string or null
+  sportsMarketType?: string | null;
+  gameId?: string | null;
+  derivedExpiry: string | null;
+  derivedExpirySource?: string;
   active: boolean;
   closed: boolean;
   archived?: boolean;
   enableOrderBook?: boolean;
   acceptingOrders?: boolean;
   outcomes: NormalizedPolymarketOutcome[];
+}
+
+interface PolymarketFilterWindow {
+  windowStart: string;
+  windowEnd: string;
+  categories?: string[];
+  maxMarkets?: number;
+}
+
+interface PolymarketMarketFetchOptions {
+  windowStart: string;
+  windowEnd: string;
+  categories?: string[];
+  forceRefresh?: boolean;
 }
 
 /**
@@ -190,6 +214,7 @@ interface ClobMarket {
   closed: boolean;
   end_date_iso?: string;
   game_start_time?: string | null;
+  game_id?: string | null;
   // Seen in your logs (not always in official docs but present in practice):
   enable_order_book?: boolean;
   accepting_orders?: boolean;
@@ -230,7 +255,14 @@ interface GammaMarket {
   slug: string;
   endDate?: string;
   endDateIso?: string;
+  umaEndDate?: string;
+  umaEndDateIso?: string;
+  startDate?: string;
+  startDateIso?: string;
+  eventStartTime?: string | null;
   gameStartTime?: string | null;
+  sportsMarketType?: string | null;
+  gameId?: string | null;
   active: boolean;
   closed: boolean;
   archived: boolean;
@@ -247,7 +279,7 @@ interface GammaMarket {
 
 /* -------------------------------------------------------------------------- */
 
-import { Market } from '@/types';
+import { Market, MarketFilterInput } from '@/types';
 import axios from 'axios';
 import { ethers, parseUnits } from 'ethers';
 
@@ -287,15 +319,12 @@ const GAMMA_BASE_URL = "https://gamma-api.polymarket.com";
 const BASE_URL = CLOB_BASE_URL; // For backward compatibility with existing methods
 const DATA_API_URL = "https://data-api.polymarket.com";
 
+const DAY_MS = 86_400_000;
 const MARKET_CACHE_TTL_MS = 30_000; // 30 seconds cache window to keep scans fast
 const GAMMA_PAGE_LIMIT = 500;
 const GAMMA_MAX_PAGES = 6; // 3k markets max per refresh
 const GAMMA_STOP_AFTER_TRADABLE = 400;
-const GAMMA_QUERY_FILTERS: Record<string, string> = {
-  active: "true",
-  closed: "false",
-  archived: "false",
-};
+const MAX_POLYMARKET_EXPIRY_LOGS = 20;
 const CLOB_MAX_PAGES = 8; // stop early to avoid 60+ page sweeps
 const CLOB_MAX_TRADABLE = 400;
 const CLOB_MAX_INACTIVE_PAGES = 3;
@@ -306,8 +335,11 @@ interface MarketCacheEntry {
   markets: NormalizedPolymarketMarket[];
 }
 
-let marketCache: MarketCacheEntry | null = null;
-let inflightMarketFetch: Promise<NormalizedPolymarketMarket[]> | null = null;
+const marketCache = new Map<string, MarketCacheEntry>();
+const inflightMarketFetches = new Map<
+  string,
+  Promise<NormalizedPolymarketMarket[]>
+>();
 
 /* -------------------------------------------------------------------------- */
 
@@ -335,6 +367,18 @@ function normalizeIso(value?: string | null): string | null {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
+}
+
+function buildPolymarketCacheKey(
+  options: PolymarketMarketFetchOptions
+): string {
+  const start = normalizeIso(options.windowStart) ?? 'invalid-start';
+  const end = normalizeIso(options.windowEnd) ?? 'invalid-end';
+  const categories =
+    options.categories && options.categories.length
+      ? options.categories.filter(Boolean).sort().join(',')
+      : 'none';
+  return `${start}|${end}|${categories}`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -473,14 +517,39 @@ function mapClobToNormalized(markets: ClobMarket[]): NormalizedPolymarketMarket[
         price,
       };
     });
+    const normalizedEndDateIso = normalizeIso(m.end_date_iso ?? null);
+    const normalizedGameStart = normalizeIso(m.game_start_time ?? null);
+    const derived = derivePolymarketExpiry({
+      eventStartTime: null,
+      gameStartTime: normalizedGameStart,
+      endDate: normalizedEndDateIso,
+      endDateIso: normalizedEndDateIso,
+      umaEndDate: null,
+      umaEndDateIso: null,
+      startDate: null,
+      startDateIso: null,
+      sportsMarketType: null,
+      gameId: m.game_id ?? null,
+    });
+
     return {
       platform: "polymarket",
       source: "clob",
       conditionId: m.condition_id,
       slug: m.market_slug,
       question: m.question,
-      endDate: normalizeIso(m.end_date_iso ?? null),
-      gameStartTime: normalizeIso(m.game_start_time ?? null),
+      endDate: normalizedEndDateIso,
+      endDateIso: normalizedEndDateIso,
+      umaEndDate: null,
+      umaEndDateIso: null,
+      startDate: null,
+      startDateIso: null,
+      eventStartTime: null,
+      gameStartTime: normalizedGameStart,
+      sportsMarketType: null,
+      gameId: m.game_id ?? null,
+      derivedExpiry: derived.iso,
+      derivedExpirySource: derived.source,
       active: m.active,
       closed: m.closed,
       archived: m.archived,
@@ -504,26 +573,28 @@ function mapClobToNormalized(markets: ClobMarket[]): NormalizedPolymarketMarket[
  * limit+offset pagination. Here we fetch a few pages to be safe.
  */
 async function fetchGammaMarkets(
+  options: PolymarketMarketFetchOptions,
   limit = GAMMA_PAGE_LIMIT,
   maxPages = GAMMA_MAX_PAGES,
   stopAfterTradable = GAMMA_STOP_AFTER_TRADABLE
 ): Promise<GammaMarket[]> {
   const all: GammaMarket[] = [];
   let tradableCollected = 0;
+  const queryFilters = buildGammaQueryFilters(options);
 
   for (let page = 0; page < maxPages; page++) {
     const offset = page * limit;
     const url = new URL("/markets", GAMMA_BASE_URL);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
-    Object.entries(GAMMA_QUERY_FILTERS).forEach(([key, value]) => {
+    Object.entries(queryFilters).forEach(([key, value]) => {
       url.searchParams.set(key, value);
     });
 
     console.info("[Polymarket Gamma] Fetching /markets page", {
       limit,
       offset,
-      filters: GAMMA_QUERY_FILTERS,
+      filters: queryFilters,
     });
     const res = await fetch(url.toString());
     if (!res.ok) {
@@ -559,9 +630,29 @@ async function fetchGammaMarkets(
   console.info(
     `[Polymarket Gamma] Retrieved ${all.length} markets from ${Math.ceil(
       all.length / limit || 1
-    )} page(s) with filters ${JSON.stringify(GAMMA_QUERY_FILTERS)}.`
+    )} page(s) with filters ${JSON.stringify(queryFilters)}.`
   );
   return all;
+}
+
+function buildGammaQueryFilters(
+  options: PolymarketMarketFetchOptions
+): Record<string, string> {
+  const filters: Record<string, string> = {
+    closed: "false",
+  };
+  const min = normalizeIso(options.windowStart);
+  const max = normalizeIso(options.windowEnd);
+  if (min) {
+    filters.end_date_min = min;
+  }
+  if (max) {
+    filters.end_date_max = max;
+  }
+  if (options.categories && options.categories.length) {
+    filters.category = options.categories.filter(Boolean).join(",");
+  }
+  return filters;
 }
 
 /**
@@ -575,8 +666,8 @@ async function fetchGammaMarkets(
  */
 function filterTradableGammaMarkets(markets: GammaMarket[]): GammaMarket[] {
   return markets.filter((m) => {
-    const hasOrderBook = m.enableOrderBook !== false;
-    const acceptsOrders = m.acceptingOrders !== false;
+    const hasOrderBook = m.enableOrderBook === true;
+    const acceptsOrders = m.acceptingOrders === undefined ? true : m.acceptingOrders === true;
     const isActive = m.active !== false;
     const isClosed = m.closed === true;
     const isArchived = m.archived === true;
@@ -616,14 +707,46 @@ function mapGammaToNormalized(markets: GammaMarket[]): NormalizedPolymarketMarke
           price,
         };
       });
+    const normalizedEndDateIso = normalizeIso(m.endDateIso ?? null);
+    const normalizedEndDate = normalizeIso(m.endDate ?? null);
+    const normalizedUmaEndDateIso = normalizeIso(m.umaEndDateIso ?? null);
+    const normalizedUmaEndDate = normalizeIso(m.umaEndDate ?? null);
+    const normalizedStartDateIso = normalizeIso(m.startDateIso ?? null);
+    const normalizedStartDate = normalizeIso(m.startDate ?? null);
+    const normalizedEventStart = normalizeIso(m.eventStartTime ?? null);
+    const normalizedGameStart = normalizeIso(m.gameStartTime ?? null);
+
+    const derived = derivePolymarketExpiry({
+      eventStartTime: normalizedEventStart,
+      gameStartTime: normalizedGameStart,
+      endDate: normalizedEndDate,
+      endDateIso: normalizedEndDateIso,
+      umaEndDate: normalizedUmaEndDate,
+      umaEndDateIso: normalizedUmaEndDateIso,
+      startDate: normalizedStartDate,
+      startDateIso: normalizedStartDateIso,
+      sportsMarketType: m.sportsMarketType ?? null,
+      gameId: m.gameId ?? null,
+    });
+
     return {
       platform: "polymarket",
       source: "gamma",
       conditionId: m.conditionId,
       slug: m.slug,
       question: m.question,
-      endDate: normalizeIso(m.endDateIso ?? m.endDate ?? null),
-      gameStartTime: normalizeIso(m.gameStartTime ?? null),
+      endDate: normalizedEndDateIso ?? normalizedEndDate,
+      endDateIso: normalizedEndDateIso,
+      umaEndDate: normalizedUmaEndDate,
+      umaEndDateIso: normalizedUmaEndDateIso,
+      startDate: normalizedStartDate,
+      startDateIso: normalizedStartDateIso,
+      eventStartTime: normalizedEventStart,
+      gameStartTime: normalizedGameStart,
+      sportsMarketType: m.sportsMarketType ?? null,
+      gameId: m.gameId ?? null,
+      derivedExpiry: derived.iso,
+      derivedExpirySource: derived.source,
       active: m.active,
       closed: m.closed,
       archived: m.archived,
@@ -696,17 +819,82 @@ function determineBinaryOutcomePrices(
   return { yesCents, noCents };
 }
 
+interface DerivedExpiryResult {
+  iso: string | null;
+  source?: string;
+}
+
+/**
+ * Polymarket expiry derivation:
+ *   - Sports markets prefer event/game start timestamps.
+ *   - Non-sports markets prefer end/UMA settlement dates.
+ *   - Finally falls back to start timestamps when nothing else is available.
+ */
+function derivePolymarketExpiry(
+  fields: Pick<
+    NormalizedPolymarketMarket,
+    | "eventStartTime"
+    | "gameStartTime"
+    | "endDate"
+    | "endDateIso"
+    | "umaEndDate"
+    | "umaEndDateIso"
+    | "startDate"
+    | "startDateIso"
+    | "sportsMarketType"
+    | "gameId"
+  >
+): DerivedExpiryResult {
+  const isSportsMarket = Boolean(fields.sportsMarketType || fields.gameId);
+
+  const sportsPreferred: { value?: string | null; source: string }[] = [
+    { value: fields.eventStartTime, source: "eventStartTime" },
+    { value: fields.gameStartTime, source: "gameStartTime" },
+  ];
+
+  const generalPreferred: { value?: string | null; source: string }[] = [
+    { value: fields.endDateIso, source: "endDateIso" },
+    { value: fields.endDate, source: "endDate" },
+    { value: fields.umaEndDateIso, source: "umaEndDateIso" },
+    { value: fields.umaEndDate, source: "umaEndDate" },
+  ];
+
+  const fallbackPreferred: { value?: string | null; source: string }[] = [
+    { value: fields.startDateIso, source: "startDateIso" },
+    { value: fields.startDate, source: "startDate" },
+  ];
+
+  const ordered = isSportsMarket
+    ? [...sportsPreferred, ...generalPreferred, ...fallbackPreferred]
+    : [...generalPreferred, ...sportsPreferred, ...fallbackPreferred];
+
+  for (const candidate of ordered) {
+    const iso = normalizeIso(candidate.value ?? null);
+    if (iso) {
+      return { iso, source: candidate.source };
+    }
+  }
+
+  return { iso: null, source: undefined };
+}
+
 function isWithinExecutionWindow(
-  endDate: string | null,
-  now: Date,
-  maxDate: Date
+  expiryIso: string | null,
+  windowStart: Date,
+  windowEnd: Date
 ): boolean {
-  if (!endDate) return true;
-  const expiry = new Date(endDate);
+  if (!expiryIso) return false;
+  if (
+    Number.isNaN(windowStart.getTime()) ||
+    Number.isNaN(windowEnd.getTime())
+  ) {
+    return false;
+  }
+  const expiry = new Date(expiryIso);
   if (Number.isNaN(expiry.getTime())) {
     return false;
   }
-  return expiry >= now && expiry <= maxDate;
+  return expiry >= windowStart && expiry <= windowEnd;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -730,54 +918,68 @@ function isWithinExecutionWindow(
  *   // Then pass `polymarketMarkets` into your arbitrage matching logic.
  */
 export async function fetchPolymarketMarkets(
-  options: { forceRefresh?: boolean } = {}
+  options: PolymarketMarketFetchOptions
 ): Promise<NormalizedPolymarketMarket[]> {
   const forceRefresh = options.forceRefresh ?? false;
+  const cacheKey = buildPolymarketCacheKey(options);
   const now = Date.now();
+  const cached = marketCache.get(cacheKey);
 
-  if (!forceRefresh && marketCache && now - marketCache.fetchedAt < MARKET_CACHE_TTL_MS) {
+  if (
+    !forceRefresh &&
+    cached &&
+    now - cached.fetchedAt < MARKET_CACHE_TTL_MS
+  ) {
     console.info(
-      `[Polymarket] Serving ${marketCache.markets.length} cached markets from ${marketCache.source}.`
+      `[Polymarket] Serving ${cached.markets.length} cached markets (source=${cached.source}) for window ${options.windowStart} → ${options.windowEnd}.`
     );
-    return marketCache.markets;
+    return cached.markets;
   }
 
-  if (!inflightMarketFetch) {
-    inflightMarketFetch = refreshPolymarketMarkets().finally(() => {
-      inflightMarketFetch = null;
+  let inflight = inflightMarketFetches.get(cacheKey);
+  if (!inflight) {
+    inflight = refreshPolymarketMarkets(options, cacheKey).finally(() => {
+      inflightMarketFetches.delete(cacheKey);
     });
+    inflightMarketFetches.set(cacheKey, inflight);
   }
 
-  return inflightMarketFetch;
+  return inflight;
 }
 
-async function refreshPolymarketMarkets(): Promise<NormalizedPolymarketMarket[]> {
-  const gammaMarkets = await tryFetchGammaMarkets();
+async function refreshPolymarketMarkets(
+  options: PolymarketMarketFetchOptions,
+  cacheKey: string
+): Promise<NormalizedPolymarketMarket[]> {
+  const gammaMarkets = await tryFetchGammaMarkets(options);
   if (gammaMarkets.length > 0) {
-    marketCache = {
+    marketCache.set(cacheKey, {
       fetchedAt: Date.now(),
       source: "gamma",
       markets: gammaMarkets,
-    };
+    });
     return gammaMarkets;
   }
 
   console.warn(
     "[Polymarket] Gamma API returned 0 tradable markets. Attempting limited CLOB sweep..."
   );
-  const clobMarkets = await tryFetchClobMarketsLimited();
-  marketCache = {
+  const clobMarkets = await tryFetchClobMarketsLimited(options);
+  marketCache.set(cacheKey, {
     fetchedAt: Date.now(),
     source: "clob",
     markets: clobMarkets,
-  };
+  });
   return clobMarkets;
 }
 
-async function tryFetchGammaMarkets(): Promise<NormalizedPolymarketMarket[]> {
+async function tryFetchGammaMarkets(
+  options: PolymarketMarketFetchOptions
+): Promise<NormalizedPolymarketMarket[]> {
   let gammaMarkets: GammaMarket[] = [];
   try {
     gammaMarkets = await fetchGammaMarkets(
+      options,
       GAMMA_PAGE_LIMIT,
       GAMMA_MAX_PAGES,
       GAMMA_STOP_AFTER_TRADABLE
@@ -794,14 +996,22 @@ async function tryFetchGammaMarkets(): Promise<NormalizedPolymarketMarket[]> {
 
   const tradableGamma = filterTradableGammaMarkets(gammaMarkets);
   console.info(
-    `[Polymarket Gamma] ${tradableGamma.length} tradable markets out of ${gammaMarkets.length} raw entries.`
+    `[Polymarket Gamma] ${tradableGamma.length} tradable markets out of ${gammaMarkets.length} raw entries for window ${options.windowStart} → ${options.windowEnd}.`
   );
   return mapGammaToNormalized(tradableGamma);
 }
 
-async function tryFetchClobMarketsLimited(): Promise<NormalizedPolymarketMarket[]> {
+async function tryFetchClobMarketsLimited(
+  options?: PolymarketMarketFetchOptions
+): Promise<NormalizedPolymarketMarket[]> {
   try {
-    console.info("[Polymarket CLOB] Fetching markets from CLOB API (fallback)...");
+    if (options) {
+      console.info(
+        `[Polymarket CLOB] Fetching markets from CLOB API (fallback) for window ${options.windowStart} → ${options.windowEnd}...`
+      );
+    } else {
+      console.info("[Polymarket CLOB] Fetching markets from CLOB API (fallback)...");
+    }
     const result = await fetchAllClobMarkets({
       maxPages: CLOB_MAX_PAGES,
       stopAfterTradable: CLOB_MAX_TRADABLE,
@@ -919,19 +1129,54 @@ export class PolymarketAPI {
     this.walletAddress = process.env.POLYMARKET_WALLET_ADDRESS || '';
   }
 
-  async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
-    const normalizedMarkets = await fetchPolymarketMarkets();
+  async getOpenMarkets(
+    filtersOrMaxDays: number | MarketFilterInput,
+    options: { forceRefresh?: boolean } = {}
+  ): Promise<Market[]> {
+    const window = this.resolveFilterWindow(filtersOrMaxDays);
+    const normalizedMarkets = await fetchPolymarketMarkets({
+      windowStart: window.windowStart,
+      windowEnd: window.windowEnd,
+      categories: window.categories,
+      forceRefresh: options.forceRefresh,
+    });
     const markets: Market[] = [];
-    const now = new Date();
-    const maxDate = new Date(now);
-    maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
+    const windowStartDate = new Date(window.windowStart);
+    const windowEndDate = new Date(window.windowEnd);
 
     let skippedExpiry = 0;
     let skippedPrice = 0;
+    const skippedExpirySamples: Record<string, unknown>[] = [];
 
     for (const market of normalizedMarkets) {
-      if (!isWithinExecutionWindow(market.endDate, now, maxDate)) {
+      const expiry =
+        market.derivedExpiry ??
+        market.endDate ??
+        market.gameStartTime ??
+        market.eventStartTime ??
+        null;
+
+      if (!isWithinExecutionWindow(expiry, windowStartDate, windowEndDate)) {
         skippedExpiry += 1;
+        if (skippedExpirySamples.length < MAX_POLYMARKET_EXPIRY_LOGS) {
+          skippedExpirySamples.push({
+            conditionId: market.conditionId,
+            source: market.source,
+            question: market.question,
+            sportsMarketType: market.sportsMarketType ?? null,
+            gameId: market.gameId ?? null,
+            eventStartTime: market.eventStartTime ?? null,
+            gameStartTime: market.gameStartTime ?? null,
+            endDate: market.endDate,
+            endDateIso: market.endDateIso,
+            umaEndDate: market.umaEndDate,
+            umaEndDateIso: market.umaEndDateIso,
+            derivedExpiry: market.derivedExpiry,
+            derivedExpirySource: market.derivedExpirySource ?? null,
+            windowStart: window.windowStart,
+            windowEnd: window.windowEnd,
+          });
+        }
         continue;
       }
 
@@ -949,16 +1194,23 @@ export class PolymarketAPI {
         title: market.question,
         yesPrice: pricePair.yesCents,
         noPrice: pricePair.noCents,
-        expiryDate: market.endDate || new Date().toISOString(),
+        expiryDate: expiry || window.windowEnd,
         volume: 0,
       };
 
       markets.push(marketData);
+      if (window.maxMarkets && markets.length >= window.maxMarkets) {
+        break;
+      }
     }
 
-    console.log(
-      `[Polymarket] Converted ${normalizedMarkets.length} normalized markets into ${markets.length} tradeable entries (skipped ${skippedExpiry} by expiry, ${skippedPrice} by missing prices).`
+    console.info(
+      `[Polymarket] Filter breakdown (window ${window.windowStart} → ${window.windowEnd}): raw=${normalizedMarkets.length}, kept=${markets.length}, skippedByExpiry=${skippedExpiry}, skippedByPrice=${skippedPrice}.`
     );
+    if (skippedExpirySamples.length > 0) {
+      console.info('[Polymarket] Skipping by expiry (sample):', skippedExpirySamples);
+    }
+
     return markets;
   }
 
@@ -979,6 +1231,28 @@ export class PolymarketAPI {
       console.error(`Error fetching orderbook for token ${tokenId}:`, error);
       return { bestBid: null, bestAsk: null };
     }
+  }
+
+  private resolveFilterWindow(
+    filtersOrMaxDays: number | MarketFilterInput
+  ): PolymarketFilterWindow {
+    if (typeof filtersOrMaxDays === 'number') {
+      const now = new Date();
+      const end = new Date(now.getTime() + Math.max(1, filtersOrMaxDays) * DAY_MS);
+      return {
+        windowStart: now.toISOString(),
+        windowEnd: end.toISOString(),
+      };
+    }
+
+    const fallbackStart = new Date();
+    const fallbackEnd = new Date(fallbackStart.getTime() + 10 * DAY_MS);
+    return {
+      windowStart: filtersOrMaxDays.windowStart ?? fallbackStart.toISOString(),
+      windowEnd: filtersOrMaxDays.windowEnd ?? fallbackEnd.toISOString(),
+      maxMarkets: filtersOrMaxDays.maxMarkets,
+      categories: filtersOrMaxDays.categories?.filter(Boolean),
+    };
   }
 
   async getBalance(): Promise<number> {

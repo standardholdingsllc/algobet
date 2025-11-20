@@ -266,8 +266,7 @@ export class MarketFeedService {
     _adapterConfig: MarketAdapterConfig,
     filters: MarketFilterInput
   ): Promise<Market[]> {
-    const maxDays = this.getMaxDaysFromFilters(filters);
-    const markets = await this.polymarketApi.getOpenMarkets(maxDays);
+    const markets = await this.polymarketApi.getOpenMarkets(filters);
     return this.applyExpiryFilter(markets, filters);
   }
 

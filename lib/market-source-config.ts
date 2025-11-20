@@ -116,13 +116,21 @@ const DEFAULT_MARKET_SOURCE_CONFIG: MarketSourceConfig = {
         adapterType: 'polymarket:gamma',
         endpoint: '/markets',
         description:
-          'Primary Gamma feed honoring active/closed/archived flags per docs.',
+          'Primary Gamma feed honoring closed=false plus end_date_min/max filters per docs.',
         staticParams: {
-          active: 'true',
           closed: 'false',
-          archived: 'false',
         },
         filterBindings: {
+          windowStart: {
+            param: 'end_date_min',
+            strategy: 'direct',
+            format: 'iso8601',
+          },
+          windowEnd: {
+            param: 'end_date_max',
+            strategy: 'direct',
+            format: 'iso8601',
+          },
           categories: {
             param: 'category',
             strategy: 'csv',
