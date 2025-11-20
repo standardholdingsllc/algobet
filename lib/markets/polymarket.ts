@@ -43,85 +43,65 @@ export class PolymarketAPI {
       // Try different approaches to get current live markets (not historical)
       let response;
 
-      try {
-        // Attempt 1: Try multiple filtering criteria for active markets
-        response = await axios.get(`${GAMMA_URL}/markets`, {
-          params: {
-            limit: 500,
-            active: true,
-            closed: false,
-            archived: false,
-            // Try additional filters based on available fields
-          },
-        });
-        console.log(`[Polymarket] Attempt 1 - Active & not archived: ${response.data?.length || 0} markets`);
-      } catch (error) {
-        console.warn('[Polymarket] Attempt 1 failed, trying funded markets:', error instanceof Error ? error.message : String(error));
+      // Always try different API endpoints to find current markets
+      const endpoints = [
+        { name: 'Gamma API (filtered)', url: `${GAMMA_URL}/markets`, params: { limit: 500, active: true, closed: false, archived: false } },
+        { name: 'Main API', url: `${MAIN_API_URL}/markets`, params: { limit: 500, active: true, closed: false } },
+        { name: 'Sports API', url: `${SPORTS_API_URL}/markets`, params: { limit: 500, active: true } },
+        { name: 'Data API', url: `${DATA_API_URL}/markets`, params: { limit: 500, active: true } },
+        { name: 'Gamma API (unfiltered)', url: `${GAMMA_URL}/markets`, params: { limit: 500 } }
+      ];
 
+      let bestResponse = null;
+      let maxRecentMarkets = 0;
+
+      for (let i = 0; i < endpoints.length; i++) {
+        const endpoint = endpoints[i];
         try {
-          // Attempt 2: Try filtering by funded and ready markets (active trading)
-          response = await axios.get(`${GAMMA_URL}/markets`, {
-            params: {
-              limit: 500,
-              active: true,
-              funded: true,
-              ready: true,
-              // Markets that are actually tradeable
-            },
-          });
-          console.log(`[Polymarket] Attempt 2 - Funded & ready markets: ${response.data?.length || 0} markets`);
-        } catch (error2) {
-          console.warn('[Polymarket] Attempt 2 failed, trying different endpoint:', error2 instanceof Error ? error2.message : String(error2));
+          console.log(`[Polymarket] Testing ${endpoint.name}...`);
+          const testResponse = await axios.get(endpoint.url, { params: endpoint.params });
+          const markets = testResponse.data || [];
 
-          try {
-            // Attempt 3: Try Polymarket's main API endpoint
-            response = await axios.get(`${MAIN_API_URL}/markets`, {
-              params: {
-                limit: 500,
-                active: true,
-                closed: false,
-              },
-            });
-            console.log(`[Polymarket] Attempt 3 - Main API endpoint: ${response.data?.length || 0} markets`);
-          } catch (error3) {
-            console.warn('[Polymarket] Attempt 3 failed, trying sports API:', error3 instanceof Error ? error3.message : String(error3));
-
-            try {
-              // Attempt 4: Try sports API endpoint
-              response = await axios.get(`${SPORTS_API_URL}/markets`, {
-                params: {
-                  limit: 500,
-                  active: true,
-                },
-              });
-              console.log(`[Polymarket] Attempt 4 - Sports API endpoint: ${response.data?.length || 0} markets`);
-            } catch (error4) {
-              console.warn('[Polymarket] Attempt 4 failed, trying data API:', error4 instanceof Error ? error4.message : String(error4));
-
-              try {
-                // Attempt 5: Try data API endpoint
-                response = await axios.get(`${DATA_API_URL}/markets`, {
-                  params: {
-                    limit: 500,
-                    active: true,
-                  },
-                });
-                console.log(`[Polymarket] Attempt 5 - Data API endpoint: ${response.data?.length || 0} markets`);
-              } catch (error5) {
-                console.warn('[Polymarket] All API endpoints failed, using basic Gamma call:', error5 instanceof Error ? error5.message : String(error5));
-
-                // Final fallback: Basic call with just limit (what we know works)
-                response = await axios.get(`${GAMMA_URL}/markets`, {
-                  params: {
-                    limit: 500,
-                  },
-                });
-                console.log(`[Polymarket] Final fallback - Basic call: ${response.data?.length || 0} markets`);
-              }
-            }
+          // Analyze how many recent markets this endpoint provides
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          let recentCount = 0;
+          for (const market of markets.slice(0, 100)) { // Sample first 100
+            const createdAt = market.createdAt ? new Date(market.createdAt) : null;
+            if (createdAt && createdAt > thirtyDaysAgo) recentCount++;
           }
+
+          console.log(`[Polymarket] ${endpoint.name}: ${markets.length} markets, ${recentCount} created ≤30 days`);
+
+          // Keep track of the endpoint with the most recent markets
+          if (recentCount > maxRecentMarkets) {
+            maxRecentMarkets = recentCount;
+            bestResponse = testResponse;
+          }
+
+          // If we find an endpoint with recent markets, use it immediately
+          if (recentCount > 0) {
+            console.log(`[Polymarket] ✅ Found ${recentCount} recent markets from ${endpoint.name}, using this endpoint!`);
+            response = testResponse;
+            break;
+          }
+
+        } catch (error) {
+          console.warn(`[Polymarket] ${endpoint.name} failed:`, error instanceof Error ? error.message : String(error));
         }
       }
+
+      // If no endpoint had recent markets, use the one with the most recent markets overall
+      if (!response && bestResponse) {
+        console.log(`[Polymarket] Using endpoint with most recent markets (${maxRecentMarkets} in last 30 days)`);
+        response = bestResponse;
+      }
+
+      if (!response) {
+        console.error('[Polymarket] All API endpoints failed!');
+        return [];
+      }
+
+      console.log(`[Polymarket] API Response: ${response.data?.length || 0} markets received`);
 
       console.log(`[Polymarket] API Response: ${response.data?.length || 0} markets received`);
       
