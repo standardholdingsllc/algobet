@@ -240,12 +240,20 @@ import axios from 'axios';
 
 /* -------------------------------------------------------------------------- */
 
-/*  Helpers                                                                   */
+/*  Constants                                                                */
 
 /* -------------------------------------------------------------------------- */
 
 const CLOB_BASE_URL = "https://clob.polymarket.com";
 const GAMMA_BASE_URL = "https://gamma-api.polymarket.com";
+const BASE_URL = CLOB_BASE_URL; // For backward compatibility with existing methods
+const DATA_API_URL = "https://data-api.polymarket.com";
+
+/* -------------------------------------------------------------------------- */
+
+/*  Helpers                                                                   */
+
+/* -------------------------------------------------------------------------- */
 
 /**
  * Safe JSON parse helper.
