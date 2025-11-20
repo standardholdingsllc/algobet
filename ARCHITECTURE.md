@@ -1,3 +1,132 @@
+# AlgoBet Architecture
+
+This document reflects the current source code under `lib/`, `pages/`, `workers/`, and `services/`. It replaces all previous summaries.
+
+---
+
+## 1. High-Level View
+
+| Layer | Location | Responsibilities |
+|-------|----------|------------------|
+| **Dashboard** | `pages/`, `components/` | Next.js 14 app that shows balances, charts, opportunity logs, and exposes bot controls plus CSV/JSON exports. |
+| **Serverless API** | `pages/api/**/*` | Control plane for starting/stopping the bot, refreshing balances, reading configuration, exporting data, and providing health/watchdog endpoints. |
+| **Cron Bot** | `lib/bot.ts` | Sequential arbitrage scanner invoked by Vercel cron or a manual `/api/bot/cron` call. Handles market ingestion, risk checks, bet sizing, execution, and adaptive scan timing. |
+| **Background Worker** | `workers/scanner.ts` | Long-running Node worker that mirrors the bot loop, writes results to GitHub storage, and can execute opportunities independent of the serverless environment. |
+| **Storage** | `lib/kv-storage.ts`, `lib/github-storage.ts`, `data/storage.json` | KV holds live config + balances for the dashboard/API, GitHub JSON stores persistent history for the worker, and local JSON provides development seeds. |
+
+Both the cron bot and the worker import the same market clients, arbitrage engine, fee calculator, storage helpers, and email alerts.
+
+---
+
+## 2. Market Integrations
+
+### Kalshi (`lib/markets/kalshi.ts`, `services/kalshi.ts`)
+- Authenticated REST client (HMAC-SHA based) that fetches markets, balances, and submits fill-or-kill orders.
+- Shared fee helpers (`lib/fees.ts`) convert quoted prices to actual cash requirements before bets are sent.
+
+### Polymarket (`lib/markets/polymarket.ts`, `services/polymarket.ts`)
+- **Market ingestion**: Uses the Gamma API first, caches results for 30 seconds, and only falls back to a limited CLOB pagination sweep if Gamma produces zero tradable markets. This removes the 61-page sweeps visible in `logs.txt`.
+- **Normalization**: Outcomes, `clobTokenIds`, and prices are parsed into a single `NormalizedPolymarketMarket` type; markets without valid prices or outside the configured expiry window never reach the arbitrage engine.
+- **Balances**: `getTotalBalance` tries the CLOB collateral endpoint once (disabling it after the first 404), then falls back to a USDC on-chain query and the Data API’s positions feed.
+- **Orders**: Limit orders are signed via EIP-712 and posted to the CLOB order endpoint.
+
+### SX.bet (`lib/markets/sxbet.ts`, `services/sxbet.ts`)
+- REST-only for now; fixtures are optional and missing data is logged but non-fatal.
+- Order placement remains a TODO until the account receives the necessary permissions.
+
+All integrations return the shared `Market` interface so that `lib/arbitrage.ts` operates platform-agnostically.
+
+---
+
+## 3. Bot & Worker Pipeline
+
+### Shared flow
+1. Load `BotConfig` + balances from KV (bot) or GitHub storage (worker).
+2. Fetch Kalshi, Polymarket, and SX.bet markets in parallel.
+3. Update `HotMarketTracker` and remove expired entries.
+4. Generate arbitrage candidates via `lib/arbitrage.ts`:
+   - Tracked market combinations first.
+   - General cross-platform scan second.
+   - Dedupe using opportunity IDs.
+5. Size trades with `calculateBetSizes`, respecting per-platform available cash and `maxBetPercentage`.
+6. Execute up to five top-ranked opportunities unless `simulationMode` is enabled.
+7. Log opportunities, update storage, and feed scan metrics into `lib/adaptive-scanner.ts` to pick the next interval (5s–60s).
+
+### Concurrency guarantees
+- `lib/bot.ts` guards every scan with an `isScanning` flag so overlapping cron events do not run simultaneously.
+- `workers/scanner.ts` runs in a single loop and sleeps via `MARKET_SCAN_INTERVAL`.
+
+---
+
+## 4. Storage & Data Shape
+
+| Store | Module | Usage |
+|-------|--------|-------|
+| **Vercel KV** | `lib/kv-storage.ts` | Balances, configuration, opportunity logs, daily stats. Backed by Upstash Redis. |
+| **GitHub storage** | `lib/github-storage.ts` | Worker-friendly JSON snapshot of opportunities/bets committed back to the repo. |
+| **Local JSON** | `data/storage.json`, `data/bot-status.json` | Dev defaults when remote stores are unavailable. |
+
+Key types live in `types/index.ts` (e.g., `Market`, `ArbitrageOpportunity`, `BotConfig`).
+
+---
+
+## 5. Risk & Pricing Modules
+
+- `lib/arbitrage.ts`: Market matching (semantic + NLP), profit calculation, opportunity validation, and deduplication.
+- `lib/fees.ts`: Platform-specific fee tables and helpers (`calculateTotalCost`, `calculateArbitrageProfitMargin`).
+- `lib/hot-market-tracker.ts`: Tracks cross-platform duplicates so high-signal markets stay prioritized.
+- `lib/adaptive-scanner.ts`: Records scan outcomes + live event counts and adjusts the next interval.
+- `lib/email.ts`: Sends low-balance alerts without blocking the scan loop.
+
+Execution checks enforced at multiple points:
+- Profit must exceed `config.minProfitMargin`.
+- Markets must expire within `config.maxDaysToExpiry`.
+- Bet size never exceeds `maxBetPercentage` of per-platform available cash.
+- Simulation mode records everything but never places orders.
+
+---
+
+## 6. API Surface (`pages/api/`)
+
+| Endpoint | Function |
+|----------|----------|
+| `/api/bot/control`, `/api/bot/status`, `/api/bot/health`, `/api/bot/watchdog` | Start/stop the bot, report status, and expose health endpoints. |
+| `/api/bot/cron` | Entry point for Vercel cron to trigger a single `scanOnce()`. |
+| `/api/balances`, `/api/balances/refresh` | Serve cached balances and trigger an on-demand refresh. |
+| `/api/bets`, `/api/opportunity-logs`, `/api/export`, `/api/export-opportunities` | Reporting endpoints that back the dashboard downloads. |
+| `/api/config`, `/api/data` | Read/write bot configuration stored in KV. |
+
+Each route calls into the same modules the bot/worker use (no duplicated logic).
+
+---
+
+## 7. Deployment Notes
+
+- The dashboard + APIs run as a standard Next.js 14 app on Vercel.
+- The cron bot relies on `start()`, `stop()`, and `scanOnce()` exported from `lib/bot.ts`.
+- The long-running worker can be launched manually (`ts-node workers/scanner.ts`) on any Node host.
+- Environment variables (Kalshi credentials, Polymarket keys, SX.bet tokens, email settings) are required for full functionality; missing values gracefully degrade (e.g., SX.bet order placement is skipped).
+
+---
+
+## 8. Polymarket-Specific Fixes from the Code
+
+- Markets now come from the Gamma API first, are cached for 30 seconds, and only fall back to an 8-page CLOB sweep if Gamma is empty. This resolves the excessive sequential requests visible in `logs.txt`.
+- `clobTokenIds`, outcomes, and prices are parsed from JSON rather than naive comma splits, fixing token mismatches that prevented order placement.
+- The CLOB balance endpoint is automatically disabled after the first 404 to avoid repeated failures; blockchain and Data API fallbacks still provide balances.
+- Markets without usable prices or outside the configured expiry window are filtered before they enter `lib/arbitrage.ts`, preventing zero-priced opportunities.
+
+---
+
+## 9. Observability
+
+- Console logs include per-page API timing, balance breakdowns, and opportunity summaries.
+- Low-balance alerts use `sendBalanceAlert` asynchronously so scans are never blocked.
+- `logs.txt` (checked into the repo) captures recent scan output for debugging regressions.
+
+---
+
+This architecture keeps all trading logic centralized in shared modules, enabling the dashboard, cron bot, and worker to stay consistent while minimizing duplicated code. Adding a new exchange only requires a `lib/markets/<exchange>.ts` client that returns the shared `Market` type; everything else (arbitrage detection, sizing, risk checks, logging, alerts) is already wired to consume normalized markets.***
 # AlgoBet Architecture Documentation
 
 ## Overview

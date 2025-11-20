@@ -207,6 +207,18 @@ interface ClobMarketsResponse {
   data: ClobMarket[];
 }
 
+interface ClobPaginationOptions {
+  maxPages?: number;
+  stopAfterTradable?: number;
+  maxConsecutiveInactivePages?: number;
+}
+
+interface ClobPaginatedResult {
+  tradable: ClobMarket[];
+  totalFetched: number;
+  pagesFetched: number;
+}
+
 /**
  * Gamma side types (subset from Gamma docs + practice)
  * Docs: https://docs.polymarket.com/developers/gamma-markets-api/get-markets
@@ -275,6 +287,22 @@ const GAMMA_BASE_URL = "https://gamma-api.polymarket.com";
 const BASE_URL = CLOB_BASE_URL; // For backward compatibility with existing methods
 const DATA_API_URL = "https://data-api.polymarket.com";
 
+const MARKET_CACHE_TTL_MS = 30_000; // 30 seconds cache window to keep scans fast
+const GAMMA_PAGE_LIMIT = 500;
+const GAMMA_MAX_PAGES = 6; // 3k markets max per refresh
+const CLOB_MAX_PAGES = 8; // stop early to avoid 60+ page sweeps
+const CLOB_MAX_TRADABLE = 400;
+const CLOB_MAX_INACTIVE_PAGES = 3;
+
+interface MarketCacheEntry {
+  fetchedAt: number;
+  source: PolymarketSource;
+  markets: NormalizedPolymarketMarket[];
+}
+
+let marketCache: MarketCacheEntry | null = null;
+let inflightMarketFetch: Promise<NormalizedPolymarketMarket[]> | null = null;
+
 /* -------------------------------------------------------------------------- */
 
 /*  Helpers                                                                   */
@@ -310,20 +338,29 @@ function normalizeIso(value?: string | null): string | null {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Fetch ALL CLOB markets using documented pagination with optimized sequential requests.
- *
- *   GET /markets?next_cursor=<cursor>
- *
- * - next_cursor: "" → start
- * - final page often has next_cursor "LTE="
- * - Uses sequential requests with minimal delay for better performance
+ * Fetch CLOB markets with pagination limits.
+ * We stop early once we've either collected enough tradable markets or
+ * we've scanned the maximum number of pages to avoid 60+ sequential calls.
  */
-async function fetchAllClobMarkets(): Promise<ClobMarket[]> {
-  const all: ClobMarket[] = [];
+async function fetchAllClobMarkets(
+  options: ClobPaginationOptions = {}
+): Promise<ClobPaginatedResult> {
+  const { maxPages, stopAfterTradable, maxConsecutiveInactivePages } = options;
+  const tradable: ClobMarket[] = [];
   let cursor = "";
-  const requestDelay = 100; // 100ms delay between requests (reduced from sequential)
+  const requestDelay = 100;
+  let pagesFetched = 0;
+  let inactivePageStreak = 0;
+  let totalFetched = 0;
 
   while (true) {
+    if (typeof maxPages === "number" && pagesFetched >= maxPages) {
+      console.info(
+        `[Polymarket CLOB] Stopping pagination after reaching maxPages=${maxPages}.`
+      );
+      break;
+    }
+
     const url = new URL("/markets", CLOB_BASE_URL);
     if (cursor) {
       url.searchParams.set("next_cursor", cursor);
@@ -347,27 +384,51 @@ async function fetchAllClobMarkets(): Promise<ClobMarket[]> {
       throw new Error("[Polymarket CLOB] Unexpected response shape from /markets");
     }
 
-    all.push(...body.data);
-    const fetchTime = Date.now() - startTime;
-    console.info(`[Polymarket CLOB] Page fetched in ${fetchTime}ms, ${body.data.length} markets`);
+    pagesFetched += 1;
+    totalFetched += body.data.length;
 
-    // End of pagination: per docs, "LTE=" marks terminal cursor.
+    const pageTradable = filterTradableClobMarkets(body.data);
+    tradable.push(...pageTradable);
+    inactivePageStreak = pageTradable.length === 0 ? inactivePageStreak + 1 : 0;
+
+    const fetchTime = Date.now() - startTime;
+    console.info(
+      `[Polymarket CLOB] Page fetched in ${fetchTime}ms, ${body.data.length} markets (${pageTradable.length} tradable)`
+    );
+
+    if (
+      typeof stopAfterTradable === "number" &&
+      tradable.length >= stopAfterTradable
+    ) {
+      console.info(
+        `[Polymarket CLOB] Collected ${tradable.length} tradable markets (target ${stopAfterTradable}), stopping early.`
+      );
+      break;
+    }
+
+    if (
+      typeof maxConsecutiveInactivePages === "number" &&
+      inactivePageStreak >= maxConsecutiveInactivePages
+    ) {
+      console.info(
+        `[Polymarket CLOB] No tradable markets found in the last ${inactivePageStreak} page(s); stopping pagination.`
+      );
+      break;
+    }
+
     if (!body.next_cursor || body.next_cursor === "LTE=") {
       break;
     }
 
     cursor = body.next_cursor;
-
-    // Minimal rate limiting delay between requests
-    if (cursor) {
-      await new Promise(resolve => setTimeout(resolve, requestDelay));
-    }
+    await new Promise(resolve => setTimeout(resolve, requestDelay));
   }
 
   console.info(
-    `[Polymarket CLOB] Retrieved ${all.length} markets from CLOB (unfiltered).`
+    `[Polymarket CLOB] Pagination complete: ${pagesFetched} page(s), ${totalFetched} rows, ${tradable.length} tradable markets.`
   );
-  return all;
+
+  return { tradable, totalFetched, pagesFetched };
 }
 
 /**
@@ -436,31 +497,41 @@ function mapClobToNormalized(markets: ClobMarket[]): NormalizedPolymarketMarket[
  * The Gamma `/markets` endpoint is not cursor-based; it supports
  * limit+offset pagination. Here we fetch a few pages to be safe.
  */
-async function fetchGammaMarkets(limit = 500, maxPages = 3): Promise<GammaMarket[]> {
+async function fetchGammaMarkets(
+  limit = GAMMA_PAGE_LIMIT,
+  maxPages = GAMMA_MAX_PAGES
+): Promise<GammaMarket[]> {
   const all: GammaMarket[] = [];
+
   for (let page = 0; page < maxPages; page++) {
+    const offset = page * limit;
     const url = new URL("/markets", GAMMA_BASE_URL);
     url.searchParams.set("limit", String(limit));
-    url.searchParams.set("offset", String(page * limit));
-    console.info("[Polymarket Gamma] Fetching /markets page", {
-      limit,
-      offset: page * limit,
-    });
+    url.searchParams.set("offset", String(offset));
+
+    console.info("[Polymarket Gamma] Fetching /markets page", { limit, offset });
     const res = await fetch(url.toString());
     if (!res.ok) {
       throw new Error(
         `[Polymarket Gamma] HTTP ${res.status} fetching markets: ${res.statusText}`
       );
     }
+
     const body = (await res.json()) as GammaMarket[];
     if (!Array.isArray(body) || body.length === 0) {
       break;
     }
     all.push(...body);
-    if (body.length < limit) break;
+
+    if (body.length < limit) {
+      break;
+    }
   }
+
   console.info(
-    `[Polymarket Gamma] Retrieved ${all.length} markets from Gamma (unfiltered).`
+    `[Polymarket Gamma] Retrieved ${all.length} markets from ${Math.ceil(
+      all.length / limit || 1
+    )} page(s).`
   );
   return all;
 }
@@ -492,10 +563,14 @@ function mapGammaToNormalized(markets: GammaMarket[]): NormalizedPolymarketMarke
   return markets.map((m) => {
     const outcomesArr = safeJsonParse<string[]>(m.outcomes ?? "");
     const pricesArr = safeJsonParse<(number | string)[]>(m.outcomePrices ?? "");
-    const tokenIds = (m.clobTokenIds ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const parsedTokenIds = safeJsonParse<string[]>(m.clobTokenIds ?? "");
+    const tokenIds = Array.isArray(parsedTokenIds)
+      ? parsedTokenIds
+      : (m.clobTokenIds ?? "")
+          .split(",")
+          .map((s) => s.replace(/[\[\]\"]/g, "").trim())
+          .filter(Boolean);
+
     const outcomes: NormalizedPolymarketOutcome[] =
       (outcomesArr ?? []).map((name, i) => {
         const rawPrice = pricesArr && pricesArr[i];
@@ -530,6 +605,81 @@ function mapGammaToNormalized(markets: GammaMarket[]): NormalizedPolymarketMarke
   });
 }
 
+function convertPriceToCents(value: number | null | undefined): number | null {
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+  const cents = Math.round(value * 100);
+  if (!Number.isFinite(cents)) return null;
+  return Math.max(0, Math.min(100, cents));
+}
+
+function determineBinaryOutcomePrices(
+  outcomes: NormalizedPolymarketOutcome[]
+): { yesCents: number; noCents: number } | null {
+  if (!Array.isArray(outcomes) || outcomes.length < 2) {
+    return null;
+  }
+
+  const pricedOutcomes = outcomes.filter(
+    (o): o is NormalizedPolymarketOutcome & { price: number } =>
+      typeof o.price === "number" && Number.isFinite(o.price)
+  );
+
+  if (pricedOutcomes.length < 2) {
+    return null;
+  }
+
+  const findByName = (keywords: string[]) =>
+    pricedOutcomes.find((outcome) => {
+      const name = (outcome.name || "").toLowerCase();
+      return keywords.some((keyword) => name === keyword || name.startsWith(`${keyword} `));
+    });
+
+  const yesOutcome =
+    findByName(["yes", "y"]) ||
+    findByName(["over", "home", "team 1"]) ||
+    null;
+  const noOutcome =
+    findByName(["no", "n"]) ||
+    findByName(["under", "away", "team 2"]) ||
+    null;
+
+  let yesPrice = yesOutcome?.price;
+  let noPrice = noOutcome?.price;
+
+  if (yesPrice == null && noPrice == null) {
+    yesPrice = pricedOutcomes[0].price;
+    noPrice = pricedOutcomes[1].price;
+  } else if (yesPrice == null) {
+    const fallback = pricedOutcomes.find((o) => o !== noOutcome);
+    yesPrice = fallback?.price;
+  } else if (noPrice == null) {
+    const fallback = pricedOutcomes.find((o) => o !== yesOutcome);
+    noPrice = fallback?.price;
+  }
+
+  const yesCents = convertPriceToCents(yesPrice);
+  const noCents = convertPriceToCents(noPrice);
+
+  if (yesCents == null || noCents == null) {
+    return null;
+  }
+
+  return { yesCents, noCents };
+}
+
+function isWithinExecutionWindow(
+  endDate: string | null,
+  now: Date,
+  maxDate: Date
+): boolean {
+  if (!endDate) return true;
+  const expiry = new Date(endDate);
+  if (Number.isNaN(expiry.getTime())) {
+    return false;
+  }
+  return expiry >= now && expiry <= maxDate;
+}
+
 /* -------------------------------------------------------------------------- */
 
 /*  PUBLIC API – what your Bot Engine should call                             */
@@ -550,54 +700,97 @@ function mapGammaToNormalized(markets: GammaMarket[]): NormalizedPolymarketMarke
  *
  *   // Then pass `polymarketMarkets` into your arbitrage matching logic.
  */
-export async function fetchPolymarketMarkets(): Promise<
-  NormalizedPolymarketMarket[]
-> {
-  // 1) Try CLOB first
-  let clobMarkets: ClobMarket[] = [];
-  try {
-    console.info("[Polymarket CLOB] Fetching markets from CLOB API (primary)...");
-    clobMarkets = await fetchAllClobMarkets();
-  } catch (err) {
-    console.warn(
-      "[Polymarket CLOB] Error fetching markets – will consider Gamma fallback:",
-      err
-    );
-  }
-  let tradableClob: ClobMarket[] = [];
-  if (clobMarkets.length > 0) {
-    tradableClob = filterTradableClobMarkets(clobMarkets);
+export async function fetchPolymarketMarkets(
+  options: { forceRefresh?: boolean } = {}
+): Promise<NormalizedPolymarketMarket[]> {
+  const forceRefresh = options.forceRefresh ?? false;
+  const now = Date.now();
+
+  if (!forceRefresh && marketCache && now - marketCache.fetchedAt < MARKET_CACHE_TTL_MS) {
     console.info(
-      `[Polymarket CLOB] Found ${clobMarkets.length} CLOB markets, ` +
-        `${tradableClob.length} tradable after filtering (active && !closed).`
+      `[Polymarket] Serving ${marketCache.markets.length} cached markets from ${marketCache.source}.`
     );
-  } else {
-    console.warn("[Polymarket CLOB] No CLOB markets returned at all.");
+    return marketCache.markets;
   }
-  if (tradableClob.length > 0) {
-    console.info(
-      "[Polymarket] Using CLOB markets only (Gamma fallback not needed)."
-    );
-    return mapClobToNormalized(tradableClob);
+
+  if (!inflightMarketFetch) {
+    inflightMarketFetch = refreshPolymarketMarkets().finally(() => {
+      inflightMarketFetch = null;
+    });
   }
-  // 2) No tradable CLOB markets → Gamma fallback
+
+  return inflightMarketFetch;
+}
+
+async function refreshPolymarketMarkets(): Promise<NormalizedPolymarketMarket[]> {
+  const gammaMarkets = await tryFetchGammaMarkets();
+  if (gammaMarkets.length > 0) {
+    marketCache = {
+      fetchedAt: Date.now(),
+      source: "gamma",
+      markets: gammaMarkets,
+    };
+    return gammaMarkets;
+  }
+
   console.warn(
-    "[Polymarket CLOB] No tradable CLOB markets found, falling back to Gamma API..."
+    "[Polymarket] Gamma API returned 0 tradable markets. Attempting limited CLOB sweep..."
   );
+  const clobMarkets = await tryFetchClobMarketsLimited();
+  marketCache = {
+    fetchedAt: Date.now(),
+    source: "clob",
+    markets: clobMarkets,
+  };
+  return clobMarkets;
+}
+
+async function tryFetchGammaMarkets(): Promise<NormalizedPolymarketMarket[]> {
   let gammaMarkets: GammaMarket[] = [];
   try {
-    gammaMarkets = await fetchGammaMarkets();
+    gammaMarkets = await fetchGammaMarkets(GAMMA_PAGE_LIMIT, GAMMA_MAX_PAGES);
   } catch (err) {
     console.error("[Polymarket Gamma] Failed to fetch markets:", err);
-    // At this point we truly have nothing; surface as "no markets"
     return [];
   }
+
+  if (gammaMarkets.length === 0) {
+    console.warn("[Polymarket Gamma] API responded with 0 markets.");
+    return [];
+  }
+
   const tradableGamma = filterTradableGammaMarkets(gammaMarkets);
   console.info(
-    `[Polymarket Gamma] Found ${gammaMarkets.length} Gamma markets, ` +
-      `${tradableGamma.length} tradable after filtering.`
+    `[Polymarket Gamma] ${tradableGamma.length} tradable markets out of ${gammaMarkets.length} raw entries.`
   );
   return mapGammaToNormalized(tradableGamma);
+}
+
+async function tryFetchClobMarketsLimited(): Promise<NormalizedPolymarketMarket[]> {
+  try {
+    console.info("[Polymarket CLOB] Fetching markets from CLOB API (fallback)...");
+    const result = await fetchAllClobMarkets({
+      maxPages: CLOB_MAX_PAGES,
+      stopAfterTradable: CLOB_MAX_TRADABLE,
+      maxConsecutiveInactivePages: CLOB_MAX_INACTIVE_PAGES,
+    });
+    const { tradable, totalFetched, pagesFetched } = result;
+
+    if (tradable.length === 0) {
+      console.warn(
+        `[Polymarket CLOB] No tradable markets found across ${pagesFetched} page(s) (${totalFetched} rows).`
+      );
+      return [];
+    }
+
+    console.info(
+      `[Polymarket CLOB] ${tradable.length} tradable markets collected from ${pagesFetched} page(s) (${totalFetched} rows).`
+    );
+    return mapClobToNormalized(tradable);
+  } catch (err) {
+    console.error("[Polymarket CLOB] Failed to fetch markets:", err);
+    return [];
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -686,39 +879,36 @@ export class PolymarketAPI {
   private apiKey: string;
   private privateKey: string;
   private walletAddress: string;
+  private shouldSkipClobBalance: boolean;
 
   constructor() {
     this.apiKey = process.env.POLYMARKET_API_KEY || '';
     this.privateKey = process.env.POLYMARKET_PRIVATE_KEY || '';
     this.walletAddress = process.env.POLYMARKET_WALLET_ADDRESS || '';
+     this.shouldSkipClobBalance = false;
   }
 
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
-    // Use the new CLOB-first implementation with proper pagination and fallback
     const normalizedMarkets = await fetchPolymarketMarkets();
-
-    // Convert normalized markets to the Market[] format expected by the rest of the system
     const markets: Market[] = [];
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
     const now = new Date();
+    const maxDate = new Date(now);
+    maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
+
+    let skippedExpiry = 0;
+    let skippedPrice = 0;
 
     for (const market of normalizedMarkets) {
-      // Apply expiry filtering here (as per architecture - this is where risk logic lives)
-      if (market.endDate) {
-        const expiryDate = new Date(market.endDate);
-        if (expiryDate < now || expiryDate > maxDate) {
-          continue; // Skip expired or too distant markets
-        }
+      if (!isWithinExecutionWindow(market.endDate, now, maxDate)) {
+        skippedExpiry += 1;
+        continue;
       }
 
-      // Find Yes/No outcomes and their prices
-      const yesOutcome = market.outcomes.find(o => o.name.toLowerCase().includes('yes') || o.name.toLowerCase().includes('y'));
-      const noOutcome = market.outcomes.find(o => o.name.toLowerCase().includes('no') || o.name.toLowerCase().includes('n'));
-
-      // For binary markets, assume first outcome is Yes, second is No if we can't identify by name
-      const yesPrice = yesOutcome?.price ? Math.round(yesOutcome.price * 100) : Math.round((market.outcomes[0]?.price || 0) * 100);
-      const noPrice = noOutcome?.price ? Math.round(noOutcome.price * 100) : Math.round((market.outcomes[1]?.price || 0) * 100);
+      const pricePair = determineBinaryOutcomePrices(market.outcomes);
+      if (!pricePair) {
+        skippedPrice += 1;
+        continue;
+      }
 
       const marketData: Market = {
         id: market.conditionId,
@@ -726,16 +916,18 @@ export class PolymarketAPI {
         ticker: market.conditionId,
         marketType: 'prediction' as const,
         title: market.question,
-        yesPrice,
-        noPrice,
+        yesPrice: pricePair.yesCents,
+        noPrice: pricePair.noCents,
         expiryDate: market.endDate || new Date().toISOString(),
-        volume: 0, // Volume not available in normalized format
+        volume: 0,
       };
 
       markets.push(marketData);
     }
 
-    console.log(`[Polymarket] Converted ${normalizedMarkets.length} normalized markets to ${markets.length} legacy format markets`);
+    console.log(
+      `[Polymarket] Converted ${normalizedMarkets.length} normalized markets into ${markets.length} tradeable entries (skipped ${skippedExpiry} by expiry, ${skippedPrice} by missing prices).`
+    );
     return markets;
   }
 
@@ -837,8 +1029,8 @@ export class PolymarketAPI {
 
   async getAvailableBalance(): Promise<number> {
     // Get available cash balance from CLOB API
-    if (!this.walletAddress) {
-      return 0;
+    if (!this.walletAddress || this.shouldSkipClobBalance) {
+      return -1;
     }
 
     try {
@@ -855,7 +1047,15 @@ export class PolymarketAPI {
       const balance = parseFloat(response.data.collateral || response.data.balance || '0');
       return Number.isFinite(balance) ? balance : 0;
     } catch (error: any) {
-      console.warn('[Polymarket CLOB] Balance endpoint failed:', error.response?.status || error.message);
+      const status = error.response?.status;
+      if (status === 404) {
+        if (!this.shouldSkipClobBalance) {
+          console.warn('[Polymarket CLOB] Balance endpoint responded 404. Disabling future CLOB balance checks for this process.');
+        }
+        this.shouldSkipClobBalance = true;
+      } else {
+        console.warn('[Polymarket CLOB] Balance endpoint failed:', status || error.message);
+      }
       return -1; // Use -1 as a sentinel value for failure
     }
   }
