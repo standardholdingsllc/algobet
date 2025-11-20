@@ -11,22 +11,29 @@ const erc20ABI = [
 ];
 
 interface SXBetMarket {
+  status: string;
   marketHash: string;
   outcomeOneName: string;
   outcomeTwoName: string;
+  outcomeVoidName?: string;
   teamOneName?: string;
   teamTwoName?: string;
-  status: number;
-  sportXeventId: string;
-  line?: number;
-  mainLine: boolean;
   type: number;
-  leagueLabel: string;
-  gameLabel: string;
-  reporterKey: string;
+  gameTime?: number;
+  sportXeventId: string;
+  sportLabel?: string;
+  sportId?: number;
+  leagueId?: number;
+  leagueLabel?: string;
+  chainVersion?: string;
+  group1?: string;
+  line?: number;
+  mainLine?: boolean;
+  reporterKey?: string;
   group?: number;
   teamOneLogo?: string;
   teamTwoLogo?: string;
+  gameLabel?: string;
 }
 
 interface SXBetOrder {
@@ -141,20 +148,8 @@ export class SXBetAPI {
         },
       });
 
-      // Get active fixtures for event details
-      let fixtures: SXBetFixture[] = [];
-      let fixtureMap = new Map<string, SXBetFixture>();
-
-      try {
-        const fixturesResponse = await axios.get(`${BASE_URL}/fixture/active`, {
-          headers: this.getHeaders(),
-        });
-        fixtures = fixturesResponse.data.data || [];
-        fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
-        console.log(`[sx.bet] Retrieved ${fixtures.length} fixtures`);
-      } catch (fixtureError: any) {
-        console.warn(`[sx.bet] Fixtures endpoint failed (${fixtureError.response?.status}), continuing without fixture data`);
-      }
+      // Fixture endpoint currently requires elevated permissions; rely on market metadata
+      const fixtureMap = new Map<string, SXBetFixture>();
 
       // Get best odds for order data
       let ordersResponse: any;
@@ -193,16 +188,11 @@ export class SXBetAPI {
       maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
 
       for (const market of marketsData) {
-        // Get fixture details (optional)
         const fixture = fixtureMap.get(market.sportXeventId);
+        const expiryDate = this.deriveExpiryDate(market, fixture);
 
-        // Determine expiry date
-        let expiryDate: Date;
-        if (fixture && fixture.startDate) {
-          expiryDate = new Date(fixture.startDate);
-        } else {
-          // If no fixture data, skip markets without expiry info
-          console.warn(`[sx.bet] Skipping market ${market.marketHash} - no fixture data`);
+        if (!expiryDate) {
+          console.warn(`[sx.bet] Skipping market ${market.marketHash} - no start time available`);
           continue;
         }
 
@@ -236,7 +226,9 @@ export class SXBetAPI {
         const outcomeTwoOdds = this.convertToDecimalOdds(bestOutcomeTwo.percentageOdds, true);
 
         // Create market title
-        const title = fixture ? this.createMarketTitle(market, fixture) : this.createFallbackTitle(market);
+        const title = fixture
+          ? this.createMarketTitle(market, fixture)
+          : this.createFallbackTitle(market);
 
         markets.push({
           id: market.marketHash,
@@ -259,10 +251,26 @@ export class SXBetAPI {
   }
 
   /**
+   * Convert fixture or market timestamps into a Date
+   */
+  private deriveExpiryDate(
+    market: SXBetMarket,
+    fixture?: SXBetFixture
+  ): Date | null {
+    if (fixture?.startDate) {
+      return new Date(fixture.startDate);
+    }
+    if (market.gameTime) {
+      return new Date(market.gameTime * 1000);
+    }
+    return null;
+  }
+
+  /**
    * Create fallback title when fixture data is not available
    */
   private createFallbackTitle(market: SXBetMarket): string {
-    return `${market.leagueLabel || 'Sports'} - ${market.gameLabel || market.outcomeOneName + ' vs ' + market.outcomeTwoName}`;
+    return this.createBasicMarketTitle(market);
   }
 
   /**
