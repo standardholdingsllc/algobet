@@ -405,38 +405,40 @@ export class MarketFeedService {
     const startMs = Date.parse(filters.windowStart);
     const endMs = Date.parse(filters.windowEnd);
 
-    return entries
-      .map((market) => {
-        const expiry = new Date(market.close_time);
-        if (Number.isNaN(expiry.getTime())) {
-          return null;
-        }
-        if (!Number.isNaN(startMs) && expiry.getTime() < startMs) {
-          return null;
-        }
-        if (!Number.isNaN(endMs) && expiry.getTime() > endMs) {
-          return null;
-        }
-        if (
-          typeof market.yes_price !== 'number' ||
-          typeof market.no_price !== 'number'
-        ) {
-          return null;
-        }
+    const normalized: Market[] = [];
 
-        return {
-          id: market.ticker,
-          ticker: market.ticker,
-          platform: 'kalshi' as const,
-          marketType: 'prediction' as const,
-          title: market.title,
-          yesPrice: market.yes_price,
-          noPrice: market.no_price,
-          expiryDate: expiry.toISOString(),
-          volume: market.volume,
-        };
-      })
-      .filter((market): market is Market => Boolean(market));
+    for (const market of entries) {
+      const expiry = new Date(market.close_time);
+      if (Number.isNaN(expiry.getTime())) {
+        continue;
+      }
+      if (!Number.isNaN(startMs) && expiry.getTime() < startMs) {
+        continue;
+      }
+      if (!Number.isNaN(endMs) && expiry.getTime() > endMs) {
+        continue;
+      }
+      if (
+        typeof market.yes_price !== 'number' ||
+        typeof market.no_price !== 'number'
+      ) {
+        continue;
+      }
+
+      normalized.push({
+        id: market.ticker,
+        ticker: market.ticker,
+        platform: 'kalshi',
+        marketType: 'prediction',
+        title: market.title,
+        yesPrice: market.yes_price,
+        noPrice: market.no_price,
+        expiryDate: expiry.toISOString(),
+        volume: market.volume,
+      });
+    }
+
+    return normalized;
   }
 
   private applyExpiryFilter(
