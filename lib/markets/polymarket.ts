@@ -37,6 +37,16 @@ export class PolymarketAPI {
     this.walletAddress = process.env.POLYMARKET_WALLET_ADDRESS || '';
   }
 
+  // Disable market fetching since Polymarket requires special access
+  async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
+    console.log('[Polymarket] Market fetching disabled - Polymarket requires invite-only access for live markets');
+    console.log('[Polymarket] Public APIs only provide historical data for research purposes');
+    console.log('[Polymarket] See: https://docs.polymarket.com/developers/gamma-markets-api/overview');
+
+    // Return empty array to disable Polymarket market integration
+    return [];
+  }
+
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
     try {
       console.log('[Polymarket] Fetching markets from Gamma API...');
