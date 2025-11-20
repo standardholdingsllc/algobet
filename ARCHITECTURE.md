@@ -47,7 +47,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 ### 2.3 Platform-specific behavior
 - **Kalshi**
   - Requests now use the documented `min_close_ts` / `max_close_ts` query parameters (Unix timestamps in seconds) and drop undocumented sorting flags. The adapter enforces Kalshi’s timestamp-family compatibility matrix (e.g., close-time filters never send `status=open`) so every query stays inside the published contract.
-  - Pagination obeys adapter config (`limit=200`, `maxPages=8`, cursor field `meta.next_cursor`) and results are sorted client-side when needed.
+  - Pagination obeys adapter config (`limit=200`, optional `maxPages=8`) and now follows Kalshi’s top-level `cursor` field until it becomes empty. Each page log includes request params, raw counts, tradable counts, and the returned cursor so missing pages are obvious.
   - A secondary `kalshi:events` adapter targets `/events/{ticker}/markets` for league-specific feeds (driven by `leagueTickers` filter tokens).
 - **Polymarket**
   - Default adapter remains `polymarket:hybrid`, which leans on the battle-tested hybrid Gamma/CLOB client (`lib/markets/polymarket.ts`) so we retain per-page caching, fallbacks, and pricing normalization. Future overrides can switch to a pure Gamma adapter without touching the bot.

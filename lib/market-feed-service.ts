@@ -288,26 +288,32 @@ export class MarketFeedService {
     maxMarkets?: number
   ): Promise<Market[]> {
     const markets: Market[] = [];
-    let cursor: string | null = null;
+    let cursor: string | undefined;
     let page = 0;
-    const maxPages =
-      pagination?.maxPages ?? Number.POSITIVE_INFINITY;
+    const maxPagesCap = pagination?.maxPages;
+    const hasMaxPagesCap =
+      typeof maxPagesCap === 'number' &&
+      Number.isFinite(maxPagesCap) &&
+      maxPagesCap > 0;
+    const hasMarketCap =
+      typeof maxMarkets === 'number' && Number.isFinite(maxMarkets);
+    const marketCapValue = hasMarketCap ? (maxMarkets as number) : undefined;
+    let stopReason: string | null = null;
 
     while (true) {
       page += 1;
       const pageParams = { ...params };
-      if (cursor && pagination?.cursorParam) {
+      if (cursor !== undefined && pagination?.cursorParam) {
         pageParams[pagination.cursorParam] = cursor;
       }
 
       const requestLabel = `[Kalshi Adapter] ${endpoint} page ${page}`;
       const logParams = {
         ...pageParams,
-        cursor: cursor ?? null,
+        cursor: cursor ?? '<none>',
       };
       console.info(
-        `${requestLabel} → requesting with params`,
-        JSON.stringify(logParams)
+        `${requestLabel} → requesting with params ${JSON.stringify(logParams)}`
       );
 
       const response = await axios.get(`${KALSHI_API_BASE}${endpoint}`, {
@@ -320,10 +326,6 @@ export class MarketFeedService {
         rawMarkets.length > 0
           ? rawMarkets[rawMarkets.length - 1]?.close_time ?? null
           : null;
-      console.info(
-        `${requestLabel} ← received ${rawMarkets.length} markets (first_close=${firstClose}, last_close=${lastClose})`
-      );
-
       const normalized = this.normalizeKalshiMarkets(rawMarkets, filters);
       markets.push(...normalized);
 
@@ -332,31 +334,44 @@ export class MarketFeedService {
         pagination?.nextCursorPath
       );
       console.info(
-        `${requestLabel} → next_cursor=${nextCursor ?? '<null>'}`
+        `${requestLabel} ← ${rawMarkets.length} raw (first_close=${firstClose}, last_close=${lastClose}), ${normalized.length} tradable, cursor="${nextCursor ?? ''}"`
       );
 
-      const reachedMaxPages = page >= maxPages;
+      const noMorePages = !nextCursor;
+      const reachedMaxPages = hasMaxPagesCap && page >= (maxPagesCap as number);
       const reachedMarketCap =
-        Number.isFinite(maxMarkets) && markets.length >= (maxMarkets as number);
+        hasMarketCap && markets.length >= (marketCapValue as number);
 
-      if (!nextCursor || reachedMaxPages || reachedMarketCap) {
+      if (reachedMarketCap) {
+        stopReason = `reached maxMarkets cap (${marketCapValue})`;
+      } else if (reachedMaxPages) {
+        stopReason = `reached maxPages cap (${maxPagesCap})`;
+      } else if (noMorePages) {
+        stopReason = 'pagination cursor missing/empty';
+      }
+
+      if (stopReason) {
         break;
       }
 
       cursor = nextCursor;
     }
 
-    if (maxMarkets && markets.length > maxMarkets) {
-      return markets.slice(0, maxMarkets);
+    if (hasMarketCap && markets.length > (marketCapValue as number)) {
+      return markets.slice(0, marketCapValue as number);
+    }
+    if (!stopReason) {
+      stopReason = 'completed without explicit stop signal';
     }
     if (markets.length === 0) {
       console.warn(
         '[Kalshi Adapter] No markets returned after pagination ' +
-          `(window ${filters.windowStart} → ${filters.windowEnd})`
+          `(window ${filters.windowStart} → ${filters.windowEnd}) ` +
+          `(stopped because ${stopReason})`
       );
     } else {
       console.info(
-        `[Kalshi Adapter] Collected ${markets.length} tradable markets across ${page} page(s)`
+        `[Kalshi Adapter] Collected ${markets.length} tradable markets across ${page} page(s) (stopped because ${stopReason})`
       );
     }
     return markets;

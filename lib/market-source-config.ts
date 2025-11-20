@@ -49,7 +49,7 @@ const defaultKalshiAdapters: Record<string, MarketAdapterConfig> = {
     },
     pagination: {
       cursorParam: 'cursor',
-      nextCursorPath: 'meta.next_cursor',
+      nextCursorPath: 'cursor',
       maxPages: 8,
       limitParam: 'limit',
       limit: 200,
