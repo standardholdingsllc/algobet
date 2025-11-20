@@ -192,6 +192,9 @@ interface PolymarketMarketFetchOptions {
   windowEnd: string;
   categories?: string[];
   forceRefresh?: boolean;
+  maxMarkets?: number;
+  maxPages?: number;
+  limit?: number;
 }
 
 /**
@@ -323,7 +326,7 @@ const DAY_MS = 86_400_000;
 const MARKET_CACHE_TTL_MS = 30_000; // 30 seconds cache window to keep scans fast
 const GAMMA_PAGE_LIMIT = 500;
 const GAMMA_MAX_PAGES = 6; // 3k markets max per refresh
-const GAMMA_STOP_AFTER_TRADABLE = 400;
+const DEFAULT_POLYMARKET_MAX_MARKETS = 2000;
 const MAX_POLYMARKET_EXPIRY_LOGS = 20;
 const CLOB_MAX_PAGES = 8; // stop early to avoid 60+ page sweeps
 const CLOB_MAX_TRADABLE = 400;
@@ -378,7 +381,10 @@ function buildPolymarketCacheKey(
     options.categories && options.categories.length
       ? options.categories.filter(Boolean).sort().join(',')
       : 'none';
-  return `${start}|${end}|${categories}`;
+  const max = options.maxMarkets ?? DEFAULT_POLYMARKET_MAX_MARKETS;
+  const pages = options.maxPages ?? GAMMA_MAX_PAGES;
+  const limit = options.limit ?? GAMMA_PAGE_LIMIT;
+  return `${start}|${end}|${categories}|max=${max}|pages=${pages}|limit=${limit}`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -573,17 +579,28 @@ function mapClobToNormalized(markets: ClobMarket[]): NormalizedPolymarketMarket[
  * limit+offset pagination. Here we fetch a few pages to be safe.
  */
 async function fetchGammaMarkets(
-  options: PolymarketMarketFetchOptions,
-  limit = GAMMA_PAGE_LIMIT,
-  maxPages = GAMMA_MAX_PAGES,
-  stopAfterTradable = GAMMA_STOP_AFTER_TRADABLE
+  options: PolymarketMarketFetchOptions
 ): Promise<GammaMarket[]> {
+  const limit = options.limit ?? GAMMA_PAGE_LIMIT;
+  const maxPages = options.maxPages ?? GAMMA_MAX_PAGES;
+  const targetTradable =
+    options.maxMarkets && options.maxMarkets > 0
+      ? options.maxMarkets
+      : DEFAULT_POLYMARKET_MAX_MARKETS;
+
   const all: GammaMarket[] = [];
   let tradableCollected = 0;
+  let pagesFetched = 0;
+  let stopReason: string | null = null;
   const queryFilters = buildGammaQueryFilters(options);
 
-  for (let page = 0; page < maxPages; page++) {
-    const offset = page * limit;
+  while (true) {
+    if (maxPages > 0 && pagesFetched >= maxPages) {
+      stopReason = `reached maxPages cap (${maxPages})`;
+      break;
+    }
+
+    const offset = pagesFetched * limit;
     const url = new URL("/markets", GAMMA_BASE_URL);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
@@ -592,6 +609,7 @@ async function fetchGammaMarkets(
     });
 
     console.info("[Polymarket Gamma] Fetching /markets page", {
+      page: pagesFetched + 1,
       limit,
       offset,
       filters: queryFilters,
@@ -605,32 +623,43 @@ async function fetchGammaMarkets(
 
     const body = (await res.json()) as GammaMarket[];
     if (!Array.isArray(body) || body.length === 0) {
+      stopReason = "API returned 0 markets";
       break;
     }
+
+    pagesFetched += 1;
     all.push(...body);
 
     const tradableOnPage = filterTradableGammaMarkets(body).length;
     tradableCollected += tradableOnPage;
-    if (
-      typeof stopAfterTradable === "number" &&
-      stopAfterTradable > 0 &&
-      tradableCollected >= stopAfterTradable
-    ) {
-      console.info(
-        `[Polymarket Gamma] Reached tradable threshold (${tradableCollected}/${stopAfterTradable}); stopping pagination.`
-      );
+
+    console.info(
+      `[Polymarket Gamma] Page ${pagesFetched} summary: raw=${body.length}, tradable=${tradableOnPage}, cumulativeTradable=${tradableCollected}.`
+    );
+
+    const hitMaxMarkets =
+      typeof targetTradable === "number" && tradableCollected >= targetTradable;
+    const fewerThanLimit = body.length < limit;
+
+    if (hitMaxMarkets) {
+      stopReason = `reached maxMarkets cap (${targetTradable})`;
       break;
     }
-
-    if (body.length < limit) {
+    if (fewerThanLimit) {
+      stopReason = "fewer than limit results returned";
       break;
     }
   }
 
+  if (!stopReason) {
+    stopReason =
+      maxPages > 0 && pagesFetched >= maxPages
+        ? `reached maxPages cap (${maxPages})`
+        : "completed pagination";
+  }
+
   console.info(
-    `[Polymarket Gamma] Retrieved ${all.length} markets from ${Math.ceil(
-      all.length / limit || 1
-    )} page(s) with filters ${JSON.stringify(queryFilters)}.`
+    `[Polymarket Gamma] Collected ${tradableCollected} tradable markets out of ${all.length} raw across ${pagesFetched} page(s) (stopped because ${stopReason}).`
   );
   return all;
 }
@@ -978,12 +1007,7 @@ async function tryFetchGammaMarkets(
 ): Promise<NormalizedPolymarketMarket[]> {
   let gammaMarkets: GammaMarket[] = [];
   try {
-    gammaMarkets = await fetchGammaMarkets(
-      options,
-      GAMMA_PAGE_LIMIT,
-      GAMMA_MAX_PAGES,
-      GAMMA_STOP_AFTER_TRADABLE
-    );
+    gammaMarkets = await fetchGammaMarkets(options);
   } catch (err) {
     console.error("[Polymarket Gamma] Failed to fetch markets:", err);
     return [];
@@ -1138,6 +1162,7 @@ export class PolymarketAPI {
       windowStart: window.windowStart,
       windowEnd: window.windowEnd,
       categories: window.categories,
+      maxMarkets: window.maxMarkets,
       forceRefresh: options.forceRefresh,
     });
     const markets: Market[] = [];
@@ -1242,6 +1267,7 @@ export class PolymarketAPI {
       return {
         windowStart: now.toISOString(),
         windowEnd: end.toISOString(),
+        maxMarkets: DEFAULT_POLYMARKET_MAX_MARKETS,
       };
     }
 
@@ -1250,7 +1276,10 @@ export class PolymarketAPI {
     return {
       windowStart: filtersOrMaxDays.windowStart ?? fallbackStart.toISOString(),
       windowEnd: filtersOrMaxDays.windowEnd ?? fallbackEnd.toISOString(),
-      maxMarkets: filtersOrMaxDays.maxMarkets,
+      maxMarkets:
+        typeof filtersOrMaxDays.maxMarkets === 'number'
+          ? filtersOrMaxDays.maxMarkets
+          : DEFAULT_POLYMARKET_MAX_MARKETS,
       categories: filtersOrMaxDays.categories?.filter(Boolean),
     };
   }

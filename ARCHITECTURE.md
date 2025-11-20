@@ -125,6 +125,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 ### Polymarket (`lib/markets/polymarket.ts`, `services/polymarket.ts`)
 - Gamma-first ingestion with process-local caching and auto fallback to paginated CLOB sweeps when Gamma is empty.
 - Gamma adapter now uses the documented `closed=false`, `end_date_min`, and `end_date_max` query params derived from `MarketFeedService` window filters so the server only returns markets inside the execution window.
+- Gamma `/markets` pagination walks the `limit`/`offset` sequence, logging each page and continuing until Gamma returns fewer than `limit` rows, the configured `maxPages`, or the Polymarket `maxMarkets` cap (default ≈2000 tradable markets) is reached, so we routinely ingest multi-page (4+) batches when inventories are large.
 - Normalizes outcomes, token IDs, and prices into `Market` objects, filtering out invalid or far-dated markets before they reach arbitrage logic.
 - `derivePolymarketExpiry` favors `eventStartTime`/`gameStartTime` for sports and falls back to end/UMA dates for non-sports so sports inventories aren’t dropped, and the adapter logs per-scan expiry breakdowns plus samples of any skipped markets for observability.
 - Order placement signs EIP-712 payloads and posts them to the CLOB order endpoint.
