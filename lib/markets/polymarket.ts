@@ -72,55 +72,65 @@ export class PolymarketAPI {
       // Try different approaches to get active markets
       let response;
 
-      // Try different CLOB API endpoints for active markets
-      const endpoints = [
-        { url: `${BASE_URL}/markets`, params: { active: true, closed: false, limit: 500 } },
-        { url: `${BASE_URL}/markets`, params: { active: true, limit: 500 } },
-        { url: `${BASE_URL}/active-markets`, params: { limit: 500 } }, // Try active-markets endpoint
-      ];
+      // Try CLOB API first, but fall back to Gamma API for market discovery
+      // The CLOB API may not have active markets, while Gamma API provides market structure
 
-      for (const endpoint of endpoints) {
+      let clobMarkets = [];
+      try {
+        console.log(`[Polymarket CLOB] Trying CLOB markets endpoint...`);
+        response = await axios.get(`${BASE_URL}/markets`, {
+          params: { active: true, closed: false, limit: 200 }
+        });
+
+        // Parse CLOB response
+        if (response.data && Array.isArray(response.data.data)) {
+          clobMarkets = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          clobMarkets = response.data;
+        }
+
+        console.log(`[Polymarket CLOB] Found ${clobMarkets.length} markets via CLOB API`);
+
+        // Filter for actually tradable markets (accepting orders or order book enabled)
+        const tradableMarkets = clobMarkets.filter(market =>
+          market.active === true &&
+          (market.accepting_orders === true || market.enable_order_book === true)
+        );
+
+        if (tradableMarkets.length > 0) {
+          console.log(`[Polymarket CLOB] Found ${tradableMarkets.length} tradable markets`);
+          // Use CLOB markets if we have tradable ones
+        } else {
+          console.log(`[Polymarket CLOB] No tradable markets found, falling back to Gamma API for structure`);
+          // Fall back to Gamma API for market structure
+          response = await axios.get(`${GAMMA_URL}/markets`, {
+            params: { closed: false, limit: 200 }
+          });
+          clobMarkets = response.data || [];
+          console.log(`[Polymarket Gamma] Found ${clobMarkets.length} markets via Gamma API`);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const statusCode = (error as any)?.response?.status;
+        console.log(`[Polymarket CLOB] CLOB markets failed (${statusCode || errorMessage}), trying Gamma API...`);
+
+        // Fall back to Gamma API
         try {
-          console.log(`[Polymarket CLOB] Trying endpoint: ${endpoint.url} with params:`, endpoint.params);
-          response = await axios.get(endpoint.url, { params: endpoint.params });
-          break; // If successful, use this response
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          const statusCode = (error as any)?.response?.status;
-          console.log(`[Polymarket CLOB] Endpoint ${endpoint.url} failed:`, statusCode || errorMessage);
+          response = await axios.get(`${GAMMA_URL}/markets`, {
+            params: { closed: false, limit: 200 }
+          });
+          clobMarkets = response.data || [];
+          console.log(`[Polymarket Gamma] Found ${clobMarkets.length} markets via Gamma API`);
+        } catch (gammaError) {
+          console.error('[Polymarket] Both CLOB and Gamma APIs failed');
+          return [];
         }
       }
 
-      if (!response) {
-        console.error('[Polymarket CLOB] All market endpoints failed');
-        return [];
-      }
+      // Use the markets we retrieved (either from CLOB or Gamma API fallback)
+      const marketsData = clobMarkets;
 
-      console.log(`[Polymarket CLOB] Raw API Response:`, response.data);
-
-      // Handle different possible response formats
-      let marketsData = [];
-      if (Array.isArray(response.data)) {
-        marketsData = response.data;
-      } else if (response.data && Array.isArray(response.data.markets)) {
-        marketsData = response.data.markets;
-      } else if (response.data && Array.isArray(response.data.data)) {
-        marketsData = response.data.data;
-      } else if (response.data && typeof response.data === 'object') {
-        // Try to find array in any property
-        const possibleArrays = Object.values(response.data).filter(val => Array.isArray(val));
-        if (possibleArrays.length > 0) {
-          marketsData = possibleArrays[0];
-          console.log(`[Polymarket CLOB] Found markets array in property:`, Object.keys(response.data).find(key => Array.isArray(response.data[key])));
-        }
-      }
-
-      console.log(`[Polymarket CLOB] API Response: ${marketsData.length} markets received`);
-
-      if (!marketsData || marketsData.length === 0) {
-        console.warn('[Polymarket CLOB] No markets found in response');
-        return [];
-      }
+      console.log(`[Polymarket] Processing ${marketsData.length} markets for arbitrage opportunities`);
 
       const markets: Market[] = [];
       const maxDate = new Date();
@@ -150,12 +160,13 @@ export class PolymarketAPI {
         }
 
         // Check if market has expired or is too far in the future
-        if (!market.end_date_iso && !market.end_date) {
+        // Handle both CLOB (end_date_iso) and Gamma API (endDateIso) formats
+        const endDateStr = market.end_date_iso || market.endDateIso || market.end_date;
+        if (!endDateStr) {
           skippedExpired++;
           continue;
         }
 
-        const endDateStr = market.end_date_iso || market.end_date;
         const expiryDate = new Date(endDateStr + (endDateStr.includes('T') ? '' : 'T23:59:59Z'));
         const now = new Date();
 
@@ -165,30 +176,38 @@ export class PolymarketAPI {
         }
 
         // Check if market is active and tradable
-        // Accept markets that are active, accepting orders, or have order books enabled
-        const isTradable = market.active === true &&
-                          (market.accepting_orders === true || market.enable_order_book === true);
+        // For CLOB API: check accepting_orders or enable_order_book
+        // For Gamma API: check that it's not closed and active
+        const isTradable = (market.accepting_orders === true || market.enable_order_book === true) ||
+                          (market.active !== false && market.closed !== true);
 
         if (!isTradable) {
           skippedExpired++;
           continue;
         }
 
-        // Parse outcomes and prices from CLOB API format
+        // Parse outcomes and prices - handle both CLOB and Gamma API formats
         let outcomes: string[];
         let prices: number[];
 
         try {
-          // CLOB API uses 'tokens' array with outcome and price data
+          // Try CLOB API format first (tokens array)
           if (market.tokens && Array.isArray(market.tokens) && market.tokens.length >= 2) {
             outcomes = market.tokens.map((t: any) => t.outcome);
             prices = market.tokens.map((t: any) => parseFloat(t.price || '0'));
-          } else {
+          }
+          // Try Gamma API format (outcomes and outcomePrices as JSON strings)
+          else if (market.outcomes && market.outcomePrices) {
+            outcomes = typeof market.outcomes === 'string' ? JSON.parse(market.outcomes) : market.outcomes;
+            prices = typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : market.outcomePrices;
+            prices = prices.map(p => parseFloat(p));
+          }
+          else {
             outcomes = [];
             prices = [];
           }
         } catch (error) {
-          console.warn(`[Polymarket CLOB] Failed to parse tokens for market ${market.condition_id || market.market_id || market.id}:`, error);
+          console.warn(`[Polymarket] Failed to parse market data for ${market.condition_id || market.id}:`, error);
           skippedNonBinary++;
           continue;
         }
