@@ -43,7 +43,6 @@ interface KalshiMarket {
 }
 
 const DAY_MS = 86_400_000;
-const DEFAULT_MAX_MARKETS = 400;
 const SNAPSHOT_DEFAULT_MAX_AGE_MS = MARKET_SNAPSHOT_TTL_SECONDS * 1000;
 
 type AdapterHandler = (
@@ -67,15 +66,18 @@ export class MarketFeedService {
     const now = new Date();
     const maxDate = new Date(now.getTime() + config.maxDaysToExpiry * DAY_MS);
     const preferences = config.marketFilters || {};
-    return {
+    const filterInput: MarketFilterInput = {
       windowStart: now.toISOString(),
       windowEnd: maxDate.toISOString(),
-      maxMarkets: DEFAULT_MAX_MARKETS,
       sportsOnly: preferences.sportsOnly,
       categories: preferences.categories?.filter(Boolean),
       eventTypes: preferences.eventTypes?.filter(Boolean),
       leagueTickers: preferences.leagueTickers?.filter(Boolean),
     };
+    if (typeof preferences.maxMarkets === 'number') {
+      filterInput.maxMarkets = preferences.maxMarkets;
+    }
+    return filterInput;
   }
 
   async fetchLiveMarketsForPlatforms(
@@ -218,7 +220,8 @@ export class MarketFeedService {
   ): Promise<Market[]> {
     const params = this.buildQueryParams(adapterConfig, filters);
     const pagination = adapterConfig.pagination;
-    const maxMarkets = filters.maxMarkets ?? DEFAULT_MAX_MARKETS;
+    const maxMarkets =
+      filters.maxMarkets ?? Number.POSITIVE_INFINITY;
     this.normalizeKalshiMarketParams(params);
 
     return this.fetchKalshiMarketsFromEndpoint(
@@ -285,15 +288,19 @@ export class MarketFeedService {
     maxMarkets?: number
   ): Promise<Market[]> {
     const markets: Market[] = [];
-    let cursor: string | undefined;
+    let cursor: string | null = null;
     let page = 0;
+    const maxPages =
+      pagination?.maxPages ?? Number.POSITIVE_INFINITY;
 
-    do {
+    while (true) {
+      page += 1;
       const pageParams = { ...params };
       if (cursor && pagination?.cursorParam) {
         pageParams[pagination.cursorParam] = cursor;
       }
-      const requestLabel = `[Kalshi Adapter] ${endpoint} page ${page + 1}`;
+
+      const requestLabel = `[Kalshi Adapter] ${endpoint} page ${page}`;
       const logParams = {
         ...pageParams,
         cursor: cursor ?? null,
@@ -320,19 +327,24 @@ export class MarketFeedService {
       const normalized = this.normalizeKalshiMarkets(rawMarkets, filters);
       markets.push(...normalized);
 
-      cursor = this.extractCursor(response.data, pagination?.nextCursorPath);
-      page += 1;
+      const nextCursor = this.extractCursor(
+        response.data,
+        pagination?.nextCursorPath
+      );
+      console.info(
+        `${requestLabel} → next_cursor=${nextCursor ?? '<null>'}`
+      );
 
-      if (!cursor) {
+      const reachedMaxPages = page >= maxPages;
+      const reachedMarketCap =
+        Number.isFinite(maxMarkets) && markets.length >= (maxMarkets as number);
+
+      if (!nextCursor || reachedMaxPages || reachedMarketCap) {
         break;
       }
-      if (pagination?.maxPages && page >= pagination.maxPages) {
-        break;
-      }
-      if (maxMarkets && markets.length >= maxMarkets) {
-        break;
-      }
-    } while (cursor);
+
+      cursor = nextCursor;
+    }
 
     if (maxMarkets && markets.length > maxMarkets) {
       return markets.slice(0, maxMarkets);

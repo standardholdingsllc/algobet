@@ -20,6 +20,7 @@ export interface MarketFilterPreferences {
   categories?: string[];
   eventTypes?: string[];
   leagueTickers?: string[];
+  maxMarkets?: number;
 }
 
 export interface MarketFilterInput {
