@@ -77,10 +77,29 @@ export class PolymarketAPI {
         },
       });
 
-      console.log(`[Polymarket CLOB] API Response: ${response.data?.length || 0} markets received`);
+      console.log(`[Polymarket CLOB] Raw API Response:`, response.data);
 
-      if (!response.data || !Array.isArray(response.data)) {
-        console.warn('[Polymarket CLOB] Unexpected response format:', typeof response.data);
+      // Handle different possible response formats
+      let marketsData = [];
+      if (Array.isArray(response.data)) {
+        marketsData = response.data;
+      } else if (response.data && Array.isArray(response.data.markets)) {
+        marketsData = response.data.markets;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        marketsData = response.data.data;
+      } else if (response.data && typeof response.data === 'object') {
+        // Try to find array in any property
+        const possibleArrays = Object.values(response.data).filter(val => Array.isArray(val));
+        if (possibleArrays.length > 0) {
+          marketsData = possibleArrays[0];
+          console.log(`[Polymarket CLOB] Found markets array in property:`, Object.keys(response.data).find(key => Array.isArray(response.data[key])));
+        }
+      }
+
+      console.log(`[Polymarket CLOB] API Response: ${marketsData.length} markets received`);
+
+      if (!marketsData || marketsData.length === 0) {
+        console.warn('[Polymarket CLOB] No markets found in response');
         return [];
       }
 
@@ -95,7 +114,7 @@ export class PolymarketAPI {
       let sportsMarketsFound = 0;
       let predictionMarketsFound = 0;
 
-      for (const market of response.data) {
+      for (const market of marketsData) {
         processedCount++;
 
         // Debug first few markets to understand the CLOB API structure
