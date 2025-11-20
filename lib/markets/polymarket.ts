@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { ethers } from 'ethers';
 import { Market } from '@/types';
 
 const BASE_URL = 'https://clob.polymarket.com';
@@ -8,6 +9,32 @@ const DATA_API_URL = 'https://data-api.polymarket.com';
 // Alternative API endpoints to try
 const MAIN_API_URL = 'https://api.polymarket.com';
 const SPORTS_API_URL = 'https://sports-api.polymarket.com';
+
+// EIP712 Domain for Polymarket CLOB
+const EIP712_DOMAIN = {
+  name: 'Polymarket CLOB',
+  version: '1',
+  chainId: 137, // Polygon
+  verifyingContract: '0x4BFB41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E', // CLOB Exchange contract
+};
+
+// EIP712 Types for Limit Orders
+const EIP712_TYPES = {
+  Order: [
+    { name: 'salt', type: 'uint256' },
+    { name: 'maker', type: 'address' },
+    { name: 'signer', type: 'address' },
+    { name: 'taker', type: 'address' },
+    { name: 'tokenId', type: 'uint256' },
+    { name: 'makerAmount', type: 'uint256' },
+    { name: 'takerAmount', type: 'uint256' },
+    { name: 'expiration', type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'feeRateBps', type: 'uint256' },
+    { name: 'side', type: 'uint8' },
+    { name: 'signatureType', type: 'uint8' },
+  ],
+};
 
 interface PolymarketMarket {
   condition_id: string;
@@ -37,121 +64,105 @@ export class PolymarketAPI {
     this.walletAddress = process.env.POLYMARKET_WALLET_ADDRESS || '';
   }
 
-  // Disable market fetching since Polymarket requires special access
-  async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
-    console.log('[Polymarket] Market fetching disabled - Polymarket requires invite-only access for live markets');
-    console.log('[Polymarket] Public APIs only provide historical data for research purposes');
-    console.log('[Polymarket] See: https://docs.polymarket.com/developers/gamma-markets-api/overview');
-
-    // Return empty array to disable Polymarket market integration
-    return [];
-  }
-
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
     try {
-      console.log('[Polymarket] Fetching markets from Gamma API...');
-      // Try different approaches to get current live markets (not historical)
-      let response;
+      console.log('[Polymarket CLOB] Fetching markets from CLOB API...');
 
-      // Try different API approaches - Polymarket uses WebSocket for live data
-      console.log('[Polymarket] REST APIs return historical data. Polymarket uses WebSocket RTDS for live data.');
+      // Use CLOB API markets endpoint
+      // The CLOB API provides active markets through /markets endpoint
+      const response = await axios.get(`${BASE_URL}/markets`, {
+        params: {
+          active: true,
+          limit: 200, // Reasonable limit for CLOB API
+        },
+      });
 
-      // For now, try the live volume endpoint to see if we can get current activity
-      try {
-        const liveVolumeResponse = await axios.get(`${DATA_API_URL}/live-volume`, {
-          params: {
-            id: 1, // Try with event ID 1
-          },
-        });
-        console.log(`[Polymarket] Live volume test:`, liveVolumeResponse.data);
-      } catch (liveVolumeError) {
-        console.warn('[Polymarket] Live volume endpoint failed:', liveVolumeError instanceof Error ? liveVolumeError.message : String(liveVolumeError));
-      }
+      console.log(`[Polymarket CLOB] API Response: ${response.data?.length || 0} markets received`);
 
-      // Fall back to REST APIs for now (they provide market structure even if historical)
-      const endpoints = [
-        { name: 'Data API (live volume tested above)', url: `${DATA_API_URL}/markets`, params: { limit: 500, active: true } },
-        { name: 'Gamma API (historical)', url: `${GAMMA_URL}/markets`, params: { limit: 500 } }
-      ];
-
-      let bestResponse = null;
-      let maxRecentMarkets = 0;
-
-      for (let i = 0; i < endpoints.length; i++) {
-        const endpoint = endpoints[i];
-        try {
-          console.log(`[Polymarket] Testing ${endpoint.name}...`);
-          const testResponse = await axios.get(endpoint.url, { params: endpoint.params });
-          const markets = testResponse.data || [];
-
-          // Analyze how many recent markets this endpoint provides
-          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-          let recentCount = 0;
-          for (const market of markets.slice(0, 100)) { // Sample first 100
-            const createdAt = market.createdAt ? new Date(market.createdAt) : null;
-            if (createdAt && createdAt > thirtyDaysAgo) recentCount++;
-          }
-
-          console.log(`[Polymarket] ${endpoint.name}: ${markets.length} markets, ${recentCount} created ≤30 days`);
-
-          // Keep track of the endpoint with the most recent markets
-          if (recentCount > maxRecentMarkets) {
-            maxRecentMarkets = recentCount;
-            bestResponse = testResponse;
-          }
-
-          // If we find an endpoint with recent markets, use it immediately
-          if (recentCount > 0) {
-            console.log(`[Polymarket] ✅ Found ${recentCount} recent markets from ${endpoint.name}, using this endpoint!`);
-            response = testResponse;
-            break;
-          }
-
-        } catch (error) {
-          console.warn(`[Polymarket] ${endpoint.name} failed:`, error instanceof Error ? error.message : String(error));
-        }
-      }
-
-      // If no endpoint had recent markets, use the one with the most recent markets overall
-      if (!response && bestResponse) {
-        console.log(`[Polymarket] Using endpoint with most recent markets (${maxRecentMarkets} in last 30 days)`);
-        response = bestResponse;
-      }
-
-      if (!response) {
-        console.error('[Polymarket] All API endpoints failed!');
-        return [];
-      }
-
-      console.log(`[Polymarket] API Response: ${response.data?.length || 0} markets received`);
-
-      console.log(`[Polymarket] API Response: ${response.data?.length || 0} markets received`);
-      
       if (!response.data || !Array.isArray(response.data)) {
-        console.warn('[Polymarket] Unexpected response format:', typeof response.data);
+        console.warn('[Polymarket CLOB] Unexpected response format:', typeof response.data);
         return [];
       }
 
       const markets: Market[] = [];
       const maxDate = new Date();
       maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
-      
+
       let processedCount = 0;
       let skippedNonBinary = 0;
       let skippedExpired = 0;
       let skippedMissingTokens = 0;
       let sportsMarketsFound = 0;
       let predictionMarketsFound = 0;
-      let recentMarketsFound = 0;
-      let oldMarketsFound = 0;
 
       for (const market of response.data) {
         processedCount++;
 
-        // Categorize markets by type - be more specific to avoid false positives
+        // Debug first few markets to understand the CLOB API structure
+        if (processedCount <= 3) {
+          console.log(`[Polymarket CLOB] Market ${processedCount}:`, {
+            id: market.market_id || market.id,
+            question: market.question?.substring(0, 50),
+            end_date: market.end_date,
+            active: market.active,
+            closed: market.closed,
+            outcomes: market.outcomes,
+            prices: market.prices,
+            available_fields: Object.keys(market),
+          });
+        }
+
+        // Check if market has expired or is too far in the future
+        if (!market.end_date) {
+          skippedExpired++;
+          continue;
+        }
+
+        const expiryDate = new Date(market.end_date + 'T23:59:59Z');
+        const now = new Date();
+
+        if (expiryDate < now || expiryDate > maxDate) {
+          skippedExpired++;
+          continue;
+        }
+
+        // Check if market is active
+        if (market.closed || market.active === false) {
+          skippedExpired++;
+          continue;
+        }
+
+        // Parse outcomes and prices from CLOB API format
+        let outcomes: string[];
+        let prices: number[];
+
+        try {
+          // CLOB API might have different field names
+          outcomes = market.outcomes || market.tokens?.map((t: any) => t.outcome) || [];
+          prices = market.prices || market.outcome_prices || [];
+
+          // If outcomes come as objects, extract the outcome names
+          if (outcomes.length > 0 && typeof outcomes[0] === 'object') {
+            outcomes = outcomes.map((o: any) => o.outcome || o.name);
+          }
+        } catch (error) {
+          console.warn(`[Polymarket CLOB] Failed to parse outcomes/prices for market ${market.market_id || market.id}:`, error);
+          skippedNonBinary++;
+          continue;
+        }
+
+        if (!outcomes || outcomes.length !== 2 || !prices || prices.length !== 2) {
+          skippedNonBinary++;
+          continue;
+        }
+
+        // Convert prices from decimal (0-1) to cents (0-100)
+        const yesPrice = Math.round(prices[0] * 100);
+        const noPrice = Math.round(prices[1] * 100);
+
+        // Categorize markets by type
         const question = market.question?.toLowerCase() || '';
         const isSportsRelated = (
-          // Specific sports terms
           question.includes('football') ||
           question.includes('soccer') ||
           question.includes('basketball') ||
@@ -163,7 +174,6 @@ export class PolymarketAPI {
           question.includes('nba') ||
           question.includes('mlb') ||
           question.includes('nhl') ||
-          // Match/game contexts (but not political "win")
           (question.includes('match') && !question.includes('political')) ||
           (question.includes('game') && !question.includes('political')) ||
           (question.includes('vs ') && !question.includes('political')) ||
@@ -180,118 +190,22 @@ export class PolymarketAPI {
           predictionMarketsFound++;
         }
 
-        // Debug first few markets to understand expiry dates
-        if (processedCount <= 3) {
-          const expiryDate = market.endDateIso ? new Date(market.endDateIso + 'T23:59:59Z') : null;
-          const now = new Date();
-          const daysFromNow = expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : null;
-
-          console.log(`[Polymarket] Market ${processedCount}:`, {
-            conditionId: market.conditionId,
-            question: market.question?.substring(0, 50),
-            endDateIso: market.endDateIso,
-            expiry_parsed: expiryDate?.toISOString(),
-            days_from_now: daysFromNow?.toFixed(1),
-            is_expired: expiryDate && expiryDate < now,
-            is_too_far: expiryDate && expiryDate > maxDate,
-            active: market.active,
-            closed: market.closed,
-            outcomes: market.outcomes,
-            outcomePrices: market.outcomePrices,
-            available_fields: Object.keys(market),
-          });
-        }
-        
-        if (!market.endDateIso) {
-          skippedExpired++;
-          continue;
-        }
-
-        const expiryDate = new Date(market.endDateIso + 'T23:59:59Z');
-        const now = new Date();
-
-        // Check if market is recently created (within last 90 days)
-        const createdAt = market.createdAt ? new Date(market.createdAt) : null;
-        const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        const isRecent = createdAt && createdAt > ninetyDaysAgo;
-
-        // Count recent vs old markets
-        if (isRecent) {
-          recentMarketsFound++;
-        } else {
-          oldMarketsFound++;
-        }
-
-        // Skip if market has expired OR is too far in the future OR is old (created >90 days ago)
-        if (expiryDate < now || expiryDate > maxDate || !isRecent) {
-          // Log details about skipped markets for better debugging
-          // Focus on markets that might be sports-related or near-term
-          const isSportsRelated = market.question?.toLowerCase().includes('match') ||
-                                 market.question?.toLowerCase().includes('game') ||
-                                 market.question?.toLowerCase().includes('win') ||
-                                 market.question?.toLowerCase().includes('vs') ||
-                                 market.question?.toLowerCase().includes('draw');
-
-          if (processedCount <= 15 && (isSportsRelated || processedCount <= 5)) { // Log sports markets and first 5
-            console.log(`[Polymarket] Skipping market ${processedCount} (${isSportsRelated ? 'SPORTS' : 'OTHER'}):`, {
-              question: market.question?.substring(0, 60),
-              expiry: expiryDate?.toISOString(),
-              created: createdAt?.toISOString(),
-              days_from_now: expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : 'N/A',
-              is_expired: expiryDate < now,
-              is_too_far: expiryDate > maxDate,
-              is_old: !isRecent,
-              reason: expiryDate < now ? 'EXPIRED' : (expiryDate > maxDate ? 'TOO_FAR' : (!isRecent ? 'TOO_OLD' : 'UNKNOWN'))
-            });
-          }
-          skippedExpired++;
-          continue;
-        }
-
-        // Additional check: skip if market has an 'active' field and it's false
-        if (market.active === false || market.active === 'false') {
-          skippedExpired++;
-          continue;
-        }
-        
-        // Parse outcomes and outcomePrices (they come as JSON strings)
-        let outcomes: string[];
-        let prices: string[];
-
-        try {
-          outcomes = typeof market.outcomes === 'string' ? JSON.parse(market.outcomes) : market.outcomes;
-          prices = typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : market.outcomePrices;
-        } catch (error) {
-          console.warn(`[Polymarket] Failed to parse outcomes/prices for market ${market.conditionId}:`, error);
-          skippedNonBinary++;
-          continue;
-        }
-
-        if (!outcomes || outcomes.length !== 2 || !prices || prices.length !== 2) {
-          skippedNonBinary++;
-          continue;
-        }
-
-        // Assume first outcome is "Yes" and second is "No" (common pattern)
-        const yesPrice = parseFloat(prices[0]) * 100;
-        const noPrice = parseFloat(prices[1]) * 100;
-
-        // Create market with outcome prices (new API structure)
+        // Create market with CLOB API structure
         const marketData = {
-          id: market.conditionId || market.id,
+          id: market.market_id || market.condition_id || market.id,
           platform: 'polymarket' as const,
-          ticker: market.conditionId || market.id,
+          ticker: market.market_id || market.condition_id || market.id,
           marketType: 'prediction' as const,
           title: market.question,
           yesPrice,
           noPrice,
           expiryDate: expiryDate.toISOString(),
-          volume: parseFloat(market.volume || '0'),
+          volume: parseFloat(market.volume || market.volume24hr || '0'),
         };
 
         // Log successfully added markets for debugging
-        if (markets.length <= 5) { // Log first 5 added markets
-          console.log(`[Polymarket] ✅ Added market ${markets.length + 1}:`, {
+        if (markets.length <= 5) {
+          console.log(`[Polymarket CLOB] ✅ Added market ${markets.length + 1}:`, {
             id: marketData.id?.substring(0, 10),
             question: marketData.title?.substring(0, 50),
             expiry: marketData.expiryDate,
@@ -304,54 +218,27 @@ export class PolymarketAPI {
         markets.push(marketData);
       }
 
-      // Log expiry date range summary
-      const now = new Date();
-      const maxExpiryDate = new Date(now.getTime() + maxDaysToExpiry * 24 * 60 * 60 * 1000);
-      console.log(`[Polymarket] Processing window: ${now.toISOString()} to ${maxExpiryDate.toISOString()} (${maxDaysToExpiry} days)`);
-
-      // Analyze market freshness
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      let marketsLast30Days = 0;
-      let marketsLast7Days = 0;
-
-      if (response?.data && Array.isArray(response.data)) {
-        for (const market of response.data.slice(0, 100)) { // Sample first 100
-          const createdAt = market.createdAt ? new Date(market.createdAt) : null;
-          if (createdAt) {
-            if (createdAt > thirtyDaysAgo) marketsLast30Days++;
-            if (createdAt > sevenDaysAgo) marketsLast7Days++;
-          }
-        }
-      }
-
-      console.log(`[Polymarket] Market analysis:`);
-      console.log(`  - Total markets found: ${processedCount}`);
+      console.log(`[Polymarket CLOB] Processing results:`);
+      console.log(`  - Total markets processed: ${processedCount}`);
       console.log(`  - Sports-related markets: ${sportsMarketsFound}`);
       console.log(`  - Prediction/other markets: ${predictionMarketsFound}`);
-      console.log(`  - Recently created (≤90 days): ${recentMarketsFound}`);
-      console.log(`  - Markets created ≤30 days: ${marketsLast30Days}`);
-      console.log(`  - Markets created ≤7 days: ${marketsLast7Days}`);
-      console.log(`  - Old markets (>90 days): ${oldMarketsFound}`);
-
-      console.log(`[Polymarket] Processing results:`);
       console.log(`  - Added: ${markets.length}`);
       console.log(`  - Skipped (expired/future): ${skippedExpired}`);
       console.log(`  - Skipped (non-binary): ${skippedNonBinary}`);
-      console.log(`  - Skipped (missing tokens): ${skippedMissingTokens}`);
+      console.log(`  - Skipped (missing data): ${skippedMissingTokens}`);
 
       if (markets.length > 0) {
         const earliestExpiry = markets.reduce((min, m) => m.expiryDate < min ? m.expiryDate : min, markets[0].expiryDate);
         const latestExpiry = markets.reduce((max, m) => m.expiryDate > max ? m.expiryDate : max, markets[0].expiryDate);
-        console.log(`[Polymarket] Added markets expiry range: ${earliestExpiry} to ${latestExpiry}`);
+        console.log(`[Polymarket CLOB] Added markets expiry range: ${earliestExpiry} to ${latestExpiry}`);
       }
 
       return markets;
     } catch (error: any) {
-      console.error('[Polymarket] Error fetching markets:', error.message);
+      console.error('[Polymarket CLOB] Error fetching markets:', error.message);
       if (error.response) {
-        console.error(`[Polymarket] Response status: ${error.response.status}`);
-        console.error(`[Polymarket] Response data:`, error.response.data);
+        console.error(`[Polymarket CLOB] Response status: ${error.response.status}`);
+        console.error(`[Polymarket CLOB] Response data:`, error.response.data);
       }
       return [];
     }
@@ -460,115 +347,89 @@ export class PolymarketAPI {
     }
 
     try {
-      // CLOB API balance endpoint
+      // CLOB API balance endpoint - get collateral balance
       const response = await axios.get(`${BASE_URL}/balance`, {
         params: {
           address: this.walletAddress,
         },
       });
 
-      console.log('[Polymarket] CLOB balance response:', response.data);
+      console.log('[Polymarket CLOB] Balance response:', response.data);
 
-      // Parse the balance from response
-      const balance = parseFloat(response.data.balance || response.data.collateral || response.data.available || '0');
+      // Parse the collateral balance (available USDC)
+      const balance = parseFloat(response.data.collateral || response.data.balance || '0');
       return Number.isFinite(balance) ? balance : 0;
     } catch (error: any) {
-      console.warn('[Polymarket] CLOB balance endpoint failed:', error.response?.status || error.message);
-      // Return null to indicate we couldn't get the cash balance
-      return -1; // Use -1 as a sentinel value
+      console.warn('[Polymarket CLOB] Balance endpoint failed:', error.response?.status || error.message);
+      return -1; // Use -1 as a sentinel value for failure
     }
   }
 
   async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
     if (!this.walletAddress) {
-      console.warn('[Polymarket] ⚠️ Wallet address not configured');
+      console.warn('[Polymarket CLOB] ⚠️ Wallet address not configured');
       return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
 
     try {
-      // Step 1: Get positions value from /value endpoint
-      const positionsValueFromAPI = await this.getBalance();
-      console.log(`[Polymarket] 📊 Positions value (from /value): $${positionsValueFromAPI.toFixed(2)}`);
-      
-      // Step 2: Try to get wallet USDC balance from blockchain
+      // Primary approach: Use CLOB API for comprehensive balance data
+      console.log('[Polymarket CLOB] Fetching balance from CLOB API...');
+
+      // Get available collateral (cash) balance
+      const availableCash = await this.getAvailableBalance();
+
+      if (availableCash >= 0) {
+        console.log(`[Polymarket CLOB] 💵 Available cash: $${availableCash.toFixed(2)}`);
+
+        // Get positions value from Data API as fallback (CLOB might not have this)
+        const positionsValue = await this.getBalance();
+        console.log(`[Polymarket CLOB] 📊 Positions value: $${positionsValue.toFixed(2)}`);
+
+        const totalValue = availableCash + positionsValue;
+        console.log(`[Polymarket CLOB] ✅ Total account value: $${totalValue.toFixed(2)}`);
+
+        return {
+          totalValue,
+          availableCash,
+          positionsValue
+        };
+      }
+
+      // Fallback: Use blockchain query for wallet balance
+      console.log('[Polymarket CLOB] ⚠️ CLOB API failed, trying blockchain query...');
       const walletBalance = await this.getWalletBalance();
-      
+
       if (walletBalance >= 0) {
-        // Successfully got wallet balance from blockchain
-        console.log(`[Polymarket] 💵 Wallet USDC balance: $${walletBalance.toFixed(2)}`);
-        
-        // Total = wallet balance + positions value
-        const totalValue = walletBalance + positionsValueFromAPI;
-        console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
-        
+        console.log(`[Polymarket CLOB] 💵 Wallet USDC balance: $${walletBalance.toFixed(2)}`);
+
+        const positionsValue = await this.getBalance();
+        console.log(`[Polymarket CLOB] 📊 Positions value: $${positionsValue.toFixed(2)}`);
+
+        const totalValue = walletBalance + positionsValue;
+        console.log(`[Polymarket CLOB] ✅ Total account value: $${totalValue.toFixed(2)}`);
+
         return {
-          totalValue: totalValue,
+          totalValue,
           availableCash: walletBalance,
-          positionsValue: positionsValueFromAPI
+          positionsValue
         };
       }
-      
-      // Blockchain query failed, try CLOB API
-      console.log('[Polymarket] ⚠️ Blockchain query failed, trying CLOB API...');
-      const clobCash = await this.getAvailableBalance();
-      
-      if (clobCash >= 0) {
-        // CLOB API worked!
-        console.log(`[Polymarket] 💵 Available cash (from CLOB): $${clobCash.toFixed(2)}`);
-        const totalValue = clobCash + positionsValueFromAPI;
-        console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
-        
-        return {
-          totalValue: totalValue,
-          availableCash: clobCash,
-          positionsValue: positionsValueFromAPI
-        };
-      }
-      
-      // Both blockchain and CLOB failed - fall back to position-based calculation
-      console.log('[Polymarket] ⚠️ All direct balance queries failed, using position data only...');
-      
-      // Get detailed positions to verify the value
-      const positions = await this.getPositions();
-      console.log(`[Polymarket] 📊 Found ${positions.length} positions`);
-      
-      if (positions.length > 0) {
-        console.log(`[Polymarket] 🔍 Sample position:`, JSON.stringify(positions[0], null, 2));
-      }
-      
-      let positionsValue = 0;
-      
-      for (const position of positions) {
-        // Try different field names for position value
-        const value = position.currentValue || position.value || position.current_value;
-        
-        if (value) {
-          const parsedValue = parseFloat(value);
-          if (Number.isFinite(parsedValue)) {
-            positionsValue += parsedValue;
-            console.log(`[Polymarket]   → Position value: $${parsedValue.toFixed(2)}`);
-          }
-        } else if (position.size && position.curPrice) {
-          // Fallback: calculate from size and current price
-          const calculatedValue = parseFloat(position.size) * parseFloat(position.curPrice);
-          if (Number.isFinite(calculatedValue)) {
-            positionsValue += calculatedValue;
-            console.log(`[Polymarket]   → Calculated: ${position.size} @ $${position.curPrice} = $${calculatedValue.toFixed(2)}`);
-          }
-        }
-      }
-      
-      console.log(`[Polymarket] 💰 Positions value (from positions): $${positionsValue.toFixed(2)}`);
-      console.log(`[Polymarket] ⚠️ Cannot determine cash balance - showing positions only`);
-      
-      // We can only report positions value, cash is unknown
+
+      // Last resort: Use positions data only
+      console.log('[Polymarket CLOB] ⚠️ All balance queries failed, using positions only...');
+      const positionsValue = await this.getBalance();
+
+      console.log(`[Polymarket CLOB] 💰 Positions value: $${positionsValue.toFixed(2)}`);
+      console.log(`[Polymarket CLOB] ⚠️ Cannot determine cash balance`);
+
       return {
         totalValue: positionsValue,
-        availableCash: 0, // Unknown, defaulting to 0
-        positionsValue: positionsValue
+        availableCash: 0,
+        positionsValue
       };
+
     } catch (error: any) {
-      console.error('[Polymarket] ❌ Error fetching total balance:', error.message);
+      console.error('[Polymarket CLOB] ❌ Error fetching total balance:', error.message);
       return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
   }
@@ -580,31 +441,85 @@ export class PolymarketAPI {
     size: number
   ): Promise<{ success: boolean; orderId?: string; error?: string }> {
     try {
+      if (!this.privateKey || !this.walletAddress) {
+        return { success: false, error: 'Private key and wallet address required for CLOB orders' };
+      }
+
       // Convert price to decimal (0-1)
       const priceDecimal = price / 100;
 
-      const order = {
-        token_id: tokenId,
-        price: priceDecimal.toString(),
-        size: size.toString(),
-        side: side === 'yes' ? 'BUY' : 'SELL',
-        type: 'FOK', // Fill or Kill
+      // Create wallet from private key
+      const wallet = new ethers.Wallet(this.privateKey);
+
+      // For limit orders, we need to calculate maker and taker amounts
+      // makerAmount = size in outcome tokens
+      // takerAmount = size * price in collateral (USDC)
+      const makerAmount = ethers.utils.parseUnits(size.toString(), 6); // USDC has 6 decimals
+      const takerAmount = ethers.utils.parseUnits((size * priceDecimal).toFixed(6), 6);
+
+      // Create order data for EIP712 signing
+      const orderData = {
+        salt: ethers.BigNumber.from(Date.now()), // Use timestamp as salt
+        maker: this.walletAddress,
+        signer: this.walletAddress,
+        taker: ethers.constants.AddressZero, // Allow any taker
+        tokenId: ethers.BigNumber.from(tokenId),
+        makerAmount,
+        takerAmount,
+        expiration: ethers.BigNumber.from(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiry
+        nonce: ethers.BigNumber.from(0), // Can be incremented for multiple orders
+        feeRateBps: ethers.BigNumber.from(0), // 0 bps fee for current CLOB
+        side: side === 'yes' ? 0 : 1, // 0 = BUY, 1 = SELL
+        signatureType: 0, // EIP712
       };
 
-      const response = await axios.post(`${BASE_URL}/order`, order, {
+      // Sign the order using EIP712
+      const signature = await wallet._signTypedData(EIP712_DOMAIN, EIP712_TYPES, orderData);
+
+      // Create the signed order payload
+      const signedOrder = {
+        order: orderData,
+        signature,
+        owner: this.walletAddress,
+      };
+
+      console.log('[Polymarket CLOB] Placing signed order:', {
+        tokenId,
+        side,
+        price: priceDecimal,
+        size,
+        orderData: {
+          ...orderData,
+          salt: orderData.salt.toString(),
+          tokenId: orderData.tokenId.toString(),
+          makerAmount: orderData.makerAmount.toString(),
+          takerAmount: orderData.takerAmount.toString(),
+          expiration: orderData.expiration.toString(),
+          nonce: orderData.nonce.toString(),
+          feeRateBps: orderData.feeRateBps.toString(),
+        }
+      });
+
+      // Submit the signed order to CLOB API
+      const response = await axios.post(`${BASE_URL}/order`, signedOrder, {
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
       });
 
-      if (response.data.order_id) {
+      if (response.data && response.data.order_id) {
+        console.log('[Polymarket CLOB] Order placed successfully:', response.data.order_id);
         return { success: true, orderId: response.data.order_id };
       }
 
-      return { success: false, error: 'Order not filled' };
+      console.warn('[Polymarket CLOB] Order response:', response.data);
+      return { success: false, error: 'Order not filled or invalid response' };
     } catch (error: any) {
-      console.error('Error placing Polymarket bet:', error);
+      console.error('[Polymarket CLOB] Error placing order:', error.message);
+      if (error.response) {
+        console.error('[Polymarket CLOB] Response status:', error.response.status);
+        console.error('[Polymarket CLOB] Response data:', error.response.data);
+      }
       return { success: false, error: error.message };
     }
   }

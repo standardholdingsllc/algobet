@@ -5,7 +5,7 @@ export const POLYMARKET_DATA_API = 'https://gamma-api.polymarket.com';
 
 // Fee structures (in percentage)
 export const KALSHI_FEE = 7; // 7% fee on profits
-export const POLYMARKET_FEE = 2; // 2% fee on trades
+export const POLYMARKET_FEE = 0; // 0% fee on trades (CLOB structure)
 
 // Betting constraints
 export const DEFAULT_MAX_BET_PERCENTAGE = 4; // 4% of account balance

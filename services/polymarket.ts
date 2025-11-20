@@ -1,74 +1,29 @@
-import axios from 'axios';
 import { Market } from '@/types';
-import { POLYMARKET_DATA_API, POLYMARKET_FEE } from '@/lib/constants';
+import { PolymarketAPI } from '@/lib/markets/polymarket';
+import { POLYMARKET_FEE } from '@/lib/constants';
 
-interface PolymarketMarket {
-  condition_id: string;
-  question: string;
-  end_date_iso: string;
-  tokens: {
-    outcome: string;
-    price: string;
-    token_id: string;
-  }[];
-  volume: string;
-}
 
 export class PolymarketService {
-  private apiKey: string;
-  private baseUrl: string;
-  private walletAddress: string;
+  private polymarketAPI: PolymarketAPI;
 
   constructor() {
-    this.apiKey = process.env.POLYMARKET_API_KEY || '';
-    this.baseUrl = POLYMARKET_DATA_API;
-    this.walletAddress = process.env.POLYMARKET_WALLET_ADDRESS || '';
+    this.polymarketAPI = new PolymarketAPI();
   }
 
   async getOpenMarkets(): Promise<Market[]> {
-    try {
-      // Polymarket Gamma API endpoint for active markets
-      const response = await axios.get(`${this.baseUrl}/markets`, {
-        params: {
-          closed: false,
-          limit: 200,
-        },
-      });
-
-      const markets: PolymarketMarket[] = response.data || [];
-      return markets.map(this.transformMarket).filter(m => m !== null) as Market[];
-    } catch (error) {
-      console.error('Error fetching Polymarket markets:', error);
-      return [];
-    }
+    // Use the CLOB API implementation
+    return this.polymarketAPI.getOpenMarkets(30); // Default to 30 days
   }
 
   async getMarketsByExpiry(maxDays: number): Promise<Market[]> {
-    const allMarkets = await this.getOpenMarkets();
-    const now = new Date();
-    const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
-
-    return allMarkets.filter(market => new Date(market.expiryDate) <= maxDate);
+    return this.polymarketAPI.getOpenMarkets(maxDays);
   }
 
   async getMarketPrices(marketId: string): Promise<{ yes: number, no: number } | null> {
-    try {
-      const response = await axios.get(`${this.baseUrl}/markets/${marketId}`);
-      const market = response.data;
-
-      if (market.outcomePrices && market.outcomePrices.length >= 2) {
-        // Convert from 0-1 to 0-100 (cents)
-        const yesPrice = Math.round(parseFloat(market.outcomePrices[0]) * 100);
-        const noPrice = Math.round(parseFloat(market.outcomePrices[1]) * 100);
-
-        return { yes: yesPrice, no: noPrice };
-      }
-
-      return null;
-    } catch (error) {
-      console.error(`Error fetching Polymarket prices for ${marketId}:`, error);
-      return null;
-    }
+    // For now, return null as CLOB API focuses on order book data
+    // This method may need to be updated based on specific CLOB endpoints
+    console.log(`[PolymarketService] getMarketPrices not implemented for CLOB API`);
+    return null;
   }
 
   async placeOrder(
@@ -78,30 +33,15 @@ export class PolymarketService {
     price: number
   ): Promise<string | null> {
     try {
-      // Note: Polymarket uses their CLOB API for order placement
-      // This requires proper authentication and signing
-      // Implementation depends on their specific requirements
-      
-      const outcomeIndex = side === 'yes' ? 0 : 1;
-      
-      const response = await axios.post(
-        `${POLYMARKET_DATA_API}/order`,
-        {
-          market: marketId,
-          outcome: outcomeIndex,
-          side: 'BUY',
-          size: amount.toString(),
-          price: (price / 100).toFixed(4), // Convert cents to decimal
-          type: 'FOK', // Fill or Kill
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-        }
-      );
+      // Use the CLOB API implementation with EIP712 signing
+      const result = await this.polymarketAPI.placeBet(marketId, side, price, amount);
 
-      return response.data.orderId || null;
+      if (result.success && result.orderId) {
+        return result.orderId;
+      }
+
+      console.error('Polymarket order failed:', result.error);
+      return null;
     } catch (error) {
       console.error('Error placing Polymarket order:', error);
       return null;
@@ -109,116 +49,20 @@ export class PolymarketService {
   }
 
   async getBalance(): Promise<number> {
-    try {
-      // This would need to query the user's wallet balance
-      // Implementation depends on Polymarket's specific API
-      const response = await axios.get(`${this.baseUrl}/balance`, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-      });
-
-      return parseFloat(response.data.balance || '0');
-    } catch (error) {
-      console.error('Error fetching Polymarket balance:', error);
-      return 0;
-    }
+    // Delegate to the CLOB API implementation
+    return this.polymarketAPI.getBalance();
   }
 
   async getPositions(): Promise<any[]> {
-    try {
-      const response = await axios.get(`${this.baseUrl}/positions`, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        params: {
-          user: this.walletAddress, // Changed from 'address' to 'user'
-        },
-      });
-
-      console.log(`[Polymarket] Raw positions response: ${JSON.stringify(response.data)}`);
-      return response.data || []; // Gamma API returns array directly, not { positions: [] }
-    } catch (error) {
-      console.error('Error fetching Polymarket positions:', error);
-      return [];
-    }
+    // Delegate to the CLOB API implementation
+    return this.polymarketAPI.getPositions();
   }
 
   async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
-    if (!this.walletAddress) {
-      const balance = await this.getBalance();
-      return { totalValue: balance, availableCash: balance, positionsValue: 0 };
-    }
-
-    try {
-      // Get total value (includes positions) from data-api
-      const valueResponse = await axios.get(`https://data-api.polymarket.com/value`, {
-        params: { user: this.walletAddress }
-      });
-      
-      console.log(`[Polymarket] Value response: ${JSON.stringify(valueResponse.data)}`);
-
-      const balanceEntry = Array.isArray(valueResponse.data)
-        ? valueResponse.data.find((entry: any) => entry.user?.toLowerCase() === this.walletAddress.toLowerCase())
-        : null;
-        
-      const totalValue = balanceEntry ? parseFloat(balanceEntry.value) : await this.getBalance();
-
-      // Get positions to calculate their value
-      const positions = await this.getPositions();
-      let positionsValue = 0;
-      
-      console.log(`[Polymarket] Calculating positions value. Count: ${positions.length}`);
-
-      for (const position of positions) {
-        if (position.value) {
-          positionsValue += parseFloat(position.value);
-        } else if (position.size && position.outcome_price) {
-          positionsValue += parseFloat(position.size) * parseFloat(position.outcome_price);
-        }
-      }
-      
-      const availableCash = totalValue - positionsValue;
-
-      console.log(`[Polymarket] Final values - Total: ${totalValue}, Cash: ${availableCash}, Positions: ${positionsValue}`);
-
-      return {
-        totalValue,
-        availableCash: Math.max(0, availableCash),
-        positionsValue
-      };
-    } catch (error) {
-      console.error('Error fetching Polymarket total balance:', error);
-      return { totalValue: 0, availableCash: 0, positionsValue: 0 };
-    }
+    // Delegate to the CLOB API implementation
+    return this.polymarketAPI.getTotalBalance();
   }
 
-  private transformMarket(polymarketMarket: PolymarketMarket): Market | null {
-    try {
-      // Only process binary markets (Yes/No)
-      if (!polymarketMarket.tokens || polymarketMarket.tokens.length !== 2) {
-        return null;
-      }
-
-      const yesPrice = Math.round(parseFloat(polymarketMarket.tokens[0]?.price || '0') * 100);
-      const noPrice = Math.round(parseFloat(polymarketMarket.tokens[1]?.price || '0') * 100);
-
-      return {
-        id: polymarketMarket.condition_id,
-        platform: 'polymarket',
-        ticker: polymarketMarket.condition_id,
-        marketType: 'prediction',
-        title: polymarketMarket.question,
-        expiryDate: new Date(polymarketMarket.end_date_iso).toISOString(),
-        yesPrice,
-        noPrice,
-        volume: parseFloat(polymarketMarket.volume || '0'),
-      };
-    } catch (error) {
-      console.error('Error transforming Polymarket market:', error);
-      return null;
-    }
-  }
 
   static calculateFees(amount: number): number {
     // Polymarket charges 2% on trade amount
