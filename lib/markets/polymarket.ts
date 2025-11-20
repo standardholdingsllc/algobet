@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ethers, parseUnits, BigNumber } from 'ethers';
+import { ethers, parseUnits } from 'ethers';
 import { Market } from '@/types';
 
 const BASE_URL = 'https://clob.polymarket.com';
@@ -459,16 +459,16 @@ export class PolymarketAPI {
 
       // Create order data for EIP712 signing
       const orderData = {
-        salt: BigNumber.from(Date.now()), // Use timestamp as salt
+        salt: BigInt(Date.now()), // Use timestamp as salt
         maker: this.walletAddress,
         signer: this.walletAddress,
         taker: ethers.ZeroAddress, // Allow any taker
-        tokenId: BigNumber.from(tokenId),
+        tokenId: BigInt(tokenId),
         makerAmount,
         takerAmount,
-        expiration: BigNumber.from(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiry
-        nonce: BigNumber.from(0), // Can be incremented for multiple orders
-        feeRateBps: BigNumber.from(0), // 0 bps fee for current CLOB
+        expiration: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiry
+        nonce: BigInt(0), // Can be incremented for multiple orders
+        feeRateBps: BigInt(0), // 0 bps fee for current CLOB
         side: side === 'yes' ? 0 : 1, // 0 = BUY, 1 = SELL
         signatureType: 0, // EIP712
       };
