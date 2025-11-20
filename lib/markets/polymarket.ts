@@ -237,6 +237,7 @@ interface GammaMarket {
 
 import { Market } from '@/types';
 import axios from 'axios';
+import { ethers, parseUnits } from 'ethers';
 
 /* -------------------------------------------------------------------------- */
 
