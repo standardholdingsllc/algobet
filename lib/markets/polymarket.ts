@@ -43,13 +43,25 @@ export class PolymarketAPI {
       // Try different approaches to get current live markets (not historical)
       let response;
 
-      // Always try different API endpoints to find current markets
+      // Try different API approaches - Polymarket uses WebSocket for live data
+      console.log('[Polymarket] REST APIs return historical data. Polymarket uses WebSocket RTDS for live data.');
+
+      // For now, try the live volume endpoint to see if we can get current activity
+      try {
+        const liveVolumeResponse = await axios.get(`${DATA_API_URL}/live-volume`, {
+          params: {
+            id: 1, // Try with event ID 1
+          },
+        });
+        console.log(`[Polymarket] Live volume test:`, liveVolumeResponse.data);
+      } catch (liveVolumeError) {
+        console.warn('[Polymarket] Live volume endpoint failed:', liveVolumeError instanceof Error ? liveVolumeError.message : String(liveVolumeError));
+      }
+
+      // Fall back to REST APIs for now (they provide market structure even if historical)
       const endpoints = [
-        { name: 'Gamma API (filtered)', url: `${GAMMA_URL}/markets`, params: { limit: 500, active: true, closed: false, archived: false } },
-        { name: 'Main API', url: `${MAIN_API_URL}/markets`, params: { limit: 500, active: true, closed: false } },
-        { name: 'Sports API', url: `${SPORTS_API_URL}/markets`, params: { limit: 500, active: true } },
-        { name: 'Data API', url: `${DATA_API_URL}/markets`, params: { limit: 500, active: true } },
-        { name: 'Gamma API (unfiltered)', url: `${GAMMA_URL}/markets`, params: { limit: 500 } }
+        { name: 'Data API (live volume tested above)', url: `${DATA_API_URL}/markets`, params: { limit: 500, active: true } },
+        { name: 'Gamma API (historical)', url: `${GAMMA_URL}/markets`, params: { limit: 500 } }
       ];
 
       let bestResponse = null;
