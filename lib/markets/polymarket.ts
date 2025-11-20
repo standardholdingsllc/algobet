@@ -43,42 +43,57 @@ export class PolymarketAPI {
       let response;
 
       try {
-        // Attempt 1: Filter by recently created markets (last 90 days)
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-        const createdSince = ninetyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD format
-
+        // Attempt 1: Try multiple filtering criteria for active markets
         response = await axios.get(`${GAMMA_URL}/markets`, {
           params: {
             limit: 500,
-            // Try filtering by creation date to get recent markets
-            created_after: createdSince, // Might not be supported, but let's try
+            active: true,
+            closed: false,
+            archived: false,
+            // Try additional filters based on available fields
           },
         });
-        console.log(`[Polymarket] Attempt 1 - Recent markets (${createdSince}): ${response.data?.length || 0} markets`);
+        console.log(`[Polymarket] Attempt 1 - Active & not archived: ${response.data?.length || 0} markets`);
       } catch (error) {
         console.warn('[Polymarket] Attempt 1 failed, trying different approach:', error instanceof Error ? error.message : String(error));
 
         try {
-          // Attempt 2: Try with active=true and no closed filter
+          // Attempt 2: Try filtering by funded and ready markets (active trading)
           response = await axios.get(`${GAMMA_URL}/markets`, {
             params: {
+              limit: 500,
               active: true,
-              limit: 500,
-              // Don't include closed=false to avoid filtering out open markets
+              funded: true,
+              ready: true,
+              // Markets that are actually tradeable
             },
           });
-          console.log(`[Polymarket] Attempt 2 - Active only: ${response.data?.length || 0} markets`);
+          console.log(`[Polymarket] Attempt 2 - Funded & ready markets: ${response.data?.length || 0} markets`);
         } catch (error2) {
-          console.warn('[Polymarket] Attempt 2 failed, trying basic call:', error2 instanceof Error ? error2.message : String(error2));
+          console.warn('[Polymarket] Attempt 2 failed, trying different endpoint:', error2 instanceof Error ? error2.message : String(error2));
 
-          // Attempt 3: Basic call with just limit
-          response = await axios.get(`${GAMMA_URL}/markets`, {
-            params: {
-              limit: 500,
-            },
-          });
-          console.log(`[Polymarket] Attempt 3 - Basic call: ${response.data?.length || 0} markets`);
+          try {
+            // Attempt 3: Try using a different endpoint or different base URL
+            // Maybe there's a different API for live markets
+            const alternativeUrl = 'https://api.polymarket.com'; // Try main API
+            response = await axios.get(`${alternativeUrl}/markets`, {
+              params: {
+                limit: 500,
+                active: true,
+              },
+            });
+            console.log(`[Polymarket] Attempt 3 - Alternative API endpoint: ${response.data?.length || 0} markets`);
+          } catch (error3) {
+            console.warn('[Polymarket] Attempt 3 failed, falling back to basic call:', error3 instanceof Error ? error3.message : String(error3));
+
+            // Attempt 4: Basic call with just limit (what we know works)
+            response = await axios.get(`${GAMMA_URL}/markets`, {
+              params: {
+                limit: 500,
+              },
+            });
+            console.log(`[Polymarket] Attempt 4 - Basic fallback: ${response.data?.length || 0} markets`);
+          }
         }
       }
 
@@ -105,18 +120,31 @@ export class PolymarketAPI {
       for (const market of response.data) {
         processedCount++;
 
-        // Categorize markets by type
-        const isSportsRelated = market.question?.toLowerCase().includes('match') ||
-                               market.question?.toLowerCase().includes('game') ||
-                               market.question?.toLowerCase().includes('win') ||
-                               market.question?.toLowerCase().includes('vs') ||
-                               market.question?.toLowerCase().includes('draw') ||
-                               market.question?.toLowerCase().includes('score') ||
-                               market.question?.toLowerCase().includes('football') ||
-                               market.question?.toLowerCase().includes('soccer') ||
-                               market.question?.toLowerCase().includes('basketball') ||
-                               market.question?.toLowerCase().includes('baseball') ||
-                               market.question?.toLowerCase().includes('hockey');
+        // Categorize markets by type - be more specific to avoid false positives
+        const question = market.question?.toLowerCase() || '';
+        const isSportsRelated = (
+          // Specific sports terms
+          question.includes('football') ||
+          question.includes('soccer') ||
+          question.includes('basketball') ||
+          question.includes('baseball') ||
+          question.includes('hockey') ||
+          question.includes('tennis') ||
+          question.includes('golf') ||
+          question.includes('nfl') ||
+          question.includes('nba') ||
+          question.includes('mlb') ||
+          question.includes('nhl') ||
+          // Match/game contexts (but not political "win")
+          (question.includes('match') && !question.includes('political')) ||
+          (question.includes('game') && !question.includes('political')) ||
+          (question.includes('vs ') && !question.includes('political')) ||
+          (question.includes(' vs') && !question.includes('political')) ||
+          question.includes('score') ||
+          question.includes('final score') ||
+          question.includes('point spread') ||
+          question.includes('over/under')
+        );
 
         if (isSportsRelated) {
           sportsMarketsFound++;
