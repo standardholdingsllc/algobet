@@ -9,6 +9,7 @@
     "lint": "next lint",
     "check-env": "node scripts/check-env.js",
     "test-apis": "node scripts/test-apis.js",
+    "test-sxbet": "node scripts/test-sxbet-api.js",
     "test-fees": "node -r esbuild-register scripts/test-fee-calculations.js",
     "test-matching": "node -r esbuild-register scripts/test-market-matching.js",
     "test-tracking": "node -r esbuild-register scripts/test-hot-market-tracking.ts",
