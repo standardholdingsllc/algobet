@@ -179,7 +179,7 @@ class MarketScanner {
       ];
 
       // Check for low balance alerts
-      if (dataStore.config.emailAlerts.lowBalanceAlert) {
+      if (dataStore.config.emailAlerts.enabled && dataStore.config.emailAlerts.lowBalanceAlert) {
         if (kalshiBalances.totalValue < dataStore.config.balanceThresholds.kalshi) {
           await sendBalanceAlert(
             'kalshi',

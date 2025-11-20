@@ -111,7 +111,7 @@ export class ArbitrageBotEngine {
 
     // Check balance thresholds and send alerts (use total value for alerts)
     // Send emails without blocking (fire and forget to prevent timeouts)
-    if (config.emailAlerts) {
+    if (config.emailAlerts.enabled && config.emailAlerts.lowBalanceAlert) {
       if (kalshiBalances.totalValue < config.balanceThresholds.kalshi) {
         sendBalanceAlert('kalshi', kalshiBalances.totalValue, config.balanceThresholds.kalshi).catch(err => 
           console.error('Email alert failed (non-blocking):', err.message)

@@ -3,12 +3,47 @@ import nodemailer from 'nodemailer';
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT || '587'),
-  secure: false,
+  secure: process.env.EMAIL_SECURE === 'true' || false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  // Add timeout and connection options to prevent hanging
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 5000, // 5 seconds
+  socketTimeout: 30000, // 30 seconds
+  // Disable debugging in production
+  debug: process.env.NODE_ENV === 'development',
+  logger: process.env.NODE_ENV === 'development',
 });
+
+// Helper function to send email with retry logic
+async function sendEmailWithRetry(mailOptions: any, maxRetries: number = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await transporter.sendMail(mailOptions);
+      return; // Success, exit the retry loop
+    } catch (error: any) {
+      const isLastAttempt = attempt === maxRetries;
+      const shouldRetry = !isLastAttempt && (
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'ENOTFOUND' ||
+        error.message?.includes('Greeting never received')
+      );
+
+      if (shouldRetry) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Exponential backoff, max 10s
+        console.warn(`Email attempt ${attempt} failed, retrying in ${delay}ms:`, error.message);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Final failure
+      throw error;
+    }
+  }
+}
 
 export async function sendBalanceAlert(
   platform: string,
@@ -18,7 +53,13 @@ export async function sendBalanceAlert(
   const alertEmail = process.env.ALERT_EMAIL;
 
   if (!alertEmail) {
-    console.error('Alert email not configured');
+    console.warn('Alert email not configured - skipping balance alert');
+    return;
+  }
+
+  // Check if required email environment variables are set
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn('Email configuration incomplete - skipping balance alert');
     return;
   }
 
@@ -38,14 +79,14 @@ Time: ${new Date().toLocaleString()}
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #ef4444;">⚠️ Low Balance Alert</h2>
       <p>Your <strong>${platform.toUpperCase()}</strong> account balance has fallen below the threshold.</p>
-      
+
       <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0;">
         <p style="margin: 8px 0;"><strong>Current Balance:</strong> $${currentBalance.toFixed(2)}</p>
         <p style="margin: 8px 0;"><strong>Threshold:</strong> $${threshold.toFixed(2)}</p>
       </div>
-      
+
       <p>Please add funds to continue automated trading.</p>
-      
+
       <p style="color: #6b7280; font-size: 14px; margin-top: 32px;">
         Time: ${new Date().toLocaleString()}
       </p>
@@ -53,7 +94,7 @@ Time: ${new Date().toLocaleString()}
   `;
 
   try {
-    await transporter.sendMail({
+    await sendEmailWithRetry({
       from: process.env.EMAIL_USER,
       to: alertEmail,
       subject,
@@ -61,9 +102,10 @@ Time: ${new Date().toLocaleString()}
       html,
     });
 
-    console.log(`Balance alert email sent for ${platform}`);
-  } catch (error) {
-    console.error('Error sending balance alert email:', error);
+    console.log(`✅ Balance alert email sent successfully for ${platform}`);
+  } catch (error: any) {
+    console.error(`❌ Failed to send balance alert email for ${platform} after retries:`, error.message);
+    // Don't rethrow - email failures shouldn't break the bot
   }
 }
 
@@ -131,7 +173,7 @@ Time: ${new Date().toLocaleString()}
   `;
 
   try {
-    await transporter.sendMail({
+    await sendEmailWithRetry({
       from: process.env.EMAIL_USER,
       to: alertEmail,
       subject,
@@ -139,8 +181,9 @@ Time: ${new Date().toLocaleString()}
       html,
     });
 
-    console.log('Bet notification email sent');
-  } catch (error) {
-    console.error('Error sending bet notification email:', error);
+    console.log('✅ Bet notification email sent successfully');
+  } catch (error: any) {
+    console.error('❌ Failed to send bet notification email after retries:', error.message);
+    // Don't rethrow - email failures shouldn't break the bot
   }
 }

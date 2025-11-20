@@ -32,7 +32,10 @@ if [ ! -f "data/storage.json" ]; then
       "kalshi": 100,
       "polymarket": 100
     },
-    "emailAlerts": true
+    "emailAlerts": {
+      "enabled": true,
+      "lowBalanceAlert": true
+    }
   },
   "dailyStats": [],
   "balances": []
