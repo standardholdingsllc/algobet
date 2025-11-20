@@ -304,8 +304,6 @@ export class KalshiAPI {
 
     const params: Record<string, string | number> = {
       limit: KALSHI_PAGE_LIMIT,
-      sort_by: 'close_time',
-      sort_dir: 'asc',
       min_close_ts: startUnix,
       max_close_ts: endUnix,
     };

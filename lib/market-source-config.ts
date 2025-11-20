@@ -15,11 +15,8 @@ const defaultKalshiAdapters: Record<string, MarketAdapterConfig> = {
     adapterType: 'kalshi:markets',
     endpoint: '/markets',
     description:
-      'Generic Kalshi markets feed using documented close_time_start/close_time_end filters.',
+      'Generic Kalshi markets feed using documented min_close_ts/max_close_ts filters.',
     staticParams: {
-      status: 'open',
-      sort_by: 'close_time',
-      sort_dir: 'asc',
       limit: 200,
     },
     filterBindings: {

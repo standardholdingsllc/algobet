@@ -216,6 +216,7 @@ export class MarketFeedService {
     const params = this.buildQueryParams(adapterConfig, filters);
     const pagination = adapterConfig.pagination;
     const maxMarkets = filters.maxMarkets ?? DEFAULT_MAX_MARKETS;
+    this.normalizeKalshiMarketParams(params);
 
     return this.fetchKalshiMarketsFromEndpoint(
       adapterConfig.endpoint,
@@ -418,6 +419,71 @@ export class MarketFeedService {
       return Math.floor(date.getTime() / 1000);
     }
     return value as string | number | boolean;
+  }
+
+  private normalizeKalshiMarketParams(
+    params: Record<string, string | number | boolean>
+  ): void {
+    const timestampFamilies: Record<
+      'created' | 'close' | 'settled',
+      string[]
+    > = {
+      created: ['min_created_ts', 'max_created_ts'],
+      close: ['min_close_ts', 'max_close_ts'],
+      settled: ['min_settled_ts', 'max_settled_ts'],
+    };
+
+    const activeFamilies = Object.entries(timestampFamilies)
+      .filter(([, keys]) => keys.some((key) => params[key] !== undefined))
+      .map(([family]) => family as 'created' | 'close' | 'settled');
+
+    if (activeFamilies.length > 1) {
+      const [kept, ...dropped] = activeFamilies;
+      console.warn(
+        `[Kalshi Adapter] Multiple timestamp families provided (${activeFamilies.join(
+          ', '
+        )}); keeping ${kept} and dropping ${dropped.join(', ')} per API contract.`
+      );
+      for (const family of dropped) {
+        for (const key of timestampFamilies[family]) {
+          delete params[key];
+        }
+      }
+    }
+
+    const family = activeFamilies[0] ?? 'none';
+    const status = params.status as string | undefined;
+    const allowedStatuses: Record<
+      'none' | 'created' | 'close' | 'settled',
+      (string | undefined)[]
+    > = {
+      none: [],
+      created: ['unopened', 'open', undefined],
+      close: ['closed', undefined],
+      settled: ['settled', undefined],
+    };
+
+    if (
+      status &&
+      allowedStatuses[family as 'created' | 'close' | 'settled' | 'none'].length &&
+      !allowedStatuses[
+        family as 'created' | 'close' | 'settled' | 'none'
+      ].includes(status)
+    ) {
+      console.warn(
+        `[Kalshi Adapter] Removing incompatible status=${status} for ${family} timestamp filters`
+      );
+      delete params.status;
+    }
+
+    if (params.limit !== undefined) {
+      const limit = Number(params.limit);
+      if (!Number.isNaN(limit)) {
+        params.limit = Math.min(Math.max(Math.floor(limit), 1), 1000);
+      } else {
+        delete params.limit;
+      }
+    }
   }
 
   private extractCursor(payload: any, path?: string): string | undefined {
