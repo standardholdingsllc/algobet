@@ -2,7 +2,25 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { Market } from '@/types';
 
-const SNAPSHOT_DIR = path.join(process.cwd(), 'data', 'market-snapshots');
+const DEFAULT_SNAPSHOT_DIR = path.join(process.cwd(), 'data', 'market-snapshots');
+const TMP_FALLBACK_DIR = '/tmp/market-snapshots';
+
+const userConfiguredDir = process.env.MARKET_SNAPSHOT_DIR;
+const preferredDirs: string[] = [];
+
+if (userConfiguredDir) {
+  preferredDirs.push(userConfiguredDir);
+}
+
+if (process.env.VERCEL) {
+  preferredDirs.push(TMP_FALLBACK_DIR);
+}
+
+preferredDirs.push(DEFAULT_SNAPSHOT_DIR);
+
+let resolvedSnapshotDir: string | null = null;
+let resolvingPromise: Promise<string | null> | null = null;
+let warnedDisabled = false;
 
 export interface MarketSnapshot {
   platform: Market['platform'];
@@ -12,8 +30,46 @@ export interface MarketSnapshot {
   markets: Market[];
 }
 
-async function ensureSnapshotDir(): Promise<void> {
-  await fs.mkdir(SNAPSHOT_DIR, { recursive: true });
+async function resolveSnapshotDirectory(): Promise<string | null> {
+  if (resolvedSnapshotDir !== null || warnedDisabled) {
+    return resolvedSnapshotDir;
+  }
+
+  if (resolvingPromise) {
+    return resolvingPromise;
+  }
+
+  resolvingPromise = (async () => {
+    for (const candidate of preferredDirs) {
+      try {
+        await fs.mkdir(candidate, { recursive: true });
+        console.info(`[Snapshots] Using directory ${candidate}`);
+        resolvedSnapshotDir = candidate;
+        warnedDisabled = false;
+        return candidate;
+      } catch (error: any) {
+        const code = error?.code;
+        if (code === 'EROFS' || code === 'EACCES' || code === 'ENOTDIR') {
+          console.warn(
+            `[Snapshots] Cannot write to ${candidate} (${code}). ${
+              candidate !== TMP_FALLBACK_DIR ? 'Trying next option...' : 'Fallback also failed.'
+            }`
+          );
+          continue;
+        }
+        console.warn(`[Snapshots] Failed to prepare snapshot directory (${code ?? 'unknown'}).`);
+        return null;
+      }
+    }
+    console.warn('[Snapshots] No writable directory available; snapshotting disabled for this process.');
+    warnedDisabled = true;
+    resolvedSnapshotDir = null;
+    return null;
+  })();
+
+  const dir = await resolvingPromise;
+  resolvingPromise = null;
+  return dir;
 }
 
 async function writeSnapshot(
@@ -21,7 +77,10 @@ async function writeSnapshot(
   markets: Market[],
   options: { maxDaysToExpiry?: number }
 ): Promise<void> {
-  await ensureSnapshotDir();
+  const dir = await resolveSnapshotDirectory();
+  if (!dir) {
+    return;
+  }
 
   const snapshot: MarketSnapshot = {
     platform,
@@ -31,7 +90,7 @@ async function writeSnapshot(
     markets,
   };
 
-  const filePath = path.join(SNAPSHOT_DIR, `${platform}.json`);
+  const filePath = path.join(dir, `${platform}.json`);
   await fs.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
 
   const relativePath = path.relative(process.cwd(), filePath);

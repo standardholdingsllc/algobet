@@ -68,7 +68,7 @@ All integrations return the shared `Market` interface so that `lib/arbitrage.ts`
 | **Vercel KV** | `lib/kv-storage.ts` | Balances, configuration, opportunity logs, daily stats. Backed by Upstash Redis. |
 | **GitHub storage** | `lib/github-storage.ts` | Worker-friendly JSON snapshot of opportunities/bets committed back to the repo. |
 | **Local JSON** | `data/storage.json`, `data/bot-status.json` | Dev defaults when remote stores are unavailable. |
-| **Market snapshots** | `data/market-snapshots/*.json` | Latest fetched markets per platform (≤ configured expiry) for debugging, manual comparisons, and faster offline analysis. |
+| **Market snapshots** | `data/market-snapshots/*.json` (local) or `/tmp/market-snapshots/*.json` (serverless fallback) | Latest fetched markets per platform (≤ configured expiry) for debugging, manual comparisons, and faster offline analysis. Automatically disables if no writable directory exists to avoid runtime errors. |
 
 Key types live in `types/index.ts` (e.g., `Market`, `ArbitrageOpportunity`, `BotConfig`).
 
