@@ -290,6 +290,7 @@ const DATA_API_URL = "https://data-api.polymarket.com";
 const MARKET_CACHE_TTL_MS = 30_000; // 30 seconds cache window to keep scans fast
 const GAMMA_PAGE_LIMIT = 500;
 const GAMMA_MAX_PAGES = 6; // 3k markets max per refresh
+const GAMMA_STOP_AFTER_TRADABLE = 400;
 const GAMMA_QUERY_FILTERS: Record<string, string> = {
   active: "true",
   closed: "false",
@@ -504,9 +505,11 @@ function mapClobToNormalized(markets: ClobMarket[]): NormalizedPolymarketMarket[
  */
 async function fetchGammaMarkets(
   limit = GAMMA_PAGE_LIMIT,
-  maxPages = GAMMA_MAX_PAGES
+  maxPages = GAMMA_MAX_PAGES,
+  stopAfterTradable = GAMMA_STOP_AFTER_TRADABLE
 ): Promise<GammaMarket[]> {
   const all: GammaMarket[] = [];
+  let tradableCollected = 0;
 
   for (let page = 0; page < maxPages; page++) {
     const offset = page * limit;
@@ -534,6 +537,19 @@ async function fetchGammaMarkets(
       break;
     }
     all.push(...body);
+
+    const tradableOnPage = filterTradableGammaMarkets(body).length;
+    tradableCollected += tradableOnPage;
+    if (
+      typeof stopAfterTradable === "number" &&
+      stopAfterTradable > 0 &&
+      tradableCollected >= stopAfterTradable
+    ) {
+      console.info(
+        `[Polymarket Gamma] Reached tradable threshold (${tradableCollected}/${stopAfterTradable}); stopping pagination.`
+      );
+      break;
+    }
 
     if (body.length < limit) {
       break;
@@ -761,7 +777,11 @@ async function refreshPolymarketMarkets(): Promise<NormalizedPolymarketMarket[]>
 async function tryFetchGammaMarkets(): Promise<NormalizedPolymarketMarket[]> {
   let gammaMarkets: GammaMarket[] = [];
   try {
-    gammaMarkets = await fetchGammaMarkets(GAMMA_PAGE_LIMIT, GAMMA_MAX_PAGES);
+    gammaMarkets = await fetchGammaMarkets(
+      GAMMA_PAGE_LIMIT,
+      GAMMA_MAX_PAGES,
+      GAMMA_STOP_AFTER_TRADABLE
+    );
   } catch (err) {
     console.error("[Polymarket Gamma] Failed to fetch markets:", err);
     return [];
