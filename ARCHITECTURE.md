@@ -48,10 +48,12 @@ AlgoBet is a sophisticated automated arbitrage trading bot designed to identify 
 
 ## Recent Technical Improvements
 
-### Concurrency & Race Condition Fixes
-- **Mutex Protection**: Added `isScanning` flag to prevent overlapping cron job executions
-- **Sequential Processing**: Ensures market scans complete before starting new ones
-- **Error Recovery**: Proper cleanup of scanning state on failures
+### Performance & Reliability Fixes
+- **Sequential Pagination**: Polymarket CLOB pagination working correctly with 100ms rate limiting
+- **EIP-712 Compliance**: Proper domain separator and type definitions implemented
+- **Web3 Preparation**: SX.bet balance checking infrastructure ready for elevated permissions
+- **Logging Corrections**: Fixed duplicate market count reporting
+- **Type Safety**: Enhanced error handling throughout the system
 
 ### API Integration Enhancements
 - **EIP-712 Compliance**: Proper domain separator and type definitions for Polymarket CLOB
@@ -91,30 +93,30 @@ The main user interface built with Next.js and React components.
 
 ### 2. Bot Engine (`lib/bot.ts`)
 
-The core trading logic implemented as `ArbitrageBotEngine` class with enhanced concurrency protection.
+The core trading logic implemented as `ArbitrageBotEngine` class with verified sequential processing.
 
 **Main Responsibilities:**
-- **Market Scanning**: Continuous loop scanning all platforms with race condition protection
-- **Concurrency Control**: Mutex-based `isScanning` flag prevents overlapping cron executions
+- **Market Scanning**: Cron-triggered scanning with in-process concurrency protection
+- **Sequential Execution**: Verified single-threaded operation per Vercel instance
 - **Adaptive Scanning**: Dynamic scan intervals (5s-60s) based on market conditions
 - **Opportunity Detection**: Identifies arbitrage opportunities across platforms
 - **Risk Management**: Validates opportunities and manages position sizing
 - **Bet Execution**: Places simultaneous Fill-or-Kill orders
-- **Health Monitoring**: Tracks bot performance and concurrent execution conflicts
+- **Health Monitoring**: Tracks bot performance and execution timing
 
 **Key Methods:**
 ```typescript
-start(): Promise<void>        // Begins the scanning loop with concurrency checks
-stop(): void                  // Stops the bot and resets scanning state
+start(): Promise<void>        // Begins the scanning loop
+stop(): void                  // Stops the bot
 scanOnce(): Promise<void>     // Cron-safe single scan with mutex protection
-scanAndExecute(): Promise<void> // Core scan logic with race condition prevention
-executeBet(): Promise<void>   // Places arbitrage bets with error recovery
+scanAndExecute(): Promise<void> // Core scan logic
+executeBet(): Promise<void>   // Places arbitrage bets
 ```
 
-**Concurrency Protection:**
-- **Mutex Implementation**: `isScanning` flag prevents multiple simultaneous scans
-- **Graceful Handling**: Overlapping requests log warnings instead of failing
-- **State Management**: Proper flag reset on completion or error
+**Execution Model:**
+- **Cron Triggers**: Vercel cron jobs call `scanOnce()` method
+- **In-Process Mutex**: `isScanning` flag prevents re-entrancy within single instance
+- **Sequential Processing**: All API calls execute in order (verified by timestamp analysis)
 
 ### 3. Arbitrage Detection (`lib/arbitrage.ts`)
 
@@ -144,8 +146,8 @@ Platform-specific API clients handling authentication and trading operations.
 - **CLOB API**: REST-based with cursor pagination and EIP-712 authentication
 - **EIP-712 Integration**: Proper domain separator for Polygon mainnet CLOB contract
 - **Performance Optimized**: Rate-limited pagination (100ms intervals) with timing telemetry
-- **Fallback Support**: Blockchain queries when CLOB API unavailable
-- **Concurrency Protected**: Mutex-based scan prevention
+- **Balance Architecture**: CLOB API (404 expected) → Data-API fallback → Blockchain queries
+- **Sequential Processing**: Verified single-threaded pagination with proper cursor ordering
 
 #### SX.bet API (`sxbet.ts`)
 - **Dual Integration**: REST API for markets + Web3 for balances (awaiting elevated permissions)
@@ -389,13 +391,14 @@ This architecture provides a robust, scalable foundation for automated arbitrage
 
 ## Version History
 
-### v1.0.1 - Concurrency & Performance (Latest)
-- ✅ **Concurrency Control**: Added mutex-based scan protection to prevent overlapping executions
+### v1.0.1 - Performance & Reliability (Latest)
+- ✅ **Sequential Processing**: Verified Polymarket pagination works correctly with proper cursor ordering
 - ✅ **EIP-712 Compliance**: Proper domain separator and type definitions for Polymarket CLOB
-- ✅ **Web3 Integration**: Prepared SX.bet balance checking infrastructure for elevated permissions
-- ✅ **Performance Optimization**: Rate-limited pagination with timing telemetry (100ms intervals)
+- ✅ **Web3 Preparation**: SX.bet balance checking infrastructure ready for elevated permissions
+- ✅ **Performance Optimization**: Rate-limited pagination (100ms intervals) with timing telemetry
 - ✅ **Type Safety**: Enhanced TypeScript error handling throughout the system
-- ✅ **Logging Fixes**: Eliminated duplicate market count reporting and improved error logging
+- ✅ **Logging Fixes**: Eliminated duplicate market count reporting
+- ✅ **Balance Architecture**: Proper fallback chain (CLOB 404 → Data-API → Blockchain)
 
 ### v1.0.0 - Initial Release
 - Core arbitrage engine with Kalshi, Polymarket, and SX.bet integration
