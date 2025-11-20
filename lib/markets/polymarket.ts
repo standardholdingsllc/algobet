@@ -69,13 +69,30 @@ export class PolymarketAPI {
       console.log('[Polymarket CLOB] Fetching markets from CLOB API...');
 
       // Use CLOB API markets endpoint
-      // The CLOB API provides active markets through /markets endpoint
-      const response = await axios.get(`${BASE_URL}/markets`, {
-        params: {
-          active: true,
-          limit: 200, // Reasonable limit for CLOB API
-        },
-      });
+      // Try different approaches to get active markets
+      let response;
+
+      // Try different CLOB API endpoints for active markets
+      const endpoints = [
+        { url: `${BASE_URL}/markets`, params: { active: true, closed: false, limit: 500 } },
+        { url: `${BASE_URL}/markets`, params: { active: true, limit: 500 } },
+        { url: `${BASE_URL}/active-markets`, params: { limit: 500 } }, // Try active-markets endpoint
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`[Polymarket CLOB] Trying endpoint: ${endpoint.url} with params:`, endpoint.params);
+          response = await axios.get(endpoint.url, { params: endpoint.params });
+          break; // If successful, use this response
+        } catch (error) {
+          console.log(`[Polymarket CLOB] Endpoint ${endpoint.url} failed:`, error.response?.status || error.message);
+        }
+      }
+
+      if (!response) {
+        console.error('[Polymarket CLOB] All market endpoints failed');
+        return [];
+      }
 
       console.log(`[Polymarket CLOB] Raw API Response:`, response.data);
 
@@ -145,8 +162,12 @@ export class PolymarketAPI {
           continue;
         }
 
-        // Check if market is active and not closed
-        if (market.closed === true || market.active === false) {
+        // Check if market is active and tradable
+        // Accept markets that are active, accepting orders, or have order books enabled
+        const isTradable = market.active === true &&
+                          (market.accepting_orders === true || market.enable_order_book === true);
+
+        if (!isTradable) {
           skippedExpired++;
           continue;
         }
