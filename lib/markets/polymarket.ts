@@ -94,6 +94,17 @@ export class PolymarketAPI {
 
         // Skip if market has expired OR is too far in the future
         if (expiryDate < now || expiryDate > maxDate) {
+          // Log details about skipped markets for better debugging
+          if (processedCount <= 10) { // Log first 10 skipped markets
+            console.log(`[Polymarket] Skipping market ${processedCount} (${market.conditionId?.substring(0, 10)}...):`, {
+              question: market.question?.substring(0, 50),
+              expiry: expiryDate?.toISOString(),
+              days_from_now: expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : 'N/A',
+              is_expired: expiryDate < now,
+              is_too_far: expiryDate > maxDate,
+              max_days_allowed: maxDaysToExpiry
+            });
+          }
           skippedExpired++;
           continue;
         }
@@ -127,7 +138,7 @@ export class PolymarketAPI {
         const noPrice = parseFloat(prices[1]) * 100;
 
         // Create market with outcome prices (new API structure)
-        markets.push({
+        const marketData = {
           id: market.conditionId || market.id,
           platform: 'polymarket',
           ticker: market.conditionId || market.id,
@@ -137,14 +148,39 @@ export class PolymarketAPI {
           noPrice,
           expiryDate: expiryDate.toISOString(),
           volume: parseFloat(market.volume || '0'),
-        });
+        };
+
+        // Log successfully added markets for debugging
+        if (markets.length <= 5) { // Log first 5 added markets
+          console.log(`[Polymarket] ✅ Added market ${markets.length + 1}:`, {
+            id: marketData.id?.substring(0, 10),
+            question: marketData.title?.substring(0, 50),
+            expiry: marketData.expiryDate,
+            days_from_now: (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+            yes_price: marketData.yesPrice,
+            no_price: marketData.noPrice
+          });
+        }
+
+        markets.push(marketData);
       }
+
+      // Log expiry date range summary
+      const now = new Date();
+      const maxDate = new Date(now.getTime() + maxDaysToExpiry * 24 * 60 * 60 * 1000);
+      console.log(`[Polymarket] Processing window: ${now.toISOString()} to ${maxDate.toISOString()} (${maxDaysToExpiry} days)`);
 
       console.log(`[Polymarket] Processed ${processedCount} markets:`);
       console.log(`  - Added: ${markets.length}`);
       console.log(`  - Skipped (expired/future): ${skippedExpired}`);
       console.log(`  - Skipped (non-binary): ${skippedNonBinary}`);
       console.log(`  - Skipped (missing tokens): ${skippedMissingTokens}`);
+
+      if (markets.length > 0) {
+        const earliestExpiry = markets.reduce((min, m) => m.expiryDate < min ? m.expiryDate : min, markets[0].expiryDate);
+        const latestExpiry = markets.reduce((max, m) => m.expiryDate > max ? m.expiryDate : max, markets[0].expiryDate);
+        console.log(`[Polymarket] Added markets expiry range: ${earliestExpiry} to ${latestExpiry}`);
+      }
 
       return markets;
     } catch (error: any) {
