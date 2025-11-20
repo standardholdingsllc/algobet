@@ -289,12 +289,30 @@ export class MarketFeedService {
       if (cursor && pagination?.cursorParam) {
         pageParams[pagination.cursorParam] = cursor;
       }
+      const requestLabel = `[Kalshi Adapter] ${endpoint} page ${page + 1}`;
+      const logParams = {
+        ...pageParams,
+        cursor: cursor ?? null,
+      };
+      console.info(
+        `${requestLabel} → requesting with params`,
+        JSON.stringify(logParams)
+      );
 
       const response = await axios.get(`${KALSHI_API_BASE}${endpoint}`, {
         params: pageParams,
       });
       const rawMarkets: KalshiMarket[] =
         response.data?.markets ?? response.data?.data ?? [];
+      const firstClose = rawMarkets[0]?.close_time ?? null;
+      const lastClose =
+        rawMarkets.length > 0
+          ? rawMarkets[rawMarkets.length - 1]?.close_time ?? null
+          : null;
+      console.info(
+        `${requestLabel} ← received ${rawMarkets.length} markets (first_close=${firstClose}, last_close=${lastClose})`
+      );
+
       const normalized = this.normalizeKalshiMarkets(rawMarkets, filters);
       markets.push(...normalized);
 
@@ -314,6 +332,16 @@ export class MarketFeedService {
 
     if (maxMarkets && markets.length > maxMarkets) {
       return markets.slice(0, maxMarkets);
+    }
+    if (markets.length === 0) {
+      console.warn(
+        '[Kalshi Adapter] No markets returned after pagination ' +
+          `(window ${filters.windowStart} → ${filters.windowEnd})`
+      );
+    } else {
+      console.info(
+        `[Kalshi Adapter] Collected ${markets.length} tradable markets across ${page} page(s)`
+      );
     }
     return markets;
   }
