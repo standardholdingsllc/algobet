@@ -52,7 +52,7 @@ export class PolymarketAPI {
         });
         console.log(`[Polymarket] Attempt 1 - No filters: ${response.data?.length || 0} markets`);
       } catch (error) {
-        console.warn('[Polymarket] Attempt 1 failed, trying with active filter:', error.message);
+        console.warn('[Polymarket] Attempt 1 failed, trying with active filter:', error instanceof Error ? error.message : String(error));
         // Fallback: Try with active filter
         response = await axios.get(`${GAMMA_URL}/markets`, {
           params: {
