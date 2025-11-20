@@ -2,12 +2,12 @@ import { KalshiAPI } from '@/lib/markets/kalshi';
 import { PolymarketAPI } from '@/lib/markets/polymarket';
 import { SXBetAPI } from '@/lib/markets/sxbet';
 import { saveMarketSnapshots } from '@/lib/market-snapshots';
-import { MARKET_SNAPSHOT_MAX_DAYS } from '@/lib/constants';
+import { DEFAULT_MAX_DAYS_TO_EXPIRY } from '@/lib/constants';
 
 async function run(): Promise<void> {
   const maxDaysArg = Number(process.argv[2]);
   const maxDaysToExpiry =
-    Number.isFinite(maxDaysArg) && maxDaysArg > 0 ? maxDaysArg : MARKET_SNAPSHOT_MAX_DAYS;
+    Number.isFinite(maxDaysArg) && maxDaysArg > 0 ? maxDaysArg : DEFAULT_MAX_DAYS_TO_EXPIRY;
 
   console.log(`Dumping markets with maxDaysToExpiry=${maxDaysToExpiry}...`);
 

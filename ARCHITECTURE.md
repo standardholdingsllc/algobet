@@ -22,7 +22,7 @@ Both the cron bot and the worker import the same market clients, arbitrage engin
 
 ### Kalshi (`lib/markets/kalshi.ts`, `services/kalshi.ts`)
 - Authenticated REST client (HMAC-SHA based) that fetches markets, balances, and submits fill-or-kill orders.
-- Market ingestion now walks the `/markets` cursor-pagination (up to 8 × 200 rows) using the API's `cursor` token until it finds enough contracts that expire within the configured timeframe, so late-dated pages no longer starve the scan.
+- Market ingestion submits Kalshi’s documented time filters (`close_time_min` / `close_time_max`) plus cursor pagination (up to 8 × 200 rows) so the API itself trims the feed to the user-selected window (e.g., 10 days when changed in the dashboard) instead of forcing the bot to sift through long-dated contracts.
 - Shared fee helpers (`lib/fees.ts`) convert quoted prices to actual cash requirements before bets are sent.
 
 ### Polymarket (`lib/markets/polymarket.ts`, `services/polymarket.ts`)

@@ -217,6 +217,10 @@ export class KalshiAPI {
     const now = new Date();
     const maxDate = new Date(now);
     maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
+    const window = {
+      startISO: now.toISOString(),
+      endISO: maxDate.toISOString(),
+    };
 
     try {
       const markets: Market[] = [];
@@ -224,7 +228,7 @@ export class KalshiAPI {
       let page = 0;
 
       while (page < KALSHI_MAX_PAGES) {
-        const { entries, nextCursor } = await this.fetchMarketsPage(cursor);
+        const { entries, nextCursor } = await this.fetchMarketsPage(cursor, window);
         page += 1;
 
         if (!entries.length) {
@@ -259,7 +263,7 @@ export class KalshiAPI {
         }
 
         console.info(
-          `[Kalshi] Processed page ${page} (${entries.length} raw, ${markets.length} total tradable so far).`
+          `[Kalshi] Processed Kalshi page ${page} (${entries.length} raw within <=${maxDaysToExpiry}d, ${markets.length} total tradable so far).`
         );
 
         if (!nextCursor) {
@@ -290,11 +294,16 @@ export class KalshiAPI {
   }
 
   private async fetchMarketsPage(
-    cursor?: string
+    cursor: string | undefined,
+    window: { startISO: string; endISO: string }
   ): Promise<{ entries: KalshiMarket[]; nextCursor?: string }> {
     const params: Record<string, string | number> = {
       status: 'open',
       limit: KALSHI_PAGE_LIMIT,
+      sort_by: 'close_time',
+      sort_dir: 'asc',
+      close_time_min: window.startISO,
+      close_time_max: window.endISO,
     };
 
     if (cursor) {

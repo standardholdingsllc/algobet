@@ -9,7 +9,6 @@ import { saveMarketSnapshots } from './market-snapshots';
 import { sendBalanceAlert } from './email';
 import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { MARKET_SNAPSHOT_MAX_DAYS } from './constants';
 
 export class ArbitrageBotEngine {
   private kalshi: KalshiAPI;
@@ -156,12 +155,10 @@ export class ArbitrageBotEngine {
     // Fetch open markets from all platforms
     // Note: We fetch more markets than we'll execute on to find opportunities
     // Execution is filtered by maxDaysToExpiry in executeBet()
-    const marketHorizonDays = Math.min(config.maxDaysToExpiry, MARKET_SNAPSHOT_MAX_DAYS);
-
     const [kalshiMarkets, polymarketMarkets, sxbetMarkets] = await Promise.all([
-      this.kalshi.getOpenMarkets(marketHorizonDays),
-      this.polymarket.getOpenMarkets(marketHorizonDays),
-      this.sxbet.getOpenMarkets(marketHorizonDays),
+      this.kalshi.getOpenMarkets(config.maxDaysToExpiry),
+      this.polymarket.getOpenMarkets(config.maxDaysToExpiry),
+      this.sxbet.getOpenMarkets(config.maxDaysToExpiry),
     ]);
 
     try {
@@ -171,7 +168,7 @@ export class ArbitrageBotEngine {
           polymarket: polymarketMarkets,
           sxbet: sxbetMarkets,
         },
-        { maxDaysToExpiry: marketHorizonDays }
+        { maxDaysToExpiry: config.maxDaysToExpiry }
       );
     } catch (snapshotError: any) {
       console.warn(
