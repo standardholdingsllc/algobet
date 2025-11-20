@@ -35,6 +35,7 @@ interface KalshiMarketsResponse {
     next_cursor?: string;
   };
   next_cursor?: string;
+  cursor?: string;
 }
 
 export class KalshiAPI {
@@ -305,7 +306,10 @@ export class KalshiAPI {
     });
 
     const nextCursor =
-      response.data.meta?.next_cursor ?? response.data.next_cursor ?? undefined;
+      response.data.meta?.next_cursor ??
+      response.data.next_cursor ??
+      response.data.cursor ??
+      undefined;
 
     return {
       entries: response.data.markets ?? [],
