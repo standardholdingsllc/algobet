@@ -239,6 +239,31 @@ import { Market } from '@/types';
 import axios from 'axios';
 import { ethers, parseUnits } from 'ethers';
 
+// EIP-712 constants for Polymarket CLOB
+const EIP712_DOMAIN = {
+  name: 'Polymarket',
+  version: '1',
+  chainId: 137, // Polygon mainnet
+  verifyingContract: '0x4bFb41d5B3570f767523855b53Fc8c1acb80fA8A9', // CLOB contract
+};
+
+const EIP712_TYPES = {
+  Order: [
+    { name: 'salt', type: 'uint256' },
+    { name: 'maker', type: 'address' },
+    { name: 'signer', type: 'address' },
+    { name: 'taker', type: 'address' },
+    { name: 'tokenId', type: 'uint256' },
+    { name: 'makerAmount', type: 'uint256' },
+    { name: 'takerAmount', type: 'uint256' },
+    { name: 'expiration', type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'feeRateBps', type: 'uint256' },
+    { name: 'side', type: 'uint8' },
+    { name: 'signatureType', type: 'uint8' },
+  ],
+};
+
 /* -------------------------------------------------------------------------- */
 
 /*  Constants                                                                */
