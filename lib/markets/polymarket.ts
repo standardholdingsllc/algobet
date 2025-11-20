@@ -546,14 +546,15 @@ async function fetchGammaMarkets(
  *   - archived === false
  */
 function filterTradableGammaMarkets(markets: GammaMarket[]): GammaMarket[] {
-  return markets.filter(
-    (m) =>
-      m.enableOrderBook &&
-      m.acceptingOrders &&
-      m.active &&
-      !m.closed &&
-      !m.archived
-  );
+  return markets.filter((m) => {
+    const hasOrderBook = m.enableOrderBook !== false;
+    const acceptsOrders = m.acceptingOrders !== false;
+    const isActive = m.active !== false;
+    const isClosed = m.closed === true;
+    const isArchived = m.archived === true;
+
+    return hasOrderBook && acceptsOrders && isActive && !isClosed && !isArchived;
+  });
 }
 
 /**

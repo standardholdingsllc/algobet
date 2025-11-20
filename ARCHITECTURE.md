@@ -25,7 +25,7 @@ Both the cron bot and the worker import the same market clients, arbitrage engin
 - Shared fee helpers (`lib/fees.ts`) convert quoted prices to actual cash requirements before bets are sent.
 
 ### Polymarket (`lib/markets/polymarket.ts`, `services/polymarket.ts`)
-- **Market ingestion**: Uses the Gamma API first, caches results for 30 seconds, and only falls back to a limited CLOB pagination sweep if Gamma produces zero tradable markets. This removes the 61-page sweeps visible in `logs.txt`.
+- **Market ingestion**: Uses the Gamma API first, caches results for 30 seconds, and only falls back to a limited CLOB pagination sweep if Gamma produces zero tradable markets. Gamma filtering treats missing `acceptingOrders`/`enableOrderBook` flags as opt-in so “soft” market states do not erase the feed.
 - **Normalization**: Outcomes, `clobTokenIds`, and prices are parsed into a single `NormalizedPolymarketMarket` type; markets without valid prices or outside the configured expiry window never reach the arbitrage engine.
 - **Balances**: `getTotalBalance` tries the CLOB collateral endpoint once (disabling it after the first 404), then falls back to a USDC on-chain query and the Data API’s positions feed.
 - **Orders**: Limit orders are signed via EIP-712 and posted to the CLOB order endpoint.
