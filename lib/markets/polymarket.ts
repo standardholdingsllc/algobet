@@ -120,24 +120,24 @@ export class PolymarketAPI {
         // Debug first few markets to understand the CLOB API structure
         if (processedCount <= 3) {
           console.log(`[Polymarket CLOB] Market ${processedCount}:`, {
-            id: market.market_id || market.id,
+            id: market.condition_id || market.market_id || market.id,
             question: market.question?.substring(0, 50),
-            end_date: market.end_date,
+            end_date_iso: market.end_date_iso,
             active: market.active,
             closed: market.closed,
-            outcomes: market.outcomes,
-            prices: market.prices,
+            tokens: market.tokens?.length,
             available_fields: Object.keys(market),
           });
         }
 
         // Check if market has expired or is too far in the future
-        if (!market.end_date) {
+        if (!market.end_date_iso && !market.end_date) {
           skippedExpired++;
           continue;
         }
 
-        const expiryDate = new Date(market.end_date + 'T23:59:59Z');
+        const endDateStr = market.end_date_iso || market.end_date;
+        const expiryDate = new Date(endDateStr + (endDateStr.includes('T') ? '' : 'T23:59:59Z'));
         const now = new Date();
 
         if (expiryDate < now || expiryDate > maxDate) {
@@ -145,8 +145,8 @@ export class PolymarketAPI {
           continue;
         }
 
-        // Check if market is active
-        if (market.closed || market.active === false) {
+        // Check if market is active and not closed
+        if (market.closed === true || market.active === false) {
           skippedExpired++;
           continue;
         }
@@ -156,16 +156,16 @@ export class PolymarketAPI {
         let prices: number[];
 
         try {
-          // CLOB API might have different field names
-          outcomes = market.outcomes || market.tokens?.map((t: any) => t.outcome) || [];
-          prices = market.prices || market.outcome_prices || [];
-
-          // If outcomes come as objects, extract the outcome names
-          if (outcomes.length > 0 && typeof outcomes[0] === 'object') {
-            outcomes = outcomes.map((o: any) => o.outcome || o.name);
+          // CLOB API uses 'tokens' array with outcome and price data
+          if (market.tokens && Array.isArray(market.tokens) && market.tokens.length >= 2) {
+            outcomes = market.tokens.map((t: any) => t.outcome);
+            prices = market.tokens.map((t: any) => parseFloat(t.price || '0'));
+          } else {
+            outcomes = [];
+            prices = [];
           }
         } catch (error) {
-          console.warn(`[Polymarket CLOB] Failed to parse outcomes/prices for market ${market.market_id || market.id}:`, error);
+          console.warn(`[Polymarket CLOB] Failed to parse tokens for market ${market.condition_id || market.market_id || market.id}:`, error);
           skippedNonBinary++;
           continue;
         }
@@ -210,16 +210,17 @@ export class PolymarketAPI {
         }
 
         // Create market with CLOB API structure
+        const marketId = market.condition_id || market.market_id || market.id;
         const marketData = {
-          id: market.market_id || market.condition_id || market.id,
+          id: marketId,
           platform: 'polymarket' as const,
-          ticker: market.market_id || market.condition_id || market.id,
+          ticker: marketId,
           marketType: 'prediction' as const,
           title: market.question,
           yesPrice,
           noPrice,
           expiryDate: expiryDate.toISOString(),
-          volume: parseFloat(market.volume || market.volume24hr || '0'),
+          volume: parseFloat(market.volume24hr || market.volume || '0'),
         };
 
         // Log successfully added markets for debugging
