@@ -205,9 +205,15 @@ function mergeMarketSourceConfig(
 ): MarketSourceConfig {
   const merged: Partial<MarketSourceConfig> = {};
 
+  const defaultPlatforms = Object.keys(
+    DEFAULT_MARKET_SOURCE_CONFIG
+  ) as MarketPlatform[];
+  const overridePlatforms = overrides
+    ? (Object.keys(overrides) as MarketPlatform[])
+    : [];
   const platforms = new Set<MarketPlatform>([
-    ...Object.keys(DEFAULT_MARKET_SOURCE_CONFIG),
-    ...(overrides ? (Object.keys(overrides) as MarketPlatform[]) : []),
+    ...defaultPlatforms,
+    ...overridePlatforms,
   ]);
 
   platforms.forEach((platform) => {
