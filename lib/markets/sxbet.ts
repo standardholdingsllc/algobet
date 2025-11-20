@@ -275,7 +275,7 @@ export class SXBetAPI {
           const balance = await usdcContract.balanceOf(this.walletAddress);
           return Number(balance) / 1e6; // USDC has 6 decimals
         } catch (web3Error) {
-          console.warn('sx.bet Web3 balance query failed (may need elevated permissions):', web3Error.message);
+          console.warn('sx.bet Web3 balance query failed (may need elevated permissions):', web3Error instanceof Error ? web3Error.message : String(web3Error));
           return 0;
         }
       }
