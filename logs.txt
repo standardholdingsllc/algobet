@@ -1,37 +1,59 @@
-2025-11-20 01:13:25.334 [info] [2025-11-20T01:13:25.334Z] Cron scan starting...
-2025-11-20 01:13:25.335 [info] [2025-11-20T01:13:25.334Z] Scanning for arbitrage opportunities...
-2025-11-20 01:13:25.470 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-20 01:13:25.470 [info] [Kalshi] 💼 Portfolio value: $27.97
-2025-11-20 01:13:25.470 [info] [Kalshi] 💰 Positions value: $27.14
-2025-11-20 01:13:25.470 [info] [Kalshi] 💵 Total value: $27.97
-2025-11-20 01:13:25.587 [info] [Polymarket] 📊 Positions value (from /value): $22.37
-2025-11-20 01:13:25.623 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-20 01:13:25.623 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-20 01:13:25.623 [info] [Polymarket] ✅ Total account value: $32.38
-2025-11-20 01:13:25.623 [warning] sx.bet balance check requires Web3 integration - wallet configured but Web3 not implemented
-2025-11-20 01:13:25.623 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
-2025-11-20 01:13:25.623 [info] 💰 Polymarket: Total $32.38 (Cash: $10.01, Positions: $22.37)
-2025-11-20 01:13:25.623 [info] 💰 SX.bet: $0.00
-2025-11-20 01:13:25.634 [info] [Polymarket] Fetching markets from Gamma API...
-2025-11-20 01:13:25.634 [info] [Polymarket] Testing Gamma API (filtered)...
-2025-11-20 01:13:25.947 [info] [sx.bet] Retrieved 0 active markets
-2025-11-20 01:13:25.947 [warning] [sx.bet] Skipping fixtures - API permissions needed for order data
-2025-11-20 01:13:25.947 [warning] [sx.bet] Skipping order data - API permissions needed for live odds
-2025-11-20 01:13:25.947 [info] [sx.bet] Retrieved 50 active markets
-2025-11-20 01:13:25.947 [info] [sx.bet] Created 50 basic market entries (no live odds yet)
-2025-11-20 01:13:26.200 [info] [Polymarket] Gamma API (filtered): 500 markets, 0 created ≤30 days
-2025-11-20 01:13:26.201 [info] [Polymarket] Testing Main API...
-2025-11-20 01:13:26.212 [warning] [Polymarket] Main API failed: getaddrinfo ENOTFOUND api.polymarket.com
-2025-11-20 01:13:26.212 [info] [Polymarket] Testing Sports API...
-2025-11-20 01:13:26.433 [warning] [Polymarket] Sports API failed: Request failed with status code 404
-2025-11-20 01:13:26.433 [info] [Polymarket] Testing Data API...
-2025-11-20 01:13:26.538 [warning] [Polymarket] Data API failed: Request failed with status code 404
-2025-11-20 01:13:26.538 [info] [Polymarket] Testing Gamma API (unfiltered)...
-2025-11-20 01:13:27.050 [info] [Polymarket] Gamma API (unfiltered): 500 markets, 0 created ≤30 days
-2025-11-20 01:13:27.050 [error] [Polymarket] All API endpoints failed!
-2025-11-20 01:13:27.050 [info] Found 200 Kalshi, 0 Polymarket, and 50 sx.bet markets
-2025-11-20 01:13:27.068 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-20 01:13:27.197 [info] Found 0 matching markets across platforms
-2025-11-20 01:13:27.197 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
-2025-11-20 01:13:27.198 [info] 📊 Standard scanning - every 30 seconds
-2025-11-20 01:13:27.200 [info] [2025-11-20T01:13:27.198Z] Cron scan completed successfully in 1864ms
+2025-11-20 04:43:17.281 [info] [2025-11-20T04:43:17.280Z] Cron scan starting...
+2025-11-20 04:43:17.282 [info] [2025-11-20T04:43:17.281Z] Scanning for arbitrage opportunities...
+2025-11-20 04:43:17.388 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-20 04:43:17.388 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-20 04:43:17.388 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-20 04:43:17.388 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-20 04:43:17.388 [info] [Polymarket CLOB] Fetching balance from CLOB API...
+2025-11-20 04:43:17.505 [warning] [Polymarket CLOB] Balance endpoint responded 404. Disabling future CLOB balance checks for this process.
+2025-11-20 04:43:17.505 [info] [Polymarket CLOB] ⚠️ CLOB API failed, trying blockchain query...
+2025-11-20 04:43:17.544 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-20 04:43:17.545 [info] [Polymarket CLOB] 💵 Wallet USDC balance: $10.01
+2025-11-20 04:43:17.655 [info] [Polymarket CLOB] 📊 Positions value: $22.70
+2025-11-20 04:43:17.655 [info] [Polymarket CLOB] ✅ Total account value: $32.71
+2025-11-20 04:43:17.751 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-20 04:43:17.753 [info] 💰 Polymarket: Total $32.71 (Cash: $10.01, Positions: $22.70)
+2025-11-20 04:43:17.753 [info] 💰 SX.bet: $0.00
+2025-11-20 04:43:17.759 [info] [Polymarket Gamma] Fetching /markets page {
+  limit: 500,
+  offset: 0,
+  filters: { active: 'true', closed: 'false', archived: 'false' }
+}
+2025-11-20 04:43:17.888 [warning] [sx.bet] Skipping fixtures - API permissions needed for order data
+2025-11-20 04:43:17.888 [warning] [sx.bet] Skipping order data - API permissions needed for live odds
+2025-11-20 04:43:17.888 [info] [sx.bet] Retrieved 50 active markets
+2025-11-20 04:43:17.888 [info] [sx.bet] Created 50 basic market entries (no live odds yet)
+2025-11-20 04:43:18.355 [info] [Polymarket Gamma] Fetching /markets page {
+  limit: 500,
+  offset: 500,
+  filters: { active: 'true', closed: 'false', archived: 'false' }
+}
+2025-11-20 04:43:18.889 [info] [Polymarket Gamma] Fetching /markets page {
+  limit: 500,
+  offset: 1000,
+  filters: { active: 'true', closed: 'false', archived: 'false' }
+}
+2025-11-20 04:43:19.424 [info] [Polymarket Gamma] Fetching /markets page {
+  limit: 500,
+  offset: 1500,
+  filters: { active: 'true', closed: 'false', archived: 'false' }
+}
+2025-11-20 04:43:19.932 [info] [Polymarket Gamma] Fetching /markets page {
+  limit: 500,
+  offset: 2000,
+  filters: { active: 'true', closed: 'false', archived: 'false' }
+}
+2025-11-20 04:43:20.515 [info] [Polymarket Gamma] Fetching /markets page {
+  limit: 500,
+  offset: 2500,
+  filters: { active: 'true', closed: 'false', archived: 'false' }
+}
+2025-11-20 04:43:21.011 [info] [Polymarket Gamma] Retrieved 3000 markets from 6 page(s) with filters {"active":"true","closed":"false","archived":"false"}.
+2025-11-20 04:43:21.015 [info] [Polymarket Gamma] 3000 tradable markets out of 3000 raw entries.
+2025-11-20 04:43:21.063 [info] [Polymarket] Converted 3000 normalized markets into 325 tradeable entries (skipped 2675 by expiry, 0 by missing prices).
+2025-11-20 04:43:21.063 [info] Found 200 Kalshi, 325 Polymarket, and 50 sx.bet markets
+2025-11-20 04:43:21.063 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-20 04:43:21.525 [info] Found 0 matching markets across platforms
+2025-11-20 04:43:21.525 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-20 04:43:21.527 [info] 📊 Standard scanning - every 30 seconds
+2025-11-20 04:43:21.527 [info] [2025-11-20T04:43:21.526Z] Cron scan completed successfully in 4245ms

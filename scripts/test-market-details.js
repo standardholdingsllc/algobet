@@ -31,14 +31,14 @@ async function testSpecificMarket() {
       const firstMarket = markets[0];
       console.log(`Testing market: ${firstMarket.marketHash}`);
 
-      // Try different endpoint variations
-      const endpointsToTest = [
-        `/markets/${firstMarket.marketHash}`,
-        `/orders?marketHash=${firstMarket.marketHash}`,
-        `/orders/best-odds?marketHash=${firstMarket.marketHash}`,
-        `/orders/active?marketHash=${firstMarket.marketHash}`,
-        `/orderbook/${firstMarket.marketHash}`,
-      ];
+    // Try different endpoint variations with correct endpoints
+    const endpointsToTest = [
+      `/markets/${firstMarket.marketHash}`,
+      `/orders?marketHash=${firstMarket.marketHash}`,
+      `/orders/odds/best?marketHash=${firstMarket.marketHash}`,
+      `/orders?marketHash=${firstMarket.marketHash}`,
+      `/orderbook/${firstMarket.marketHash}`,
+    ];
 
       for (const endpoint of endpointsToTest) {
         try {

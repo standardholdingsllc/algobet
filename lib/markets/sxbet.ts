@@ -58,10 +58,12 @@ interface SXBetFixture {
  * SX.bet API Integration
  * Documentation: https://api.docs.sx.bet/#introduction
  *
- * CURRENT STATUS: Basic market data only (API permissions needed for order data)
- * - ✅ Can fetch active markets
- * - ❌ Cannot fetch order data (needs API permission upgrade)
- * - Uses placeholder odds until proper API access is granted
+ * CURRENT STATUS: Full integration with correct endpoints
+ * - ✅ Can fetch active markets (/markets/active)
+ * - ✅ Can fetch fixtures (/fixture/active)
+ * - ✅ Can fetch order data (/orders/odds/best or /orders)
+ * - ✅ REST API is open (no API key required for REST endpoints)
+ * - ✅ Real-time odds and arbitrage opportunities enabled
  *
  * Key differences from other platforms:
  * - Sports betting focus (not prediction markets)
@@ -128,11 +130,10 @@ export class SXBetAPI {
 
   /**
    * Get active markets within expiry window
-   * Modified to work with basic market data only (no order data needed)
    */
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
     try {
-      // Get active markets (this works with current API permissions)
+      // Get active markets
       const marketsResponse = await axios.get(`${BASE_URL}/markets/active`, {
         headers: this.getHeaders(),
         params: {
@@ -140,11 +141,48 @@ export class SXBetAPI {
         },
       });
 
-      // Skip fixtures for now (API permissions issue)
-      console.warn(`[sx.bet] Skipping fixtures - API permissions needed for order data`);
+      // Get active fixtures for event details
+      let fixtures: SXBetFixture[] = [];
+      let fixtureMap = new Map<string, SXBetFixture>();
 
-      // Skip orders for now (API permissions issue)
-      console.warn(`[sx.bet] Skipping order data - API permissions needed for live odds`);
+      try {
+        const fixturesResponse = await axios.get(`${BASE_URL}/fixture/active`, {
+          headers: this.getHeaders(),
+        });
+        fixtures = fixturesResponse.data.data || [];
+        fixtureMap = new Map(fixtures.map(f => [f.sportXeventId, f]));
+        console.log(`[sx.bet] Retrieved ${fixtures.length} fixtures`);
+      } catch (fixtureError: any) {
+        console.warn(`[sx.bet] Fixtures endpoint failed (${fixtureError.response?.status}), continuing without fixture data`);
+      }
+
+      // Get best odds for order data
+      let ordersResponse: any;
+      try {
+        ordersResponse = await axios.get(`${BASE_URL}/orders/odds/best`, {
+          headers: this.getHeaders(),
+          params: {
+            baseToken: this.baseToken,
+          },
+        });
+        console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} best odds`);
+      } catch (bestOddsError: any) {
+        console.warn(`[sx.bet] Best odds endpoint failed (${bestOddsError.response?.status}), trying active orders...`);
+
+        try {
+          // Fallback to active orders endpoint
+          ordersResponse = await axios.get(`${BASE_URL}/orders`, {
+            headers: this.getHeaders(),
+            params: {
+              baseToken: this.baseToken,
+            },
+          });
+          console.log(`[sx.bet] Retrieved ${ordersResponse.data?.data?.length || 0} active orders`);
+        } catch (activeOrdersError: any) {
+          console.warn(`[sx.bet] Orders endpoint also failed (${activeOrdersError.response?.status}), cannot fetch markets without order data`);
+          return [];
+        }
+      }
 
       // The API returns { status, data: { markets, nextKey } }
       const marketsData = marketsResponse.data.data?.markets || [];
@@ -155,19 +193,50 @@ export class SXBetAPI {
       maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
 
       for (const market of marketsData) {
-        // Create a default expiry date (30 days from now) since we don't have fixture data
-        const defaultExpiryDate = new Date();
-        defaultExpiryDate.setDate(defaultExpiryDate.getDate() + 30);
+        // Get fixture details (optional)
+        const fixture = fixtureMap.get(market.sportXeventId);
 
-        // Use default/placeholder odds since we can't get real order data
-        const defaultYesOdds = 2.0; // Even money default
-        const defaultNoOdds = 2.0;
+        // Determine expiry date
+        let expiryDate: Date;
+        if (fixture && fixture.startDate) {
+          expiryDate = new Date(fixture.startDate);
+        } else {
+          // If no fixture data, skip markets without expiry info
+          console.warn(`[sx.bet] Skipping market ${market.marketHash} - no fixture data`);
+          continue;
+        }
 
-        // Create basic market title from available data
-        const title = this.createBasicMarketTitle(market);
+        // Only include markets within expiry window and not started
+        if (expiryDate > maxDate || expiryDate < new Date()) continue;
 
-        // Only include markets that haven't expired (using default date)
-        if (defaultExpiryDate > maxDate || defaultExpiryDate < new Date()) continue;
+        // Get best odds for this market
+        const marketOrders = (ordersResponse.data.data || []).filter(
+          (order: SXBetOrder) => order.marketHash === market.marketHash
+        );
+
+        if (marketOrders.length === 0) continue;
+
+        // Separate by outcome
+        const outcomeOneOrders = marketOrders.filter((o: SXBetOrder) => o.isMakerBettingOutcomeOne);
+        const outcomeTwoOrders = marketOrders.filter((o: SXBetOrder) => !o.isMakerBettingOutcomeOne);
+
+        // Get best odds (lowest maker odds = highest taker odds)
+        const bestOutcomeOne = outcomeOneOrders.sort((a: SXBetOrder, b: SXBetOrder) =>
+          Number(a.percentageOdds) - Number(b.percentageOdds)
+        )[0];
+
+        const bestOutcomeTwo = outcomeTwoOrders.sort((a: SXBetOrder, b: SXBetOrder) =>
+          Number(a.percentageOdds) - Number(b.percentageOdds)
+        )[0];
+
+        if (!bestOutcomeOne || !bestOutcomeTwo) continue;
+
+        // Convert to decimal odds (taker perspective)
+        const outcomeOneOdds = this.convertToDecimalOdds(bestOutcomeOne.percentageOdds, true);
+        const outcomeTwoOdds = this.convertToDecimalOdds(bestOutcomeTwo.percentageOdds, true);
+
+        // Create market title
+        const title = fixture ? this.createMarketTitle(market, fixture) : this.createFallbackTitle(market);
 
         markets.push({
           id: market.marketHash,
@@ -175,14 +244,13 @@ export class SXBetAPI {
           ticker: market.marketHash.substring(0, 16),
           marketType: 'sportsbook',
           title,
-          yesPrice: defaultYesOdds,
-          noPrice: defaultNoOdds,
-          expiryDate: defaultExpiryDate.toISOString(),
+          yesPrice: outcomeOneOdds,
+          noPrice: outcomeTwoOdds,
+          expiryDate: expiryDate.toISOString(),
           volume: 0,
         });
       }
 
-      console.log(`[sx.bet] Created ${markets.length} basic market entries (no live odds yet)`);
       return markets;
     } catch (error) {
       console.error('Error fetching sx.bet markets:', error);
@@ -335,8 +403,8 @@ export class SXBetAPI {
     try {
       let response;
       try {
-        // Try best-odds first
-        response = await axios.get(`${BASE_URL}/orders/best-odds`, {
+        // Try best-odds first with correct endpoint
+        response = await axios.get(`${BASE_URL}/orders/odds/best`, {
           headers: this.getHeaders(),
           params: {
             baseToken: this.baseToken,
@@ -344,8 +412,8 @@ export class SXBetAPI {
           },
         });
       } catch (bestOddsError) {
-        // Fallback to active orders
-        response = await axios.get(`${BASE_URL}/orders/active`, {
+        // Fallback to active orders with correct endpoint
+        response = await axios.get(`${BASE_URL}/orders`, {
           headers: this.getHeaders(),
           params: {
             baseToken: this.baseToken,

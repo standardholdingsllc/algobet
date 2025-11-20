@@ -86,24 +86,23 @@ async function runComprehensiveTest() {
     `${BASE_URL}/metadata`
   );
 
-  // Test 4: Fixtures (failing in logs)
+  // Test 4: Fixtures (corrected endpoint)
   const fixturesResult = await testEndpoint(
     'Fixtures',
-    `${BASE_URL}/fixtures`,
-    { status: 1 }
+    `${BASE_URL}/fixture/active`
   );
 
-  // Test 5: Best odds (failing in logs)
+  // Test 5: Best odds (corrected endpoint)
   const bestOddsResult = await testEndpoint(
     'Best Odds',
-    `${BASE_URL}/orders/best-odds`,
+    `${BASE_URL}/orders/odds/best`,
     { baseToken: BASE_TOKEN }
   );
 
-  // Test 6: Active orders (failing in logs)
+  // Test 6: Active orders (corrected endpoint)
   const activeOrdersResult = await testEndpoint(
     'Active Orders',
-    `${BASE_URL}/orders/active`,
+    `${BASE_URL}/orders`,
     { baseToken: BASE_TOKEN }
   );
 

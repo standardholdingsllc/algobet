@@ -15,20 +15,20 @@ async function testParameterVariations() {
 
   // Test different parameter combinations for orders endpoints
   const paramVariations = [
-    // Original attempts
-    { endpoint: '/orders/best-odds', params: { baseToken: BASE_TOKEN } },
-    { endpoint: '/orders/active', params: { baseToken: BASE_TOKEN } },
+    // Corrected endpoints
+    { endpoint: '/orders/odds/best', params: { baseToken: BASE_TOKEN } },
+    { endpoint: '/orders', params: { baseToken: BASE_TOKEN } },
 
     // Without baseToken
-    { endpoint: '/orders/best-odds', params: {} },
-    { endpoint: '/orders/active', params: {} },
+    { endpoint: '/orders/odds/best', params: {} },
+    { endpoint: '/orders', params: {} },
 
     // With different parameters
-    { endpoint: '/orders/best-odds', params: { status: 'active' } },
-    { endpoint: '/orders/active', params: { status: 'active' } },
+    { endpoint: '/orders/odds/best', params: { status: 'active' } },
+    { endpoint: '/orders', params: { status: 'active' } },
 
     // Try different auth headers
-    { endpoint: '/orders/best-odds', params: { baseToken: BASE_TOKEN }, auth: 'query' },
+    { endpoint: '/orders/odds/best', params: { baseToken: BASE_TOKEN }, auth: 'query' },
   ];
 
   for (const variation of paramVariations) {
