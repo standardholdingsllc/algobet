@@ -912,13 +912,11 @@ export class PolymarketAPI {
   private apiKey: string;
   private privateKey: string;
   private walletAddress: string;
-  private shouldSkipClobBalance: boolean;
 
   constructor() {
     this.apiKey = process.env.POLYMARKET_API_KEY || '';
     this.privateKey = process.env.POLYMARKET_PRIVATE_KEY || '';
     this.walletAddress = process.env.POLYMARKET_WALLET_ADDRESS || '';
-     this.shouldSkipClobBalance = false;
   }
 
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
@@ -1060,104 +1058,44 @@ export class PolymarketAPI {
     }
   }
 
-  async getAvailableBalance(): Promise<number> {
-    // Get available cash balance from CLOB API
-    if (!this.walletAddress || this.shouldSkipClobBalance) {
-      return -1;
-    }
-
-    try {
-      // CLOB API balance endpoint - get collateral balance
-      const response = await axios.get(`${BASE_URL}/balance`, {
-        params: {
-          address: this.walletAddress,
-        },
-      });
-
-      console.log('[Polymarket CLOB] Balance response:', response.data);
-
-      // Parse the collateral balance (available USDC)
-      const balance = parseFloat(response.data.collateral || response.data.balance || '0');
-      return Number.isFinite(balance) ? balance : 0;
-    } catch (error: any) {
-      const status = error.response?.status;
-      if (status === 404) {
-        if (!this.shouldSkipClobBalance) {
-          console.warn('[Polymarket CLOB] Balance endpoint responded 404. Disabling future CLOB balance checks for this process.');
-        }
-        this.shouldSkipClobBalance = true;
-      } else {
-        console.warn('[Polymarket CLOB] Balance endpoint failed:', status || error.message);
-      }
-      return -1; // Use -1 as a sentinel value for failure
-    }
-  }
-
   async getTotalBalance(): Promise<{ totalValue: number; availableCash: number; positionsValue: number }> {
     if (!this.walletAddress) {
-      console.warn('[Polymarket CLOB] ⚠️ Wallet address not configured');
+      console.warn('[Polymarket] ⚠️ Wallet address not configured');
       return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
 
     try {
-      // Primary approach: Use CLOB API for comprehensive balance data
-      console.log('[Polymarket CLOB] Fetching balance from CLOB API...');
+      const [walletBalanceRaw, positionsValueRaw] = await Promise.all([
+        this.getWalletBalance(),
+        this.getBalance(),
+      ]);
 
-      // Get available collateral (cash) balance
-      const availableCash = await this.getAvailableBalance();
+      const walletBalance =
+        typeof walletBalanceRaw === 'number' && walletBalanceRaw >= 0 ? walletBalanceRaw : 0;
+      const positionsValue =
+        typeof positionsValueRaw === 'number' && Number.isFinite(positionsValueRaw)
+          ? positionsValueRaw
+          : 0;
+      const totalValue = walletBalance + positionsValue;
 
-      if (availableCash >= 0) {
-        console.log(`[Polymarket CLOB] 💵 Available cash: $${availableCash.toFixed(2)}`);
-
-        // Get positions value from Data API as fallback (CLOB might not have this)
-        const positionsValue = await this.getBalance();
-        console.log(`[Polymarket CLOB] 📊 Positions value: $${positionsValue.toFixed(2)}`);
-
-        const totalValue = availableCash + positionsValue;
-        console.log(`[Polymarket CLOB] ✅ Total account value: $${totalValue.toFixed(2)}`);
-
-        return {
-          totalValue,
-          availableCash,
-          positionsValue
-        };
+      if (walletBalanceRaw < 0) {
+        console.warn(
+          '[Polymarket] ⚠️ Wallet balance query failed, assuming $0 available cash for this scan.'
+        );
+      } else {
+        console.log(`[Polymarket] 💵 Available cash: $${walletBalance.toFixed(2)}`);
       }
 
-      // Fallback: Use blockchain query for wallet balance
-      console.log('[Polymarket CLOB] ⚠️ CLOB API failed, trying blockchain query...');
-      const walletBalance = await this.getWalletBalance();
-
-      if (walletBalance >= 0) {
-        console.log(`[Polymarket CLOB] 💵 Wallet USDC balance: $${walletBalance.toFixed(2)}`);
-
-        const positionsValue = await this.getBalance();
-        console.log(`[Polymarket CLOB] 📊 Positions value: $${positionsValue.toFixed(2)}`);
-
-        const totalValue = walletBalance + positionsValue;
-        console.log(`[Polymarket CLOB] ✅ Total account value: $${totalValue.toFixed(2)}`);
-
-        return {
-          totalValue,
-          availableCash: walletBalance,
-          positionsValue
-        };
-      }
-
-      // Last resort: Use positions data only
-      console.log('[Polymarket CLOB] ⚠️ All balance queries failed, using positions only...');
-      const positionsValue = await this.getBalance();
-
-      console.log(`[Polymarket CLOB] 💰 Positions value: $${positionsValue.toFixed(2)}`);
-      console.log(`[Polymarket CLOB] ⚠️ Cannot determine cash balance`);
+      console.log(`[Polymarket] 📊 Positions value: $${positionsValue.toFixed(2)}`);
+      console.log(`[Polymarket] ✅ Total account value: $${totalValue.toFixed(2)}`);
 
       return {
-        totalValue: positionsValue,
-        availableCash: 0,
-        positionsValue
+        totalValue,
+        availableCash: walletBalance,
+        positionsValue,
       };
-
     } catch (error: any) {
-      console.error('[Polymarket CLOB] ❌ Error fetching total balance:', error.message);
+      console.error('[Polymarket] ❌ Error fetching total balance:', error.message);
       return { totalValue: 0, availableCash: 0, positionsValue: 0 };
     }
   }
