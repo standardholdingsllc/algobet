@@ -85,7 +85,9 @@ export class PolymarketAPI {
           response = await axios.get(endpoint.url, { params: endpoint.params });
           break; // If successful, use this response
         } catch (error) {
-          console.log(`[Polymarket CLOB] Endpoint ${endpoint.url} failed:`, error.response?.status || error.message);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const statusCode = (error as any)?.response?.status;
+          console.log(`[Polymarket CLOB] Endpoint ${endpoint.url} failed:`, statusCode || errorMessage);
         }
       }
 
