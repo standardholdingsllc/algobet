@@ -1,6 +1,11 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { Redis } from '@upstash/redis';
 import { Market } from '@/types';
+import {
+  MARKET_SNAPSHOT_KV_PREFIX,
+  MARKET_SNAPSHOT_TTL_SECONDS,
+} from './constants';
 
 const DEFAULT_SNAPSHOT_DIR = path.join(process.cwd(), 'data', 'market-snapshots');
 const TMP_FALLBACK_DIR = '/tmp/market-snapshots';
@@ -21,6 +26,14 @@ preferredDirs.push(DEFAULT_SNAPSHOT_DIR);
 let resolvedSnapshotDir: string | null = null;
 let resolvingPromise: Promise<string | null> | null = null;
 let warnedDisabled = false;
+const redisClient =
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+    ? new Redis({
+        url: process.env.KV_REST_API_URL,
+        token: process.env.KV_REST_API_TOKEN,
+      })
+    : null;
+let redisWarningEmitted = false;
 
 export interface MarketSnapshot {
   platform: Market['platform'];
@@ -77,11 +90,6 @@ async function writeSnapshot(
   markets: Market[],
   options: { maxDaysToExpiry?: number }
 ): Promise<void> {
-  const dir = await resolveSnapshotDirectory();
-  if (!dir) {
-    return;
-  }
-
   const snapshot: MarketSnapshot = {
     platform,
     fetchedAt: new Date().toISOString(),
@@ -90,15 +98,10 @@ async function writeSnapshot(
     markets,
   };
 
-  const filePath = path.join(dir, `${platform}.json`);
-  await fs.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
-
-  const relativePath = path.relative(process.cwd(), filePath);
-  console.info(
-    `[Snapshots] Wrote ${markets.length} ${platform} markets to ${relativePath}${
-      options.maxDaysToExpiry ? ` (≤ ${options.maxDaysToExpiry}d)` : ''
-    }`
-  );
+  await Promise.all([
+    writeSnapshotToDisk(platform, snapshot),
+    writeSnapshotToRedis(platform, snapshot),
+  ]);
 }
 
 export async function saveMarketSnapshots(
@@ -109,5 +112,52 @@ export async function saveMarketSnapshots(
     writeSnapshot(platform as Market['platform'], markets, options)
   );
   await Promise.all(tasks);
+}
+
+async function writeSnapshotToDisk(
+  platform: Market['platform'],
+  snapshot: MarketSnapshot
+): Promise<void> {
+  const dir = await resolveSnapshotDirectory();
+  if (!dir) {
+    return;
+  }
+
+  const filePath = path.join(dir, `${platform}.json`);
+  await fs.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
+
+  const relativePath = path.relative(process.cwd(), filePath);
+  console.info(
+    `[Snapshots] Wrote ${snapshot.totalMarkets} ${platform} markets to ${relativePath}${
+      snapshot.maxDaysToExpiry ? ` (≤ ${snapshot.maxDaysToExpiry}d)` : ''
+    }`
+  );
+}
+
+async function writeSnapshotToRedis(
+  platform: Market['platform'],
+  snapshot: MarketSnapshot
+): Promise<void> {
+  if (!redisClient) {
+    if (!redisWarningEmitted) {
+      console.warn(
+        '[Snapshots] Upstash credentials not set; skipping Redis persistence.'
+      );
+      redisWarningEmitted = true;
+    }
+    return;
+  }
+
+  try {
+    const key = `${MARKET_SNAPSHOT_KV_PREFIX}:${platform}`;
+    await redisClient.set(key, snapshot, {
+      ex: MARKET_SNAPSHOT_TTL_SECONDS,
+    });
+  } catch (error: any) {
+    console.warn(
+      '[Snapshots] Failed to persist snapshot to Upstash:',
+      error?.message || error
+    );
+  }
 }
 

@@ -16,6 +16,11 @@ export const MIN_PROFIT_THRESHOLD = 0.5; // 0.5% minimum profit after fees
 export const MARKET_SCAN_INTERVAL = 30000; // 30 seconds
 export const BALANCE_CHECK_INTERVAL = 300000; // 5 minutes
 
+// Market snapshot settings
+export const MARKET_SNAPSHOT_MAX_DAYS = 5;
+export const MARKET_SNAPSHOT_TTL_SECONDS = 300; // 5 minutes
+export const MARKET_SNAPSHOT_KV_PREFIX = 'market-snapshots';
+
 // Data file paths
 export const DATA_FILE_PATH = 'data/store.json';
 export const PROFIT_HISTORY_PATH = 'data/profit_history.json';
