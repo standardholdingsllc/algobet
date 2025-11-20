@@ -62,15 +62,24 @@ export class PolymarketAPI {
       for (const market of response.data) {
         processedCount++;
         
-        // Debug first market
-        if (processedCount === 1) {
-          console.log('[Polymarket] Sample market structure:', JSON.stringify({
+        // Debug first few markets to understand expiry dates
+        if (processedCount <= 3) {
+          const expiryDate = market.end_date_iso ? new Date(market.end_date_iso) : null;
+          const now = new Date();
+          const daysFromNow = expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : null;
+
+          console.log(`[Polymarket] Market ${processedCount}:`, {
             condition_id: market.condition_id,
             question: market.question?.substring(0, 50),
             end_date_iso: market.end_date_iso,
-            tokens_count: market.tokens?.length,
-            tokens: market.tokens,
-          }, null, 2));
+            expiry_parsed: expiryDate?.toISOString(),
+            days_from_now: daysFromNow?.toFixed(1),
+            is_expired: expiryDate && expiryDate < now,
+            is_too_far: expiryDate && expiryDate > maxDate,
+            active: market.active,
+            closed: market.closed,
+            available_fields: Object.keys(market),
+          });
         }
         
         if (!market.end_date_iso) {
@@ -80,9 +89,15 @@ export class PolymarketAPI {
         
         const expiryDate = new Date(market.end_date_iso);
         const now = new Date();
-        
+
         // Skip if market has expired OR is too far in the future
         if (expiryDate < now || expiryDate > maxDate) {
+          skippedExpired++;
+          continue;
+        }
+
+        // Additional check: skip if market has an 'active' field and it's false
+        if (market.active === false || market.active === 'false') {
           skippedExpired++;
           continue;
         }
