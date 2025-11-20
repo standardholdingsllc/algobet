@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ethers } from 'ethers';
+import { ethers, parseUnits, BigNumber } from 'ethers';
 import { Market } from '@/types';
 
 const BASE_URL = 'https://clob.polymarket.com';
@@ -454,21 +454,21 @@ export class PolymarketAPI {
       // For limit orders, we need to calculate maker and taker amounts
       // makerAmount = size in outcome tokens
       // takerAmount = size * price in collateral (USDC)
-      const makerAmount = ethers.utils.parseUnits(size.toString(), 6); // USDC has 6 decimals
-      const takerAmount = ethers.utils.parseUnits((size * priceDecimal).toFixed(6), 6);
+      const makerAmount = parseUnits(size.toString(), 6); // USDC has 6 decimals
+      const takerAmount = parseUnits((size * priceDecimal).toFixed(6), 6);
 
       // Create order data for EIP712 signing
       const orderData = {
-        salt: ethers.BigNumber.from(Date.now()), // Use timestamp as salt
+        salt: BigNumber.from(Date.now()), // Use timestamp as salt
         maker: this.walletAddress,
         signer: this.walletAddress,
-        taker: ethers.constants.AddressZero, // Allow any taker
-        tokenId: ethers.BigNumber.from(tokenId),
+        taker: ethers.ZeroAddress, // Allow any taker
+        tokenId: BigNumber.from(tokenId),
         makerAmount,
         takerAmount,
-        expiration: ethers.BigNumber.from(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiry
-        nonce: ethers.BigNumber.from(0), // Can be incremented for multiple orders
-        feeRateBps: ethers.BigNumber.from(0), // 0 bps fee for current CLOB
+        expiration: BigNumber.from(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiry
+        nonce: BigNumber.from(0), // Can be incremented for multiple orders
+        feeRateBps: BigNumber.from(0), // 0 bps fee for current CLOB
         side: side === 'yes' ? 0 : 1, // 0 = BUY, 1 = SELL
         signatureType: 0, // EIP712
       };
