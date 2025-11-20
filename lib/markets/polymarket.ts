@@ -140,9 +140,9 @@ export class PolymarketAPI {
         // Create market with outcome prices (new API structure)
         const marketData = {
           id: market.conditionId || market.id,
-          platform: 'polymarket',
+          platform: 'polymarket' as const,
           ticker: market.conditionId || market.id,
-          marketType: 'prediction',
+          marketType: 'prediction' as const,
           title: market.question,
           yesPrice,
           noPrice,
