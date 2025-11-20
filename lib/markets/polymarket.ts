@@ -290,6 +290,11 @@ const DATA_API_URL = "https://data-api.polymarket.com";
 const MARKET_CACHE_TTL_MS = 30_000; // 30 seconds cache window to keep scans fast
 const GAMMA_PAGE_LIMIT = 500;
 const GAMMA_MAX_PAGES = 6; // 3k markets max per refresh
+const GAMMA_QUERY_FILTERS: Record<string, string> = {
+  active: "true",
+  closed: "false",
+  archived: "false",
+};
 const CLOB_MAX_PAGES = 8; // stop early to avoid 60+ page sweeps
 const CLOB_MAX_TRADABLE = 400;
 const CLOB_MAX_INACTIVE_PAGES = 3;
@@ -508,8 +513,15 @@ async function fetchGammaMarkets(
     const url = new URL("/markets", GAMMA_BASE_URL);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
+    Object.entries(GAMMA_QUERY_FILTERS).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
 
-    console.info("[Polymarket Gamma] Fetching /markets page", { limit, offset });
+    console.info("[Polymarket Gamma] Fetching /markets page", {
+      limit,
+      offset,
+      filters: GAMMA_QUERY_FILTERS,
+    });
     const res = await fetch(url.toString());
     if (!res.ok) {
       throw new Error(
@@ -531,7 +543,7 @@ async function fetchGammaMarkets(
   console.info(
     `[Polymarket Gamma] Retrieved ${all.length} markets from ${Math.ceil(
       all.length / limit || 1
-    )} page(s).`
+    )} page(s) with filters ${JSON.stringify(GAMMA_QUERY_FILTERS)}.`
   );
   return all;
 }
