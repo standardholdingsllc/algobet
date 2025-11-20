@@ -69,25 +69,27 @@ export class PolymarketAPI {
           const daysFromNow = expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : null;
 
           console.log(`[Polymarket] Market ${processedCount}:`, {
-            condition_id: market.condition_id,
+            conditionId: market.conditionId,
             question: market.question?.substring(0, 50),
-            end_date_iso: market.end_date_iso,
+            endDateIso: market.endDateIso,
             expiry_parsed: expiryDate?.toISOString(),
             days_from_now: daysFromNow?.toFixed(1),
             is_expired: expiryDate && expiryDate < now,
             is_too_far: expiryDate && expiryDate > maxDate,
             active: market.active,
             closed: market.closed,
+            outcomes: market.outcomes,
+            outcomePrices: market.outcomePrices,
             available_fields: Object.keys(market),
           });
         }
         
-        if (!market.end_date_iso) {
+        if (!market.endDateIso) {
           skippedExpired++;
           continue;
         }
-        
-        const expiryDate = new Date(market.end_date_iso);
+
+        const expiryDate = new Date(market.endDateIso);
         const now = new Date();
 
         // Skip if market has expired OR is too far in the future
@@ -102,83 +104,31 @@ export class PolymarketAPI {
           continue;
         }
         
-        if (!market.tokens || market.tokens.length !== 2) {
+        if (!market.outcomes || market.outcomes.length !== 2 || !market.outcomePrices || market.outcomePrices.length !== 2) {
           skippedNonBinary++;
           continue;
         }
-        
-        // Binary markets only - check for Yes/No tokens
-        const yesToken = market.tokens.find((t: any) => 
-          t.outcome === 'Yes' || t.outcome === 'YES' || t.outcome === 'yes'
-        );
-        const noToken = market.tokens.find((t: any) => 
-          t.outcome === 'No' || t.outcome === 'NO' || t.outcome === 'no'
-        );
 
-        if (!yesToken || !noToken) {
-          // Try alternative approach - assume first token is Yes, second is No
-          if (market.tokens.length === 2) {
-            const token0 = market.tokens[0];
-            const token1 = market.tokens[1];
-            
-            if (token0.price && token1.price && token0.token_id && token1.token_id) {
-              const yesPrice = parseFloat(token0.price) * 100;
-              const noPrice = parseFloat(token1.price) * 100;
+        // Binary markets - outcomes and prices are in separate arrays
+        const outcomes = market.outcomes;
+        const prices = market.outcomePrices;
 
-              markets.push({
-                id: market.condition_id,
-                platform: 'polymarket',
-                ticker: market.condition_id,
-                marketType: 'prediction',
-                title: market.question,
-                yesPrice,
-                noPrice,
-                expiryDate: expiryDate.toISOString(),
-                volume: parseFloat(market.volume || '0'),
-              });
-              continue;
-            }
-          }
-          
-          skippedMissingTokens++;
-          continue;
-        }
+        // Assume first outcome is "Yes" and second is "No" (common pattern)
+        const yesPrice = parseFloat(prices[0]) * 100;
+        const noPrice = parseFloat(prices[1]) * 100;
 
-        // Get orderbook for better pricing (optional, fall back to token price)
-        try {
-          const orderbook = await this.getOrderbook(yesToken.token_id);
-          
-          const yesPrice = orderbook.bestBid ? parseFloat(orderbook.bestBid) * 100 : parseFloat(yesToken.price) * 100;
-          const noPrice = orderbook.bestAsk ? (1 - parseFloat(orderbook.bestAsk)) * 100 : parseFloat(noToken.price) * 100;
-
-          markets.push({
-            id: market.condition_id,
-            platform: 'polymarket',
-            ticker: market.condition_id,
-            marketType: 'prediction',
-            title: market.question,
-            yesPrice,
-            noPrice,
-            expiryDate: expiryDate.toISOString(),
-            volume: parseFloat(market.volume || '0'),
-          });
-        } catch (orderbookError) {
-          // Fallback to token prices if orderbook fails
-          const yesPrice = parseFloat(yesToken.price) * 100;
-          const noPrice = parseFloat(noToken.price) * 100;
-
-          markets.push({
-            id: market.condition_id,
-            platform: 'polymarket',
-            ticker: market.condition_id,
-            marketType: 'prediction',
-            title: market.question,
-            yesPrice,
-            noPrice,
-            expiryDate: expiryDate.toISOString(),
-            volume: parseFloat(market.volume || '0'),
-          });
-        }
+        // Create market with outcome prices (new API structure)
+        markets.push({
+          id: market.conditionId || market.id,
+          platform: 'polymarket',
+          ticker: market.conditionId || market.id,
+          marketType: 'prediction',
+          title: market.question,
+          yesPrice,
+          noPrice,
+          expiryDate: expiryDate.toISOString(),
+          volume: parseFloat(market.volume || '0'),
+        });
       }
 
       console.log(`[Polymarket] Processed ${processedCount} markets:`);
