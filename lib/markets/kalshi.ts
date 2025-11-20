@@ -4,6 +4,9 @@ import { Market } from '@/types';
 
 const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';
+const KALSHI_PAGE_LIMIT = 200;
+const KALSHI_MAX_PAGES = 8;
+const KALSHI_TARGET_MARKETS = 150;
 
 interface KalshiMarket {
   ticker: string;
@@ -24,6 +27,14 @@ interface KalshiOrderbookEntry {
 interface KalshiOrderbook {
   yes: [number, number][];
   no: [number, number][];
+}
+
+interface KalshiMarketsResponse {
+  markets: KalshiMarket[];
+  meta?: {
+    next_cursor?: string;
+  };
+  next_cursor?: string;
 }
 
 export class KalshiAPI {
@@ -202,32 +213,37 @@ export class KalshiAPI {
   }
 
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
+    const now = new Date();
+    const maxDate = new Date(now);
+    maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
+
     try {
-      const response = await axios.get(`${BASE_URL}/markets`, {
-        params: {
-          status: 'open',
-          limit: 200,
-        },
-      });
-
       const markets: Market[] = [];
-      const maxDate = new Date();
-      maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
+      let cursor: string | undefined;
+      let page = 0;
 
-      for (const market of response.data.markets) {
-        const expiryDate = new Date(market.close_time);
-        
-        if (expiryDate <= maxDate) {
-          // Use market prices directly to avoid rate limits
-          // Orderbook fetching would require 200+ requests and exceed Basic tier (20/sec)
+      while (page < KALSHI_MAX_PAGES) {
+        const { entries, nextCursor } = await this.fetchMarketsPage(cursor);
+        page += 1;
+
+        if (!entries.length) {
+          console.info(`[Kalshi] Markets page ${page} returned 0 entries; stopping pagination.`);
+          break;
+        }
+
+        for (const market of entries) {
+          const expiryDate = new Date(market.close_time);
+          if (
+            Number.isNaN(expiryDate.getTime()) ||
+            expiryDate > maxDate ||
+            expiryDate < now
+          ) {
+            continue;
+          }
+
           const yesPrice = market.yes_price;
           const noPrice = market.no_price;
-          
-          // Calculate actual fee percentage for this market and price
-          // Store the midpoint fee for display (actual fee varies by side)
-          const avgPrice = (yesPrice + noPrice) / 2;
-          const feePercentage = this.getFeePercentage(market.ticker, avgPrice);
-          
+
           markets.push({
             id: market.ticker,
             platform: 'kalshi',
@@ -240,6 +256,29 @@ export class KalshiAPI {
             volume: market.volume,
           });
         }
+
+        console.info(
+          `[Kalshi] Processed page ${page} (${entries.length} raw, ${markets.length} total tradable so far).`
+        );
+
+        if (!nextCursor) {
+          break;
+        }
+
+        if (markets.length >= KALSHI_TARGET_MARKETS) {
+          console.info(
+            `[Kalshi] Reached target tradable market count (${markets.length}); stopping pagination early.`
+          );
+          break;
+        }
+
+        cursor = nextCursor;
+      }
+
+      if (markets.length === 0) {
+        console.warn(
+          `[Kalshi] No markets matched the expiry filter (<= ${maxDaysToExpiry}d) across ${page} page(s).`
+        );
       }
 
       return markets;
@@ -247,6 +286,31 @@ export class KalshiAPI {
       console.error('Error fetching Kalshi markets:', error.response?.status || error.message);
       return [];
     }
+  }
+
+  private async fetchMarketsPage(
+    cursor?: string
+  ): Promise<{ entries: KalshiMarket[]; nextCursor?: string }> {
+    const params: Record<string, string | number> = {
+      status: 'open',
+      limit: KALSHI_PAGE_LIMIT,
+    };
+
+    if (cursor) {
+      params.cursor = cursor;
+    }
+
+    const response = await axios.get<KalshiMarketsResponse>(`${BASE_URL}/markets`, {
+      params,
+    });
+
+    const nextCursor =
+      response.data.meta?.next_cursor ?? response.data.next_cursor ?? undefined;
+
+    return {
+      entries: response.data.markets ?? [],
+      nextCursor,
+    };
   }
 
   async getOrderbook(ticker: string): Promise<{ bestYesPrice: number; bestNoPrice: number }> {
