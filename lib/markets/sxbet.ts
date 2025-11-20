@@ -212,8 +212,9 @@ export class SXBetAPI {
               baseToken: this.baseToken,
             },
           });
-          fallbackOrders = response.data?.data || [];
-          console.log(`[sx.bet] Retrieved ${fallbackOrders.length} active orders (fallback)`);
+          const orders: SXBetOrder[] = response.data?.data || [];
+          fallbackOrders = orders;
+          console.log(`[sx.bet] Retrieved ${orders.length} active orders (fallback)`);
         } catch (error: any) {
           console.warn(
             `[sx.bet] Orders endpoint failed (${error.response?.status}) - no fallback order data available`
