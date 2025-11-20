@@ -474,7 +474,7 @@ export class PolymarketAPI {
       };
 
       // Sign the order using EIP712
-      const signature = await wallet._signTypedData(EIP712_DOMAIN, EIP712_TYPES, orderData);
+      const signature = await wallet.signTypedData(EIP712_DOMAIN, EIP712_TYPES, orderData);
 
       // Create the signed order payload
       const signedOrder = {
