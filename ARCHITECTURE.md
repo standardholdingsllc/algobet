@@ -45,14 +45,15 @@ All integrations return the shared `Market` interface so that `lib/arbitrage.ts`
 ### Shared flow
 1. Load `BotConfig` + balances from KV (bot) or GitHub storage (worker).
 2. Fetch Kalshi, Polymarket, and SX.bet markets in parallel.
-3. Update `HotMarketTracker` and remove expired entries.
-4. Generate arbitrage candidates via `lib/arbitrage.ts`:
+3. Persist every tradable market that met the scan criteria into JSON snapshots under `data/market-snapshots/` (one file per platform) so manual diffing and downstream tooling can inspect the full feed without re-hitting upstream APIs.
+4. Update `HotMarketTracker` and remove expired entries.
+5. Generate arbitrage candidates via `lib/arbitrage.ts`:
    - Tracked market combinations first.
    - General cross-platform scan second.
    - Dedupe using opportunity IDs.
-5. Size trades with `calculateBetSizes`, respecting per-platform available cash and `maxBetPercentage`.
-6. Execute up to five top-ranked opportunities unless `simulationMode` is enabled.
-7. Log opportunities, update storage, and feed scan metrics into `lib/adaptive-scanner.ts` to pick the next interval (5s–60s).
+6. Size trades with `calculateBetSizes`, respecting per-platform available cash and `maxBetPercentage`.
+7. Execute up to five top-ranked opportunities unless `simulationMode` is enabled.
+8. Log opportunities, update storage, and feed scan metrics into `lib/adaptive-scanner.ts` to pick the next interval (5s–60s).
 
 ### Concurrency guarantees
 - `lib/bot.ts` guards every scan with an `isScanning` flag so overlapping cron events do not run simultaneously.
@@ -67,6 +68,7 @@ All integrations return the shared `Market` interface so that `lib/arbitrage.ts`
 | **Vercel KV** | `lib/kv-storage.ts` | Balances, configuration, opportunity logs, daily stats. Backed by Upstash Redis. |
 | **GitHub storage** | `lib/github-storage.ts` | Worker-friendly JSON snapshot of opportunities/bets committed back to the repo. |
 | **Local JSON** | `data/storage.json`, `data/bot-status.json` | Dev defaults when remote stores are unavailable. |
+| **Market snapshots** | `data/market-snapshots/*.json` | Latest fetched markets per platform (≤ configured expiry) for debugging, manual comparisons, and faster offline analysis. |
 
 Key types live in `types/index.ts` (e.g., `Market`, `ArbitrageOpportunity`, `BotConfig`).
 

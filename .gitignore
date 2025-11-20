@@ -39,3 +39,4 @@ next-env.d.ts
 logs.txt
 logs_result.json
 *.log
+data/market-snapshots/

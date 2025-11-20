@@ -5,6 +5,7 @@ import { findArbitrageOpportunities, calculateBetSizes, validateOpportunity } fr
 import { AdaptiveScanner, detectLiveEvents } from './adaptive-scanner';
 import { HotMarketTracker } from './hot-market-tracker';
 import { KVStorage } from './kv-storage';
+import { saveMarketSnapshots } from './market-snapshots';
 import { sendBalanceAlert } from './email';
 import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -159,6 +160,22 @@ export class ArbitrageBotEngine {
       this.polymarket.getOpenMarkets(30),
       this.sxbet.getOpenMarkets(30),
     ]);
+
+    try {
+      await saveMarketSnapshots(
+        {
+          kalshi: kalshiMarkets,
+          polymarket: polymarketMarkets,
+          sxbet: sxbetMarkets,
+        },
+        { maxDaysToExpiry: config.maxDaysToExpiry }
+      );
+    } catch (snapshotError: any) {
+      console.warn(
+        '[Snapshots] Failed to persist market snapshots:',
+        snapshotError?.message || snapshotError
+      );
+    }
 
     console.log(
       `Found ${kalshiMarkets.length} Kalshi, ${polymarketMarkets.length} Polymarket, ` +
