@@ -310,42 +310,60 @@ function normalizeIso(value?: string | null): string | null {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Fetch ALL CLOB markets using documented pagination.
+ * Fetch ALL CLOB markets using documented pagination with optimized sequential requests.
  *
  *   GET /markets?next_cursor=<cursor>
  *
  * - next_cursor: "" → start
  * - final page often has next_cursor "LTE="
+ * - Uses sequential requests with minimal delay for better performance
  */
 async function fetchAllClobMarkets(): Promise<ClobMarket[]> {
   const all: ClobMarket[] = [];
   let cursor = "";
+  const requestDelay = 100; // 100ms delay between requests (reduced from sequential)
+
   while (true) {
     const url = new URL("/markets", CLOB_BASE_URL);
     if (cursor) {
       url.searchParams.set("next_cursor", cursor);
     }
+
+    const startTime = Date.now();
     console.info(
       "[Polymarket CLOB] Fetching /markets page",
       cursor ? `next_cursor=${cursor}` : "(first page)"
     );
+
     const res = await fetch(url.toString());
     if (!res.ok) {
       throw new Error(
         `[Polymarket CLOB] HTTP ${res.status} fetching markets: ${res.statusText}`
       );
     }
+
     const body = (await res.json()) as ClobMarketsResponse;
     if (!Array.isArray(body.data)) {
       throw new Error("[Polymarket CLOB] Unexpected response shape from /markets");
     }
+
     all.push(...body.data);
+    const fetchTime = Date.now() - startTime;
+    console.info(`[Polymarket CLOB] Page fetched in ${fetchTime}ms, ${body.data.length} markets`);
+
     // End of pagination: per docs, "LTE=" marks terminal cursor.
     if (!body.next_cursor || body.next_cursor === "LTE=") {
       break;
     }
+
     cursor = body.next_cursor;
+
+    // Minimal rate limiting delay between requests
+    if (cursor) {
+      await new Promise(resolve => setTimeout(resolve, requestDelay));
+    }
   }
+
   console.info(
     `[Polymarket CLOB] Retrieved ${all.length} markets from CLOB (unfiltered).`
   );

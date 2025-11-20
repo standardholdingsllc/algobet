@@ -1,7 +1,14 @@
 import axios from 'axios';
+import { ethers } from 'ethers';
 import { Market } from '@/types';
 
 const BASE_URL = 'https://api.sx.bet';
+
+// ERC20 ABI for balance queries
+const erc20ABI = [
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
 
 interface SXBetMarket {
   marketHash: string;
@@ -133,8 +140,6 @@ export class SXBetAPI {
         },
       });
 
-      console.log(`[sx.bet] Retrieved ${marketsResponse.data.data?.length || 0} active markets`);
-
       // Skip fixtures for now (API permissions issue)
       console.warn(`[sx.bet] Skipping fixtures - API permissions needed for order data`);
 
@@ -260,13 +265,22 @@ export class SXBetAPI {
       // sx.bet doesn't provide a direct balance endpoint in their API
       // You would need to query the SX Network blockchain directly
 
-      // TODO: Implement Web3 query to SX Network for USDC balance
-      // const provider = new ethers.providers.JsonRpcProvider('https://rpc.sx-rollup.gelato.digital');
-      // const usdcContract = new ethers.Contract(this.baseToken, erc20ABI, provider);
-      // const balance = await usdcContract.balanceOf(this.walletAddress);
-      // return Number(balance) / 1e6; // USDC has 6 decimals
+      // Query USDC balance on SX Network via Web3
+      // Note: This requires the wallet to have proper permissions on SX Network
+      if (this.walletAddress && this.privateKey) {
+        try {
+          const provider = new ethers.JsonRpcProvider('https://rpc.sx-rollup.gelato.digital');
+          const wallet = new ethers.Wallet(this.privateKey, provider);
+          const usdcContract = new ethers.Contract(this.baseToken, erc20ABI, provider);
+          const balance = await usdcContract.balanceOf(this.walletAddress);
+          return Number(balance) / 1e6; // USDC has 6 decimals
+        } catch (web3Error) {
+          console.warn('sx.bet Web3 balance query failed (may need elevated permissions):', web3Error.message);
+          return 0;
+        }
+      }
 
-      console.warn('sx.bet balance check requires Web3 integration - wallet configured but Web3 not implemented');
+      console.warn('sx.bet wallet not configured for Web3 balance checking');
       return 0;
     } catch (error) {
       console.error('Error fetching sx.bet balance:', error);

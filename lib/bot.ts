@@ -16,6 +16,7 @@ export class ArbitrageBotEngine {
   private scanner: AdaptiveScanner;
   private hotMarketTracker: HotMarketTracker;
   private isRunning: boolean = false;
+  private isScanning: boolean = false;
 
   constructor() {
     this.kalshi = new KalshiAPI();
@@ -42,7 +43,17 @@ export class ArbitrageBotEngine {
     // Run the main loop with adaptive scanning
     while (this.isRunning) {
       try {
-        await this.scanAndExecute();
+        // Prevent concurrent scans even in the main loop
+        if (!this.isScanning) {
+          this.isScanning = true;
+          try {
+            await this.scanAndExecute();
+          } finally {
+            this.isScanning = false;
+          }
+        } else {
+          console.log('[Bot] Previous scan still running, waiting...');
+        }
       } catch (error) {
         console.error('Error in bot loop:', error);
       }
@@ -65,7 +76,18 @@ export class ArbitrageBotEngine {
    * This method runs once and exits, perfect for serverless
    */
   async scanOnce(): Promise<void> {
-    await this.scanAndExecute();
+    // Prevent concurrent scans
+    if (this.isScanning) {
+      console.log('[Bot] Scan already in progress, skipping...');
+      return;
+    }
+
+    this.isScanning = true;
+    try {
+      await this.scanAndExecute();
+    } finally {
+      this.isScanning = false;
+    }
   }
 
   private async scanAndExecute(): Promise<void> {
