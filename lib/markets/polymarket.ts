@@ -167,8 +167,8 @@ export class PolymarketAPI {
 
       // Log expiry date range summary
       const now = new Date();
-      const maxDate = new Date(now.getTime() + maxDaysToExpiry * 24 * 60 * 60 * 1000);
-      console.log(`[Polymarket] Processing window: ${now.toISOString()} to ${maxDate.toISOString()} (${maxDaysToExpiry} days)`);
+      const maxExpiryDate = new Date(now.getTime() + maxDaysToExpiry * 24 * 60 * 60 * 1000);
+      console.log(`[Polymarket] Processing window: ${now.toISOString()} to ${maxExpiryDate.toISOString()} (${maxDaysToExpiry} days)`);
 
       console.log(`[Polymarket] Processed ${processedCount} markets:`);
       console.log(`  - Added: ${markets.length}`);
