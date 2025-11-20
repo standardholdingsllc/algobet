@@ -39,28 +39,47 @@ export class PolymarketAPI {
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
     try {
       console.log('[Polymarket] Fetching markets from Gamma API...');
-      // Try different approaches to get sports markets
+      // Try different approaches to get current live markets (not historical)
       let response;
 
       try {
-        // First try: Get markets without restrictive filters
+        // Attempt 1: Filter by recently created markets (last 90 days)
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        const createdSince = ninetyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD format
+
         response = await axios.get(`${GAMMA_URL}/markets`, {
           params: {
-            limit: 500, // Increase limit significantly
-            // Remove closed/active filters to get everything
-          },
-        });
-        console.log(`[Polymarket] Attempt 1 - No filters: ${response.data?.length || 0} markets`);
-      } catch (error) {
-        console.warn('[Polymarket] Attempt 1 failed, trying with active filter:', error instanceof Error ? error.message : String(error));
-        // Fallback: Try with active filter
-        response = await axios.get(`${GAMMA_URL}/markets`, {
-          params: {
-            active: true,
             limit: 500,
+            // Try filtering by creation date to get recent markets
+            created_after: createdSince, // Might not be supported, but let's try
           },
         });
-        console.log(`[Polymarket] Attempt 2 - Active filter: ${response.data?.length || 0} markets`);
+        console.log(`[Polymarket] Attempt 1 - Recent markets (${createdSince}): ${response.data?.length || 0} markets`);
+      } catch (error) {
+        console.warn('[Polymarket] Attempt 1 failed, trying different approach:', error instanceof Error ? error.message : String(error));
+
+        try {
+          // Attempt 2: Try with active=true and no closed filter
+          response = await axios.get(`${GAMMA_URL}/markets`, {
+            params: {
+              active: true,
+              limit: 500,
+              // Don't include closed=false to avoid filtering out open markets
+            },
+          });
+          console.log(`[Polymarket] Attempt 2 - Active only: ${response.data?.length || 0} markets`);
+        } catch (error2) {
+          console.warn('[Polymarket] Attempt 2 failed, trying basic call:', error2 instanceof Error ? error2.message : String(error2));
+
+          // Attempt 3: Basic call with just limit
+          response = await axios.get(`${GAMMA_URL}/markets`, {
+            params: {
+              limit: 500,
+            },
+          });
+          console.log(`[Polymarket] Attempt 3 - Basic call: ${response.data?.length || 0} markets`);
+        }
       }
 
       console.log(`[Polymarket] API Response: ${response.data?.length || 0} markets received`);
@@ -80,6 +99,8 @@ export class PolymarketAPI {
       let skippedMissingTokens = 0;
       let sportsMarketsFound = 0;
       let predictionMarketsFound = 0;
+      let recentMarketsFound = 0;
+      let oldMarketsFound = 0;
 
       for (const market of response.data) {
         processedCount++;
@@ -133,8 +154,20 @@ export class PolymarketAPI {
         const expiryDate = new Date(market.endDateIso + 'T23:59:59Z');
         const now = new Date();
 
-        // Skip if market has expired OR is too far in the future
-        if (expiryDate < now || expiryDate > maxDate) {
+        // Check if market is recently created (within last 90 days)
+        const createdAt = market.createdAt ? new Date(market.createdAt) : null;
+        const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        const isRecent = createdAt && createdAt > ninetyDaysAgo;
+
+        // Count recent vs old markets
+        if (isRecent) {
+          recentMarketsFound++;
+        } else {
+          oldMarketsFound++;
+        }
+
+        // Skip if market has expired OR is too far in the future OR is old (created >90 days ago)
+        if (expiryDate < now || expiryDate > maxDate || !isRecent) {
           // Log details about skipped markets for better debugging
           // Focus on markets that might be sports-related or near-term
           const isSportsRelated = market.question?.toLowerCase().includes('match') ||
@@ -147,10 +180,12 @@ export class PolymarketAPI {
             console.log(`[Polymarket] Skipping market ${processedCount} (${isSportsRelated ? 'SPORTS' : 'OTHER'}):`, {
               question: market.question?.substring(0, 60),
               expiry: expiryDate?.toISOString(),
+              created: createdAt?.toISOString(),
               days_from_now: expiryDate ? (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : 'N/A',
               is_expired: expiryDate < now,
               is_too_far: expiryDate > maxDate,
-              reason: expiryDate < now ? 'EXPIRED' : 'TOO_FAR'
+              is_old: !isRecent,
+              reason: expiryDate < now ? 'EXPIRED' : (expiryDate > maxDate ? 'TOO_FAR' : (!isRecent ? 'TOO_OLD' : 'UNKNOWN'))
             });
           }
           skippedExpired++;
@@ -218,10 +253,12 @@ export class PolymarketAPI {
       const maxExpiryDate = new Date(now.getTime() + maxDaysToExpiry * 24 * 60 * 60 * 1000);
       console.log(`[Polymarket] Processing window: ${now.toISOString()} to ${maxExpiryDate.toISOString()} (${maxDaysToExpiry} days)`);
 
-      console.log(`[Polymarket] Market type breakdown:`);
+      console.log(`[Polymarket] Market analysis:`);
       console.log(`  - Total markets found: ${processedCount}`);
       console.log(`  - Sports-related markets: ${sportsMarketsFound}`);
       console.log(`  - Prediction/other markets: ${predictionMarketsFound}`);
+      console.log(`  - Recently created (≤90 days): ${recentMarketsFound}`);
+      console.log(`  - Old markets (>90 days): ${oldMarketsFound}`);
 
       console.log(`[Polymarket] Processing results:`);
       console.log(`  - Added: ${markets.length}`);
