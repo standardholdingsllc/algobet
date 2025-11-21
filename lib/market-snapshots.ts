@@ -37,11 +37,34 @@ const redisClient =
 let redisWarningEmitted = false;
 const diskReadCache = new Map<MarketPlatform, MarketSnapshot>();
 
+export type SnapshotDiagnosticState =
+  | 'missing'
+  | 'invalid'
+  | 'stale'
+  | 'error'
+  | 'disabled';
+
+export interface SnapshotDiagnostic {
+  state: SnapshotDiagnosticState;
+  reason: string;
+}
+
+export interface SnapshotLoadDiagnostics {
+  redis?: SnapshotDiagnostic;
+  disk?: SnapshotDiagnostic;
+}
+
+interface SnapshotReadResult {
+  snapshot: MarketSnapshot | null;
+  diagnostic?: SnapshotDiagnostic;
+}
+
 export type SnapshotSource = 'redis' | 'disk';
 
 export interface LoadedSnapshot {
   snapshot: MarketSnapshot | null;
   source?: SnapshotSource;
+  diagnostics?: SnapshotLoadDiagnostics;
 }
 
 interface SnapshotWriteOptions {
@@ -102,11 +125,15 @@ async function resolveSnapshotDirectory(): Promise<string | null> {
   return dir;
 }
 
+export async function getSnapshotDirectory(): Promise<string | null> {
+  return resolveSnapshotDirectory();
+}
+
 async function writeSnapshot(
   platform: MarketPlatform,
   markets: Market[],
   options: SnapshotWriteOptions = {}
-): Promise<void> {
+): Promise<MarketSnapshot> {
   const snapshot: MarketSnapshot = {
     schemaVersion: options.schemaVersion ?? MARKET_SNAPSHOT_SCHEMA_VERSION,
     platform,
@@ -131,6 +158,7 @@ async function writeSnapshot(
     writeSnapshotToDisk(platform, snapshot),
     writeSnapshotToRedis(platform, snapshot),
   ]);
+  return snapshot;
 }
 
 export async function saveMarketSnapshots(
@@ -140,19 +168,21 @@ export async function saveMarketSnapshots(
     filters?: MarketFilterInput;
     perPlatformOptions?: Partial<Record<MarketPlatform, SnapshotWriteOptions>>;
   } = {}
-): Promise<void> {
-  const tasks = Object.entries(platformMarkets).map(([platform, markets]) => {
+): Promise<Record<MarketPlatform, MarketSnapshot>> {
+  const tasks = Object.entries(platformMarkets).map(async ([platform, markets]) => {
     const platformKey = platform as MarketPlatform;
     const platformOverride = options.perPlatformOptions?.[platformKey] ?? {};
-    return writeSnapshot(platformKey, markets, {
+    const snapshot = await writeSnapshot(platformKey, markets, {
       maxDaysToExpiry:
         platformOverride.maxDaysToExpiry ?? options.maxDaysToExpiry,
       filters: platformOverride.filters ?? options.filters,
       adapterId: platformOverride.adapterId,
       schemaVersion: platformOverride.schemaVersion,
     });
+    return [platformKey, snapshot] as const;
   });
-  await Promise.all(tasks);
+  const entries = await Promise.all(tasks);
+  return Object.fromEntries(entries) as Record<MarketPlatform, MarketSnapshot>;
 }
 
 async function writeSnapshotToDisk(
@@ -209,102 +239,168 @@ async function writeSnapshotToRedis(
 
 async function readSnapshotFromRedis(
   platform: MarketPlatform
-): Promise<MarketSnapshot | null> {
+): Promise<SnapshotReadResult> {
   if (!redisClient) {
-    return null;
+    return {
+      snapshot: null,
+      diagnostic: {
+        state: 'disabled',
+        reason: 'Upstash credentials not configured',
+      },
+    };
   }
 
   try {
     const key = getSnapshotRedisKey(platform);
     const snapshot = await redisClient.get<MarketSnapshot>(key);
     if (!snapshot) {
-      return null;
+      return {
+        snapshot: null,
+        diagnostic: {
+          state: 'missing',
+          reason: `No Redis snapshot stored for key ${key}`,
+        },
+      };
     }
 
     const validation = validateMarketSnapshot(snapshot);
     if (!validation.valid) {
-      console.warn(
-        `[Snapshots] Invalid Redis snapshot for ${platform}: ${validation.errors.join(
-          '; '
-        )}`
-      );
-      return null;
+      return {
+        snapshot: null,
+        diagnostic: {
+          state: 'invalid',
+          reason: validation.errors.join('; '),
+        },
+      };
     }
 
-    return snapshot;
+    return { snapshot };
   } catch (error: any) {
-    console.warn(
-      `[Snapshots] Failed to read ${platform} snapshot from Upstash:`,
-      error?.message || error
-    );
-    return null;
+    return {
+      snapshot: null,
+      diagnostic: {
+        state: 'error',
+        reason: error?.message || String(error),
+      },
+    };
   }
 }
 
 async function readSnapshotFromDisk(
   platform: MarketPlatform
-): Promise<MarketSnapshot | null> {
+): Promise<SnapshotReadResult> {
   const dir = await resolveSnapshotDirectory();
   if (!dir) {
-    return null;
+    return {
+      snapshot: null,
+      diagnostic: {
+        state: 'disabled',
+        reason: 'No writable snapshot directory configured',
+      },
+    };
   }
 
   const filePath = path.join(dir, `${platform}.json`);
   try {
     if (diskReadCache.has(platform)) {
-      return diskReadCache.get(platform)!;
+      return { snapshot: diskReadCache.get(platform)! };
     }
 
     const raw = await fs.readFile(filePath, 'utf-8');
     const snapshot = JSON.parse(raw) as MarketSnapshot;
     const validation = validateMarketSnapshot(snapshot);
     if (!validation.valid) {
-      console.warn(
-        `[Snapshots] Invalid disk snapshot for ${platform}: ${validation.errors.join(
-          '; '
-        )}`
-      );
-      return null;
+      return {
+        snapshot: null,
+        diagnostic: {
+          state: 'invalid',
+          reason: validation.errors.join('; '),
+        },
+      };
     }
     diskReadCache.set(platform, snapshot);
-    return snapshot;
+    return { snapshot };
   } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
-      console.warn(
-        `[Snapshots] Failed to read ${platform} snapshot from disk:`,
-        error?.message || error
-      );
+    if (error?.code === 'ENOENT') {
+      return {
+        snapshot: null,
+        diagnostic: {
+          state: 'missing',
+          reason: `No snapshot file at ${filePath}`,
+        },
+      };
     }
-    return null;
+    return {
+      snapshot: null,
+      diagnostic: {
+        state: 'error',
+        reason: error?.message || String(error),
+      },
+    };
   }
 }
 
 export async function loadMarketSnapshot(
-  platform: MarketPlatform
+  platform: MarketPlatform,
+  options: SnapshotLoadOptions = {}
 ): Promise<MarketSnapshot | null> {
-  const { snapshot } = await loadMarketSnapshotWithSource(platform);
+  const { snapshot } = await loadMarketSnapshotWithSource(platform, options);
   return snapshot;
 }
 
 export async function loadMarketSnapshotWithSource(
-  platform: MarketPlatform
+  platform: MarketPlatform,
+  options: SnapshotLoadOptions = {}
 ): Promise<LoadedSnapshot> {
-  const redisSnapshot = await readSnapshotFromRedis(platform);
-  if (redisSnapshot) {
-    return { snapshot: redisSnapshot, source: 'redis' };
+  const diagnostics: SnapshotLoadDiagnostics = {};
+  let fallback: { snapshot: MarketSnapshot; source: SnapshotSource } | null = null;
+
+  const redisResult = await readSnapshotFromRedis(platform);
+  if (redisResult.diagnostic) {
+    diagnostics.redis = redisResult.diagnostic;
+    logSnapshotIssue(platform, 'redis', redisResult.diagnostic);
   }
-  const diskSnapshot = await readSnapshotFromDisk(platform);
-  if (diskSnapshot) {
-    return { snapshot: diskSnapshot, source: 'disk' };
+  if (redisResult.snapshot) {
+    const staleReason = describeStaleness(redisResult.snapshot, options.maxAgeMs);
+    if (!staleReason) {
+      return { snapshot: redisResult.snapshot, source: 'redis', diagnostics };
+    }
+    const diagnostic: SnapshotDiagnostic = { state: 'stale', reason: staleReason };
+    diagnostics.redis = diagnostic;
+    logSnapshotIssue(platform, 'redis', diagnostic);
+    fallback = { snapshot: redisResult.snapshot, source: 'redis' };
   }
-  return { snapshot: null, source: undefined };
+
+  const diskResult = await readSnapshotFromDisk(platform);
+  if (diskResult.diagnostic) {
+    diagnostics.disk = diskResult.diagnostic;
+    logSnapshotIssue(platform, 'disk', diskResult.diagnostic);
+  }
+  if (diskResult.snapshot) {
+    const staleReason = describeStaleness(diskResult.snapshot, options.maxAgeMs);
+    if (!staleReason) {
+      return { snapshot: diskResult.snapshot, source: 'disk', diagnostics };
+    }
+    const diagnostic: SnapshotDiagnostic = { state: 'stale', reason: staleReason };
+    diagnostics.disk = diagnostic;
+    logSnapshotIssue(platform, 'disk', diagnostic);
+    if (!fallback) {
+      fallback = { snapshot: diskResult.snapshot, source: 'disk' };
+    }
+  }
+
+  if (fallback) {
+    return { snapshot: fallback.snapshot, source: fallback.source, diagnostics };
+  }
+
+  return { snapshot: null, diagnostics };
 }
 
 export async function loadMarketsFromSnapshot(
   platform: MarketPlatform,
   options: SnapshotLoadOptions = {}
 ): Promise<Market[]> {
-  const snapshot = await loadMarketSnapshot(platform);
+  const snapshot = await loadMarketSnapshot(platform, options);
   if (!snapshot) {
     return [];
   }
@@ -380,5 +476,55 @@ export function validateMarketSnapshot(
     valid: errors.length === 0,
     errors,
   };
+}
+
+function describeStaleness(
+  snapshot: MarketSnapshot,
+  maxAgeMs?: number
+): string | undefined {
+  if (!maxAgeMs || maxAgeMs <= 0) {
+    return undefined;
+  }
+  const ageMs = getSnapshotAgeMs(snapshot);
+  if (ageMs == null) {
+    return 'invalid fetchedAt timestamp';
+  }
+  if (!isSnapshotFresh(snapshot, maxAgeMs)) {
+    return `stale (${formatDuration(ageMs)} old > max ${formatDuration(maxAgeMs)})`;
+  }
+  return undefined;
+}
+
+function logSnapshotIssue(
+  platform: MarketPlatform,
+  source: SnapshotSource,
+  diagnostic: SnapshotDiagnostic
+): void {
+  if (diagnostic.state === 'disabled' && source === 'disk') {
+    // Avoid spamming when disk snapshots intentionally disabled.
+    console.warn(
+      `[MarketFeed] Snapshot for ${platform} unavailable (${diagnostic.state} in ${source}); reason=${diagnostic.reason}`
+    );
+    return;
+  }
+  console.warn(
+    `[MarketFeed] Snapshot for ${platform} unavailable (${diagnostic.state} in ${source}); reason=${diagnostic.reason}`
+  );
+}
+
+function formatDuration(ms?: number | null): string {
+  if (ms == null || !Number.isFinite(ms)) {
+    return 'unknown';
+  }
+  if (ms < 1_000) {
+    return `${Math.round(ms)}ms`;
+  }
+  if (ms < 60_000) {
+    return `${(ms / 1_000).toFixed(1)}s`;
+  }
+  if (ms < 3_600_000) {
+    return `${(ms / 60_000).toFixed(1)}m`;
+  }
+  return `${(ms / 3_600_000).toFixed(1)}h`;
 }
 

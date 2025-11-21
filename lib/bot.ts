@@ -213,7 +213,7 @@ export class ArbitrageBotEngine {
 
     // 🎯 HOT MARKET TRACKING
     // Add all markets to the tracker - it will automatically group markets that exist on multiple platforms
-    this.hotMarketTracker.addMarkets(allMarkets);
+    const trackingChanges = this.hotMarketTracker.addMarkets(allMarkets);
     
     // Remove expired markets from tracking
     const expiredCount = this.hotMarketTracker.removeExpired();
@@ -223,11 +223,23 @@ export class ArbitrageBotEngine {
 
     // Get tracking stats
     const trackingStats = this.hotMarketTracker.getStats();
+    const trackedMarkets = this.hotMarketTracker.getAllTrackedMarkets();
+    const trackedSample = trackedMarkets
+      .slice(0, 3)
+      .map(
+        (market) =>
+          `${market.displayTitle} (${market.platforms.length}p)`
+      )
+      .join(' | ');
     console.log(
       `🎯 Tracking ${trackingStats.totalTracked} markets across platforms ` +
       `(${trackingStats.liveTracked} live, ${trackingStats.totalPlatformCombinations} platform combinations)`
     );
-    const trackedMarkets = this.hotMarketTracker.getAllTrackedMarkets();
+    console.log(
+      `[HotMarketTracker] tracked=${trackingStats.totalTracked}, ` +
+        `new=${trackingChanges.newlyTracked}, dropped=${expiredCount}, ` +
+        `sample=${trackedSample || 'none'}`
+    );
     const crossPlatformPairs = this.countCrossPlatformPairs(trackedMarkets);
     console.log(
       `[ArbMatch] Cross-platform candidate pairs=${crossPlatformPairs} across ${trackedMarkets.length} tracked market(s)`
@@ -266,7 +278,8 @@ export class ArbitrageBotEngine {
     }
     console.log(
       `[ArbMatch] Tracked combinations summary: candidates=${trackedCandidateCount}, ` +
-        `profitablePairs=${trackedProfitableCount} (minProfitMargin=${config.minProfitMargin}%)`
+        `profitablePairs=${trackedProfitableCount}, opportunities=${trackedOpportunities.length} ` +
+        `(minProfitMargin=${config.minProfitMargin}%)`
     );
 
     // STRATEGY 2: General scan for new markets we haven't found yet
@@ -279,7 +292,8 @@ export class ArbitrageBotEngine {
     const generalOpportunities = generalScan.opportunities;
     console.log(
       `[ArbMatch] General scan summary: candidates=${generalScan.matchCount}, ` +
-        `profitablePairs=${generalScan.profitableCount} (minProfitMargin=${config.minProfitMargin}%)`
+        `profitablePairs=${generalScan.profitableCount}, opportunities=${generalOpportunities.length} ` +
+        `(minProfitMargin=${config.minProfitMargin}%)`
     );
 
     // Combine and deduplicate opportunities (tracked markets have priority)

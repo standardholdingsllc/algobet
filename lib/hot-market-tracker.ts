@@ -22,9 +22,11 @@ export class HotMarketTracker {
    * Add or update markets in the tracking system
    * Groups markets by normalized title across platforms
    */
-  addMarkets(markets: Market[]): void {
+  addMarkets(markets: Market[]): { newlyTracked: number; updated: number } {
     // Group markets by normalized title
     const marketGroups = new Map<string, Market[]>();
+    let newlyTracked = 0;
+    let updated = 0;
     
     for (const market of markets) {
       const normalized = normalizeForMatching(market.title);
@@ -42,15 +44,25 @@ export class HotMarketTracker {
       
       // Only track if on 2+ platforms (potential for arbitrage)
       if (platforms.size >= 2) {
-        this.addOrUpdateTrackedMarket(normalizedTitle, groupMarkets);
+        const result = this.addOrUpdateTrackedMarket(normalizedTitle, groupMarkets);
+        if (result === 'new') {
+          newlyTracked += 1;
+        } else if (result === 'updated') {
+          updated += 1;
+        }
       }
     }
+
+    return { newlyTracked, updated };
   }
 
   /**
    * Add or update a tracked market
    */
-  private addOrUpdateTrackedMarket(normalizedTitle: string, markets: Market[]): void {
+  private addOrUpdateTrackedMarket(
+    normalizedTitle: string,
+    markets: Market[]
+  ): 'new' | 'updated' {
     const existing = this.trackedMarkets.get(normalizedTitle);
     const now = new Date();
 
@@ -64,6 +76,7 @@ export class HotMarketTracker {
       }));
       existing.lastChecked = now;
       existing.expiryDate = new Date(markets[0].expiryDate);
+      return 'updated';
     } else {
       // Create new tracked market
       const trackedMarket: TrackedMarket = {
@@ -85,7 +98,9 @@ export class HotMarketTracker {
 
       this.trackedMarkets.set(normalizedTitle, trackedMarket);
       console.log(`🎯 TRACKING NEW MARKET: ${trackedMarket.displayTitle} (on ${trackedMarket.platforms.length} platforms)`);
+      return 'new';
     }
+    return 'updated';
   }
 
   /**

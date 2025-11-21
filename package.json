@@ -19,6 +19,7 @@
     "test-polymarket-expiry": "node -r esbuild-register scripts/test-polymarket-expiry.ts",
     "test-snapshot-health": "node -r esbuild-register scripts/test-snapshot-health.ts",
     "test-clob": "node -r esbuild-register scripts/test-clob-integration.js",
+    "test-cross-matching": "node -r esbuild-register scripts/test-cross-matching.ts",
     "generate-password": "node scripts/generate-password-hash.js",
     "migrate-kv": "node -r esbuild-register scripts/migrate-to-kv.ts",
     "snapshot-worker": "node -r esbuild-register workers/snapshot-worker.ts"

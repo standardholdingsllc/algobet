@@ -15,6 +15,8 @@ import {
   isSnapshotFresh,
   getSnapshotAgeMs,
   SnapshotSource,
+  SnapshotLoadDiagnostics,
+  SnapshotDiagnostic,
 } from './market-snapshots';
 import { KALSHI_API_BASE, MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { PolymarketAPI } from './markets/polymarket';
@@ -147,7 +149,8 @@ export class MarketFeedService {
     const maxAgeMs = options.maxAgeMs ?? SNAPSHOT_DEFAULT_MAX_AGE_MS;
 
     for (const platform of platforms) {
-      const { snapshot, source } = await loadMarketSnapshotWithSource(platform);
+      const { snapshot, source, diagnostics } =
+        await loadMarketSnapshotWithSource(platform, { maxAgeMs });
       const snapshotAgeMs = snapshot ? getSnapshotAgeMs(snapshot) : null;
       const isFresh =
         snapshot && isSnapshotFresh(snapshot, maxAgeMs);
@@ -159,6 +162,10 @@ export class MarketFeedService {
       const reasonParts: string[] = [];
       if (!snapshot) {
         reasonParts.push('missing');
+        const diagSummary = summarizeDiagnostics(diagnostics);
+        if (diagSummary) {
+          reasonParts.push(diagSummary);
+        }
       } else {
         if (schemaMismatch) {
           reasonParts.push(
@@ -171,6 +178,10 @@ export class MarketFeedService {
               maxAgeMs
             )})`
           );
+        }
+        const diagSummary = summarizeDiagnostics(diagnostics);
+        if (diagSummary) {
+          reasonParts.push(diagSummary);
         }
       }
 
@@ -222,7 +233,7 @@ export class MarketFeedService {
     payloads: Record<MarketPlatform, AdapterResult>,
     filters: MarketFilterInput,
     maxDaysToExpiry: number
-  ): Promise<void> {
+  ): Promise<Record<MarketPlatform, MarketSnapshot>> {
     const platformMarkets: Record<string, Market[]> = {};
     const perPlatformOptions: Record<
       MarketPlatform,
@@ -245,7 +256,7 @@ export class MarketFeedService {
         };
       });
 
-    await saveMarketSnapshots(platformMarkets, {
+    return saveMarketSnapshots(platformMarkets, {
       maxDaysToExpiry,
       filters,
       perPlatformOptions,
@@ -713,6 +724,25 @@ function summarizeFilters(filters?: MarketFilterInput): string | undefined {
   if (typeof filters.maxMarkets === 'number')
     parts.push(`maxMarkets=${filters.maxMarkets}`);
   return parts.join(', ');
+}
+
+function summarizeDiagnostics(
+  diagnostics?: SnapshotLoadDiagnostics
+): string | undefined {
+  if (!diagnostics) {
+    return undefined;
+  }
+  const parts: string[] = [];
+  (Object.entries(diagnostics) as [string, SnapshotDiagnostic | undefined][])
+    .forEach(([source, diagnostic]) => {
+      if (!diagnostic) return;
+      parts.push(
+        `${source}:${diagnostic.state}${
+          diagnostic.reason ? ` (${diagnostic.reason})` : ''
+        }`
+      );
+    });
+  return parts.length ? `diagnostics=${parts.join(', ')}` : undefined;
 }
 
 function logSnapshotHit(

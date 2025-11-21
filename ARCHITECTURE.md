@@ -79,6 +79,8 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - Snapshot loads now log the Redis/disk source, age vs TTL, schema version, adapter ID, and filter metadata. The bot only emits “missing or stale” warnings when freshness/schema checks actually fail, and it includes the precise reason when it falls back to live fetches.
 - `loadMarketSnapshot` prefers Upstash but automatically falls back to disk. `isSnapshotFresh` ensures trading code can enforce TTLs (default ≤ `MARKET_SNAPSHOT_TTL_SECONDS`).
 - `saveMarketSnapshots` now accepts per-platform metadata (adapter ID, filters, schema version) so downstream consumers know exactly which adapter produced a given snapshot.
+- The snapshot worker logs each successful write via `[SnapshotWorker] Saved snapshot ...` including adapter ID, schema version, Redis key, and disk path so it is obvious where the payload landed.
+- Ops can hit `/api/snapshots/debug` to inspect freshness, schema version, adapter metadata, and diagnostics (e.g., “missing in redis”) for each platform without triggering a bot scan.
 
 ---
 
@@ -192,6 +194,8 @@ Each route reuses the same modules that power the bot/worker, so behavior stays 
 - `scripts/dump-markets.ts` can still backfill local snapshots, but the preferred path is running `npm run snapshot-worker`.
 - `scripts/test-*` helpers verify authentication, parameter formatting, and market normalization for each platform.
 - `npm run test-polymarket-expiry` and `npm run test-snapshot-health` provide quick guards for the Polymarket expiry prioritization and snapshot freshness helpers respectively.
+- `npm run test-cross-matching` exercises the semantic matcher across Kalshi, Polymarket, and sx.bet markets so “0 candidates” scenarios can be reproduced locally with deterministic fixtures.
+- `/api/snapshots/debug` surfaces live snapshot diagnostics (source, age, schema) for each platform, making it easy to confirm whether the bot is reading Redis or disk and why a snapshot might be skipped.
 
 ---
 

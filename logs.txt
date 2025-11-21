@@ -1,58 +1,541 @@
-2025-11-20 17:55:51.321 [info] [Polymarket Gamma] Fetching /markets page {
-  limit: 500,
-  offset: 2500,
-  filters: { active: 'true', closed: 'false', archived: 'false' }
-}
-2025-11-20 17:55:51.849 [info] [Polymarket Gamma] Retrieved 3000 markets from 6 page(s) with filters {"active":"true","closed":"false","archived":"false"}.
-2025-11-20 17:55:51.855 [info] [Polymarket Gamma] 3000 tradable markets out of 3000 raw entries.
-2025-11-20 17:55:51.900 [info] [Polymarket] Converted 3000 normalized markets into 335 tradeable entries (skipped 2665 by expiry, 0 by missing prices).
-2025-11-20 17:55:51.900 [info] Found 0 Kalshi, 335 Polymarket, and 5 sx.bet markets
-2025-11-20 17:55:51.903 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-20 17:55:51.948 [info] Found 0 matching markets across platforms
-2025-11-20 17:55:51.948 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
-2025-11-20 17:55:51.951 [info] 📊 Standard scanning - every 30 seconds
-2025-11-20 17:55:51.951 [info] [2025-11-20T17:55:51.948Z] Cron scan completed successfully in 3989ms
-2025-11-20 17:55:47.960 [info] [2025-11-20T17:55:47.959Z] Cron scan starting...
-2025-11-20 17:55:47.962 [info] [2025-11-20T17:55:47.961Z] Scanning for arbitrage opportunities...
-2025-11-20 17:55:48.117 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-20 17:55:48.117 [info] [Kalshi] 💼 Portfolio value: $27.97
-2025-11-20 17:55:48.117 [info] [Kalshi] 💰 Positions value: $27.14
-2025-11-20 17:55:48.117 [info] [Kalshi] 💵 Total value: $27.97
-2025-11-20 17:55:48.117 [info] [Polymarket CLOB] Fetching balance from CLOB API...
-2025-11-20 17:55:48.244 [warning] [Polymarket CLOB] Balance endpoint responded 404. Disabling future CLOB balance checks for this process.
-2025-11-20 17:55:48.244 [info] [Polymarket CLOB] ⚠️ CLOB API failed, trying blockchain query...
-2025-11-20 17:55:48.278 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-20 17:55:48.278 [info] [Polymarket CLOB] 💵 Wallet USDC balance: $10.01
-2025-11-20 17:55:48.426 [info] [Polymarket CLOB] 📊 Positions value: $22.70
-2025-11-20 17:55:48.426 [info] [Polymarket CLOB] ✅ Total account value: $32.71
-2025-11-20 17:55:48.646 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
-2025-11-20 17:55:48.646 [info] 💰 Polymarket: Total $32.71 (Cash: $10.01, Positions: $22.70)
-2025-11-20 17:55:48.646 [info] 💰 SX.bet: $0.00
-2025-11-20 17:55:48.662 [info] [Polymarket Gamma] Fetching /markets page {
-  limit: 500,
-  offset: 0,
-  filters: { active: 'true', closed: 'false', archived: 'false' }
-}
-2025-11-20 17:55:49.074 [warning] [sx.bet] Best odds endpoint failed (400), trying active orders...
-2025-11-20 17:55:49.209 [info] [Polymarket Gamma] Fetching /markets page {
-  limit: 500,
-  offset: 500,
-  filters: { active: 'true', closed: 'false', archived: 'false' }
-}
-2025-11-20 17:55:49.309 [info] [sx.bet] Retrieved 1000 active orders
-2025-11-20 17:55:49.309 [info] [sx.bet] Retrieved 50 active markets
-2025-11-20 17:55:49.720 [info] [Polymarket Gamma] Fetching /markets page {
-  limit: 500,
-  offset: 1000,
-  filters: { active: 'true', closed: 'false', archived: 'false' }
-}
-2025-11-20 17:55:50.295 [info] [Polymarket Gamma] Fetching /markets page {
+2025-11-21 06:25:32.141 [info] [Polymarket Gamma] Page 3 summary: raw=500, tradable=500, cumulativeTradable=1500.
+2025-11-21 06:25:32.142 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 4,
   limit: 500,
   offset: 1500,
-  filters: { active: 'true', closed: 'false', archived: 'false' }
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-21T06:25:26.666Z',
+    end_date_max: '2025-12-01T06:25:26.666Z'
+  }
 }
-2025-11-20 17:55:50.804 [info] [Polymarket Gamma] Fetching /markets page {
+2025-11-21 06:25:29.002 [info] [Polymarket Gamma] Page 1 summary: raw=500, tradable=500, cumulativeTradable=500.
+2025-11-21 06:25:29.002 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 2,
   limit: 500,
-  offset: 2000,
-  filters: { active: 'true', closed: 'false', archived: 'false' }
+  offset: 500,
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-21T06:25:26.666Z',
+    end_date_max: '2025-12-01T06:25:26.666Z'
+  }
+}
+2025-11-21 06:25:30.131 [info] [Polymarket Gamma] Page 2 summary: raw=500, tradable=500, cumulativeTradable=1000.
+2025-11-21 06:25:30.132 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 3,
+  limit: 500,
+  offset: 1000,
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-21T06:25:26.666Z',
+    end_date_max: '2025-12-01T06:25:26.666Z'
+  }
+}
+2025-11-21 06:25:34.303 [info] [Polymarket Gamma] Page 4 summary: raw=500, tradable=500, cumulativeTradable=2000.
+2025-11-21 06:25:34.303 [info] [Polymarket Gamma] Collected 2000 tradable markets out of 2000 raw across 4 page(s) (stopped because reached maxMarkets cap (2000)).
+2025-11-21 06:25:34.304 [info] [Polymarket Gamma] 2000 tradable markets out of 2000 raw entries for window 2025-11-21T06:25:26.666Z → 2025-12-01T06:25:26.666Z.
+2025-11-21 06:25:34.363 [info] [Polymarket] Filter breakdown (window 2025-11-21T06:25:26.666Z → 2025-12-01T06:25:26.666Z): raw=2000, kept=1859, skippedByExpiry=141, skippedByPrice=0.
+2025-11-21 06:25:34.366 [info] [Polymarket] Skipping by expiry (sample): [
+  {
+    conditionId: '0xa51c63586746e56232cad39561b1b088aa1ddda75e6218622e9fc7a62b5da291',
+    source: 'gamma',
+    question: 'Will Elon Musk post 140-159 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x59d1576e8e85c4ffbd9bf9e80e56b72fafdc94ee465290523a9c78e999f8fa7f',
+    source: 'gamma',
+    question: 'Will Elon Musk post 160-179 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x5d5d2f850188266727bd60d2fdd288d6d645fb838d64f0454ada125739dd5e24',
+    source: 'gamma',
+    question: 'Will Elon Musk post 180-199 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0xc480526413ff6a3fe0b9479c1b713bb133105178d25e15375c01282676ee5905',
+    source: 'gamma',
+    question: 'Will Elon Musk post 200-219 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x0510f1bbbec6d7063a08bcdbf2f4fb883b05ec80be995506f99d2040e9972249',
+    source: 'gamma',
+    question: 'Will Elon Musk post 220-239 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0xd14ee108b6db8bc3dc64b5d9dd3ce7ee6ba3cab14f47a1dd7d8bcda07d43476c',
+    source: 'gamma',
+    question: 'Will Elon Musk post 240-259 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0xbcce035864d8d5ee15585acf91f7292765fa634c6ecc76b07449acc4c66e1175',
+    source: 'gamma',
+    question: 'Will Elon Musk post 260-279 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x94ebcf60dde1473509f561788718163e405bcdaed33b85145e12c7ede6118e5d',
+    source: 'gamma',
+    question: 'Will Elon Musk post 280-299 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x8e7c18c8e411f55797d8bb66ff791b915b398ab2aa4aaef2f4fb17ce55695c4f',
+    source: 'gamma',
+    question: 'Will Elon Musk post 300-319 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0xdbc63765ef9c83621278f90b4164043b6c4a9a1fb26486fcf774d9e0de98a3e1',
+    source: 'gamma',
+    question: 'Will Elon Musk post 320-339 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x3aaa25a6d5ab241cd9aa6671ca6a3ff2139c7dae9a794dae9fe3bb5dde48da25',
+    source: 'gamma',
+    question: 'Will Elon Musk post 340-359 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x90a41e5177677a5bb9491276350e8be92847a0fbeaf7eb6a2888efa09774ce39',
+    source: 'gamma',
+    question: 'Will Elon Musk post 360-379 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0xbf1e4d1a13622c0d857215b87dc2765f7fc824ecdfc14c16221e78bbfdf57e95',
+    source: 'gamma',
+    question: 'Will Elon Musk post 380-399 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x089faffd281defa3aa9bf57ad61fd64ef64634482ad56cab0361c7da90b5a656',
+    source: 'gamma',
+    question: 'Will Elon Musk post 400-419 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x1a6b035576eef8072b84fd5afdd25513b9342557dd005d4cbf5a763da6f44e9b',
+    source: 'gamma',
+    question: 'Will Elon Musk post 420-439 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x31c9c5e0eb0aba6d6971ec65bee7df987641a05b2963dfcf8e298ef838cf145c',
+    source: 'gamma',
+    question: 'Will Elon Musk post 440-459 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0xceac91f22c319b5a8dd8b9248245d861644432976b458338dbccfe42f460d983',
+    source: 'gamma',
+    question: 'Will Elon Musk post 460-479 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x9731702c1b311cba029720e1faa2da398e45ccf64fb685e95fc4d8715f882311',
+    source: 'gamma',
+    question: 'Will Elon Musk post 480-499 tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0x3c85339a03477349967ff00e4478b0eec5a4b688ccc700dd1f13b2a8cebc1d38',
+    source: 'gamma',
+    question: 'Will Elon Musk post 500+ tweets from November 14 to November 21, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  },
+  {
+    conditionId: '0xbaa23d21baea6e05c9fc3807492775fa5208bacc0758eb09b7d5bcf212661b38',
+    source: 'gamma',
+    question: 'Will Apple (AAPL) close at <$245 on the final day of trading of the week of Nov 17 – Nov 21?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-21T00:00:00.000Z',
+    endDateIso: '2025-11-21T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-21T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-21T06:25:26.666Z',
+    windowEnd: '2025-12-01T06:25:26.666Z'
+  }
+]
+2025-11-21 06:25:34.366 [info] [Polymarket] gameStartTime: usedForSports=1204, ignoredAsNonSports=3.
+2025-11-21 06:25:34.366 [info] [Polymarket] Sample markets using gameStartTime for expiry: [
+  {
+    conditionId: '0x940996716ec583c08ddc4807f15a7318329d11d1fed8e5346569d2f7548835db',
+    question: 'Will Preston North End FC win on 2025-11-21?',
+    source: 'gamma',
+    gameStartTime: '2025-11-21T20:00:00.000Z',
+    derivedExpiry: '2025-11-21T20:00:00.000Z'
+  },
+  {
+    conditionId: '0x8b7d0616fffdff0b7a7f0b5c2a85e5d2c7dc570332e8c29773e0d01fda53bc18',
+    question: 'Will Preston North End FC vs. Blackburn Rovers FC end in a draw?',
+    source: 'gamma',
+    gameStartTime: '2025-11-21T20:00:00.000Z',
+    derivedExpiry: '2025-11-21T20:00:00.000Z'
+  },
+  {
+    conditionId: '0x7138499fe717342e400c306ad41917fc47712a5422b645658d17cef93f8dccbd',
+    question: 'Will Blackburn Rovers FC win on 2025-11-21?',
+    source: 'gamma',
+    gameStartTime: '2025-11-21T20:00:00.000Z',
+    derivedExpiry: '2025-11-21T20:00:00.000Z'
+  },
+  {
+    conditionId: '0xfdfef8a9bbe4173237cd9f3728565a69e74d26746fe8c4258f029668596e07df',
+    question: 'Wild vs. Penguins',
+    source: 'gamma',
+    gameStartTime: '2025-11-22T00:00:00.000Z',
+    derivedExpiry: '2025-11-22T00:00:00.000Z'
+  },
+  {
+    conditionId: '0xccd51cc60b3aaac85b33d54981b390566df3471214f0ef8cd34fea86d7016453',
+    question: 'Blackhawks vs. Sabres',
+    source: 'gamma',
+    gameStartTime: '2025-11-22T00:00:00.000Z',
+    derivedExpiry: '2025-11-22T00:00:00.000Z'
+  },
+  {
+    conditionId: '0xa68700a4dc3ff2b3cb279afe3312ae9ce8baeee2d4871b0fb83c751c021b238c',
+    question: 'Hurricanes vs. Jets',
+    source: 'gamma',
+    gameStartTime: '2025-11-22T01:00:00.000Z',
+    derivedExpiry: '2025-11-22T01:00:00.000Z'
+  },
+  {
+    conditionId: '0xe5e64022c3b45cc63290b647209b146ef4f65d3722dc6b54082185c32cba3629',
+    question: 'Bruins vs. Kings',
+    source: 'gamma',
+    gameStartTime: '2025-11-22T03:30:00.000Z',
+    derivedExpiry: '2025-11-22T03:30:00.000Z'
+  },
+  {
+    conditionId: '0xe17d337500aa53aafe106d5e92d0f9f5a5dada2ad1f55195d18d8a371e7e25be',
+    question: 'Will Coventry City FC win on 2025-11-22?',
+    source: 'gamma',
+    gameStartTime: '2025-11-22T12:30:00.000Z',
+    derivedExpiry: '2025-11-22T12:30:00.000Z'
+  },
+  {
+    conditionId: '0x54915b6a065ae5afc34a373c6c40fb99ae2e04edc220ad6d27635362e03022e2',
+    question: 'Will Coventry City FC vs. West Bromwich Albion FC end in a draw?',
+    source: 'gamma',
+    gameStartTime: '2025-11-22T12:30:00.000Z',
+    derivedExpiry: '2025-11-22T12:30:00.000Z'
+  },
+  {
+    conditionId: '0xf5207508633fb8e2ef8c4f18ac22e6037cb8f29e2a7bb75ed307bf1d2300ead2',
+    question: 'Will West Bromwich Albion FC win on 2025-11-22?',
+    source: 'gamma',
+    gameStartTime: '2025-11-22T12:30:00.000Z',
+    derivedExpiry: '2025-11-22T12:30:00.000Z'
+  }
+]
+2025-11-21 06:25:34.366 [info] [Polymarket] gameStartTime ignored for non-sports markets (sample): [
+  {
+    conditionId: '0x49e35473c638d33a73b7dedbf3eb3b5260d18e632440ce35d6720ad405b3639b',
+    question: 'Will another MrBeast video get 100m+ week 1 views by November 30?',
+    source: 'gamma',
+    gameStartTime: '2025-09-26T15:49:00.000Z',
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0x62ed99103a040747554c2f9ef1e87e111155316964e604d326cd948f49580b51',
+    question: 'TikTok sale announced by November 30?',
+    source: 'gamma',
+    gameStartTime: '2025-09-25T16:55:00.000Z',
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0xe56175e025b606bb6b89506da3b566071c0d2a82766b61e037dd0dd979b8f1e8',
+    question: 'Another S&P 500 Company buys Bitcoin by November 30?',
+    source: 'gamma',
+    gameStartTime: '2025-11-04T21:21:00.000Z',
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  }
+]
+2025-11-21 06:25:34.388 [warning] [MarketFeed] Snapshot for sxbet unavailable (missing); fetching live feed as fallback.
+2025-11-21 06:25:34.587 [info] [sx.bet] Retrieved 50 active markets
+2025-11-21 06:25:34.880 [info] [sx.bet] Retrieved 1000 active orders (fallback)
+2025-11-21 06:25:34.902 [info] [MarketFilter] kalshi: total=1600, withinExecutionWindow=1600, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-21 06:25:34.902 [info] [MarketFilter] polymarket: total=1859, withinExecutionWindow=1859, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-21 06:25:34.902 [info] [MarketFilter] sxbet: total=24, withinExecutionWindow=24, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-21 06:25:34.902 [info] Found 1600 Kalshi, 1859 Polymarket, and 24 sx.bet markets
+2025-11-21 06:25:34.932 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-21 06:25:34.932 [info] [ArbMatch] Cross-platform candidate pairs=0 across 0 tracked market(s)
+2025-11-21 06:25:34.932 [warning] [Bot] No cross-platform candidates after filters; per-platform totals kalshi=1600, polymarket=1859, sxbet=24. If this persists, review filter config or snapshot freshness.
+2025-11-21 06:25:34.932 [info] [ArbMatch] Tracked combinations summary: candidates=0, profitablePairs=0 (minProfitMargin=0.5%)
+2025-11-21 06:25:25.929 [info] [2025-11-21T06:25:25.928Z] Cron scan starting...
+2025-11-21 06:25:25.931 [info] [2025-11-21T06:25:25.931Z] Scanning for arbitrage opportunities...
+2025-11-21 06:25:26.079 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-21 06:25:26.079 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-21 06:25:26.080 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-21 06:25:26.080 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-21 06:25:26.122 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-21 06:25:26.194 [info] [Polymarket] 💵 Available cash: $10.01
+2025-11-21 06:25:26.194 [info] [Polymarket] 📊 Positions value: $23.03
+2025-11-21 06:25:26.195 [info] [Polymarket] ✅ Total account value: $33.04
+2025-11-21 06:25:26.656 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-21 06:25:26.656 [info] 💰 Polymarket: Total $33.04 (Cash: $10.01, Positions: $23.03)
+2025-11-21 06:25:26.656 [info] 💰 SX.bet: $0.00
+2025-11-21 06:25:26.669 [info] [BotConfig] maxDaysToExpiry=10d, minProfitMargin=0.5%, maxBetPercentage=10%, simulationMode=false. Snapshot window: 2025-11-21T06:25:26.666Z → 2025-12-01T06:25:26.666Z. Filters: sportsOnly=false, categories=0, eventTypes=0, leagues=0, maxMarkets=∞
+2025-11-21 06:25:26.682 [info] [Snapshots] Using directory /tmp/market-snapshots
+2025-11-21 06:25:26.683 [warning] [MarketFeed] Snapshot for kalshi unavailable (missing); fetching live feed as fallback.
+2025-11-21 06:25:26.684 [info] [Kalshi Adapter] /markets page 1 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"<none>"}
+2025-11-21 06:25:26.743 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:26.744 [info] [Kalshi Adapter] /markets page 1 ← 200 raw (first_close=2025-12-01T05:00:00Z, last_close=2025-11-28T15:00:00Z), 200 tradable, cursor="CgYI8PGmyQYSIEtYTU9TVFNUUkVBTUVEV0lDS0VELTI1Tk9WMjgtSU1O"
+2025-11-21 06:25:26.744 [info] [Kalshi Adapter] /markets page 2 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"CgYI8PGmyQYSIEtYTU9TVFNUUkVBTUVEV0lDS0VELTI1Tk9WMjgtSU1O"}
+2025-11-21 06:25:26.788 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:26.788 [info] [Kalshi Adapter] /markets page 2 ← 200 raw (first_close=2025-11-28T15:00:00Z, last_close=2025-11-24T21:00:00Z), 200 tradable, cursor="CgYI0I6TyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE2MDAtVDI2MDk5Ljk5"
+2025-11-21 06:25:26.788 [info] [Kalshi Adapter] /markets page 3 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"CgYI0I6TyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE2MDAtVDI2MDk5Ljk5"}
+2025-11-21 06:25:26.833 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:26.833 [info] [Kalshi Adapter] /markets page 3 ← 200 raw (first_close=2025-11-24T21:00:00Z, last_close=2025-11-24T20:00:00Z), 200 tradable, cursor="CgYIwPKSyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE1MDAtVDI1MTA5Ljk5"
+2025-11-21 06:25:26.833 [info] [Kalshi Adapter] /markets page 4 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"CgYIwPKSyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE1MDAtVDI1MTA5Ljk5"}
+2025-11-21 06:25:26.875 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:26.875 [info] [Kalshi Adapter] /markets page 4 ← 200 raw (first_close=2025-11-24T20:00:00Z, last_close=2025-11-24T20:00:00Z), 200 tradable, cursor="CgYIwPKSyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE1MDAtVDIzMTA5Ljk5"
+2025-11-21 06:25:26.876 [info] [Kalshi Adapter] /markets page 5 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"CgYIwPKSyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE1MDAtVDIzMTA5Ljk5"}
+2025-11-21 06:25:26.917 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:26.917 [info] [Kalshi Adapter] /markets page 5 ← 200 raw (first_close=2025-11-24T20:00:00Z, last_close=2025-11-24T20:00:00Z), 200 tradable, cursor="CgYIwPKSyQYSHktYSU5YVS0yNU5PVjI0SDE1MDAtVDcwNzkuOTk5OQ"
+2025-11-21 06:25:26.917 [info] [Kalshi Adapter] /markets page 6 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"CgYIwPKSyQYSHktYSU5YVS0yNU5PVjI0SDE1MDAtVDcwNzkuOTk5OQ"}
+2025-11-21 06:25:26.957 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:26.958 [info] [Kalshi Adapter] /markets page 6 ← 200 raw (first_close=2025-11-24T20:00:00Z, last_close=2025-11-24T20:00:00Z), 200 tradable, cursor="CgYIwPKSyQYSHktYSU5YVS0yNU5PVjI0SDE1MDAtVDYwNzkuOTk5OQ"
+2025-11-21 06:25:26.958 [info] [Kalshi Adapter] /markets page 7 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"CgYIwPKSyQYSHktYSU5YVS0yNU5PVjI0SDE1MDAtVDYwNzkuOTk5OQ"}
+2025-11-21 06:25:27.002 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:27.002 [info] [Kalshi Adapter] /markets page 7 ← 200 raw (first_close=2025-11-24T20:00:00Z, last_close=2025-11-24T19:00:00Z), 200 tradable, cursor="CgYIsNaSyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE0MDAtVDI1MTA5Ljk5"
+2025-11-21 06:25:27.002 [info] [Kalshi Adapter] /markets page 8 → requesting with params {"limit":200,"min_close_ts":1763706326,"max_close_ts":1764570326,"cursor":"CgYIsNaSyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE0MDAtVDI1MTA5Ljk5"}
+2025-11-21 06:25:27.050 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-21 06:25:27.050 [info] [Kalshi Adapter] /markets page 8 ← 200 raw (first_close=2025-11-24T19:00:00Z, last_close=2025-11-24T19:00:00Z), 200 tradable, cursor="CgYIsNaSyQYSI0tYTkFTREFRMTAwVS0yNU5PVjI0SDE0MDAtVDIzMTA5Ljk5"
+2025-11-21 06:25:27.050 [info] [Kalshi Adapter] Collected 1600 tradable markets across 8 page(s) (stopped because reached maxPages cap (8))
+2025-11-21 06:25:27.056 [warning] [MarketFeed] Snapshot for polymarket unavailable (missing); fetching live feed as fallback.
+2025-11-21 06:25:27.058 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 1,
+  limit: 500,
+  offset: 0,
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-21T06:25:26.666Z',
+    end_date_max: '2025-12-01T06:25:26.666Z'
+  }
 }
