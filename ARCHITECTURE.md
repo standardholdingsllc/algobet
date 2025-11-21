@@ -51,6 +51,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
   - A secondary `kalshi:events` adapter targets `/events/{ticker}/markets` for league-specific feeds (driven by `leagueTickers` filter tokens).
 - **Polymarket**
   - Default adapter remains `polymarket:hybrid`, which leans on the battle-tested hybrid Gamma/CLOB client (`lib/markets/polymarket.ts`) so we retain per-page caching, fallbacks, and pricing normalization. Future overrides can switch to a pure Gamma adapter without touching the bot.
+  - Expiry derivation now always prefers `gameStartTime` when present—even if `sportsMarketType` or `gameId` are `null`—then falls back to `eventStartTime`, then UMA/end dates. The adapter logs sampled examples of where `gameStartTime` was applied or ignored so we can see why sports inventories drop out of the execution window.
 - **SX.bet**
   - Adapter metadata captures the USDC base token requirement and documents `/orders/odds/best` fallback semantics. The handler wraps `SXBetAPI.getOpenMarkets`, so fee/odds logic stays centralized.
 
@@ -75,6 +76,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - Validation (`validateMarketSnapshot`) runs before every write and after every read:
   - Ensures schema version is numeric, timestamps are parseable, each market carries IDs/prices/expiry, and per-market platform tags match the snapshot envelope.
   - Invalid payloads never touch disk or Redis; stale/invalid cached entries raise warnings so the worker can self-heal.
+- Snapshot loads now log the Redis/disk source, age vs TTL, schema version, adapter ID, and filter metadata. The bot only emits “missing or stale” warnings when freshness/schema checks actually fail, and it includes the precise reason when it falls back to live fetches.
 - `loadMarketSnapshot` prefers Upstash but automatically falls back to disk. `isSnapshotFresh` ensures trading code can enforce TTLs (default ≤ `MARKET_SNAPSHOT_TTL_SECONDS`).
 - `saveMarketSnapshots` now accepts per-platform metadata (adapter ID, filters, schema version) so downstream consumers know exactly which adapter produced a given snapshot.
 
@@ -101,6 +103,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
    - Prefers validated snapshots.
    - Falls back to live fetches if snapshots are stale or missing (with warnings so ops can address the worker).
 3. Logs per-platform counts and warns when a snapshot is empty.
+   - Config + filter summaries, per-platform execution-window breakdowns, cross-platform candidate counts, and arbitrage scan stats are all emitted with `[BotConfig]`, `[MarketFilter]`, and `[ArbMatch]` tags so “Tracking 0 markets” situations can be diagnosed without digging into code.
 4. Flows markets into `HotMarketTracker`, removes expired entries, and runs the two-stage arbitrage search (tracked combinations first, general cross-scan second).
 5. Deduplicates opportunities, records scan metrics in `AdaptiveScanner`, and executes up to five best trades (simulation mode respects all logging but skips execution).
 6. Writes detailed opportunity logs, bets, and arbitrage groups back into KV.
@@ -188,6 +191,7 @@ Each route reuses the same modules that power the bot/worker, so behavior stays 
 - `logs.txt` captures recent bot runs (balances, page counts, adaptive scanner decisions) for regression debugging.
 - `scripts/dump-markets.ts` can still backfill local snapshots, but the preferred path is running `npm run snapshot-worker`.
 - `scripts/test-*` helpers verify authentication, parameter formatting, and market normalization for each platform.
+- `npm run test-polymarket-expiry` and `npm run test-snapshot-health` provide quick guards for the Polymarket expiry prioritization and snapshot freshness helpers respectively.
 
 ---
 

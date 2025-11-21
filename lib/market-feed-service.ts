@@ -1,6 +1,7 @@
 import axios from 'axios';
 import {
   Market,
+  MarketSnapshot,
   MarketFilterInput,
   MarketPlatform,
   MarketAdapterConfig,
@@ -10,8 +11,10 @@ import { MarketSourceConfigStore } from './market-source-config';
 import {
   MARKET_SNAPSHOT_SCHEMA_VERSION,
   saveMarketSnapshots,
-  loadMarketSnapshot,
+  loadMarketSnapshotWithSource,
   isSnapshotFresh,
+  getSnapshotAgeMs,
+  SnapshotSource,
 } from './market-snapshots';
 import { KALSHI_API_BASE, MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { PolymarketAPI } from './markets/polymarket';
@@ -141,23 +144,58 @@ export class MarketFeedService {
       options.platforms ?? (Object.keys(config) as MarketPlatform[]);
     const results: Partial<Record<MarketPlatform, Market[]>> = {};
 
-    for (const platform of platforms) {
-      const snapshot = await loadMarketSnapshot(platform);
-      const isFresh =
-        snapshot &&
-        isSnapshotFresh(
-          snapshot,
-          options.maxAgeMs ?? SNAPSHOT_DEFAULT_MAX_AGE_MS
-        );
+    const maxAgeMs = options.maxAgeMs ?? SNAPSHOT_DEFAULT_MAX_AGE_MS;
 
-      if (snapshot && isFresh) {
+    for (const platform of platforms) {
+      const { snapshot, source } = await loadMarketSnapshotWithSource(platform);
+      const snapshotAgeMs = snapshot ? getSnapshotAgeMs(snapshot) : null;
+      const isFresh =
+        snapshot && isSnapshotFresh(snapshot, maxAgeMs);
+      const schemaMismatch =
+        snapshot &&
+        snapshot.schemaVersion !== MARKET_SNAPSHOT_SCHEMA_VERSION;
+      const usableSnapshot = Boolean(snapshot && isFresh && !schemaMismatch);
+
+      const reasonParts: string[] = [];
+      if (!snapshot) {
+        reasonParts.push('missing');
+      } else {
+        if (schemaMismatch) {
+          reasonParts.push(
+            `schema v${snapshot.schemaVersion} expected v${MARKET_SNAPSHOT_SCHEMA_VERSION}`
+          );
+        }
+        if (!isFresh) {
+          reasonParts.push(
+            `stale (${formatDuration(snapshotAgeMs)} old, max ${formatDuration(
+              maxAgeMs
+            )})`
+          );
+        }
+      }
+
+      if (snapshot && usableSnapshot) {
+        logSnapshotHit(platform, source, snapshot, snapshotAgeMs, maxAgeMs);
+        results[platform] = snapshot.markets;
+        continue;
+      }
+
+      if (snapshot && !usableSnapshot && !options.fallbackToLiveFetch) {
+        const reason = reasonParts.length ? reasonParts.join('; ') : 'stale';
+        console.warn(
+          `[MarketFeed] Snapshot for ${platform} not fresh (${reason}) but live fallback disabled; using cached snapshot anyway.`
+        );
         results[platform] = snapshot.markets;
         continue;
       }
 
       if (options.fallbackToLiveFetch) {
+        const reason =
+          reasonParts.length > 0
+            ? reasonParts.join('; ')
+            : 'missing snapshot';
         console.warn(
-          `[MarketFeed] Snapshot for ${platform} missing or stale. Fetching live feed as fallback.`
+          `[MarketFeed] Snapshot for ${platform} unavailable (${reason}); fetching live feed as fallback.`
         );
         try {
           const live = await this.fetchLiveMarketsForPlatform(
@@ -641,5 +679,67 @@ export class MarketFeedService {
     }
     return Math.max(1, Math.ceil((end - start) / DAY_MS));
   }
+}
+
+function formatDuration(ms?: number | null): string {
+  if (ms == null || !Number.isFinite(ms)) {
+    return 'unknown';
+  }
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+  if (ms < 60_000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+  if (ms < 3_600_000) {
+    return `${(ms / 60_000).toFixed(1)}m`;
+  }
+  return `${(ms / 3_600_000).toFixed(1)}h`;
+}
+
+function summarizeFilters(filters?: MarketFilterInput): string | undefined {
+  if (!filters) return undefined;
+  const parts: string[] = [];
+  if (filters.windowStart) parts.push(`start=${filters.windowStart}`);
+  if (filters.windowEnd) parts.push(`end=${filters.windowEnd}`);
+  if (filters.sportsOnly !== undefined)
+    parts.push(`sportsOnly=${filters.sportsOnly}`);
+  if (filters.categories?.length)
+    parts.push(`categories=${filters.categories.length}`);
+  if (filters.eventTypes?.length)
+    parts.push(`eventTypes=${filters.eventTypes.length}`);
+  if (filters.leagueTickers?.length)
+    parts.push(`leagueTickers=${filters.leagueTickers.length}`);
+  if (typeof filters.maxMarkets === 'number')
+    parts.push(`maxMarkets=${filters.maxMarkets}`);
+  return parts.join(', ');
+}
+
+function logSnapshotHit(
+  platform: MarketPlatform,
+  source: SnapshotSource | undefined,
+  snapshot: MarketSnapshot,
+  ageMs: number | null,
+  maxAgeMs: number
+): void {
+  const adapterInfo = snapshot.adapterId
+    ? `, adapter=${snapshot.adapterId}`
+    : '';
+  const filterSummary = summarizeFilters(snapshot.filters);
+  const filterInfo = filterSummary ? `, filters=[${filterSummary}]` : '';
+  const maxDaysInfo = snapshot.maxDaysToExpiry
+    ? `, maxDaysToExpiry=${snapshot.maxDaysToExpiry}`
+    : '';
+  const totalMarkets =
+    snapshot.totalMarkets ?? snapshot.markets?.length ?? 0;
+  console.info(
+    `[MarketFeed] Using ${source ?? 'unknown'} snapshot for ${platform}: fetched ${formatDuration(
+      ageMs
+    )} ago (max ${formatDuration(
+      maxAgeMs
+    )}) at ${snapshot.fetchedAt}, schema v${
+      snapshot.schemaVersion
+    }, markets=${snapshot.markets.length}/${totalMarkets}${adapterInfo}${maxDaysInfo}${filterInfo}`
+  );
 }
 

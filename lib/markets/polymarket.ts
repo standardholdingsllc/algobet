@@ -328,6 +328,7 @@ const GAMMA_PAGE_LIMIT = 500;
 const GAMMA_MAX_PAGES = 6; // 3k markets max per refresh
 const DEFAULT_POLYMARKET_MAX_MARKETS = 2000;
 const MAX_POLYMARKET_EXPIRY_LOGS = 20;
+const MAX_GAME_START_LOGS = 10;
 const CLOB_MAX_PAGES = 8; // stop early to avoid 60+ page sweeps
 const CLOB_MAX_TRADABLE = 400;
 const CLOB_MAX_INACTIVE_PAGES = 3;
@@ -859,7 +860,7 @@ interface DerivedExpiryResult {
  *   - Non-sports markets prefer end/UMA settlement dates.
  *   - Finally falls back to start timestamps when nothing else is available.
  */
-function derivePolymarketExpiry(
+export function derivePolymarketExpiry(
   fields: Pick<
     NormalizedPolymarketMarket,
     | "eventStartTime"
@@ -874,30 +875,18 @@ function derivePolymarketExpiry(
     | "gameId"
   >
 ): DerivedExpiryResult {
-  const isSportsMarket = Boolean(fields.sportsMarketType || fields.gameId);
-
-  const sportsPreferred: { value?: string | null; source: string }[] = [
-    { value: fields.eventStartTime, source: "eventStartTime" },
+  const orderedCandidates: { value?: string | null; source: string }[] = [
     { value: fields.gameStartTime, source: "gameStartTime" },
-  ];
-
-  const generalPreferred: { value?: string | null; source: string }[] = [
+    { value: fields.eventStartTime, source: "eventStartTime" },
     { value: fields.endDateIso, source: "endDateIso" },
     { value: fields.endDate, source: "endDate" },
     { value: fields.umaEndDateIso, source: "umaEndDateIso" },
     { value: fields.umaEndDate, source: "umaEndDate" },
-  ];
-
-  const fallbackPreferred: { value?: string | null; source: string }[] = [
     { value: fields.startDateIso, source: "startDateIso" },
     { value: fields.startDate, source: "startDate" },
   ];
 
-  const ordered = isSportsMarket
-    ? [...sportsPreferred, ...generalPreferred, ...fallbackPreferred]
-    : [...generalPreferred, ...sportsPreferred, ...fallbackPreferred];
-
-  for (const candidate of ordered) {
+  for (const candidate of orderedCandidates) {
     const iso = normalizeIso(candidate.value ?? null);
     if (iso) {
       return { iso, source: candidate.source };
@@ -1172,6 +1161,10 @@ export class PolymarketAPI {
     let skippedExpiry = 0;
     let skippedPrice = 0;
     const skippedExpirySamples: Record<string, unknown>[] = [];
+    let gameStartUsed = 0;
+    let gameStartSkipped = 0;
+    const gameStartUsageSamples: Record<string, unknown>[] = [];
+    const gameStartSkipSamples: Record<string, unknown>[] = [];
 
     for (const market of normalizedMarkets) {
       const expiry =
@@ -1180,6 +1173,37 @@ export class PolymarketAPI {
         market.gameStartTime ??
         market.eventStartTime ??
         null;
+
+      if (market.gameStartTime) {
+        if (market.derivedExpirySource === 'gameStartTime') {
+          gameStartUsed += 1;
+          if (gameStartUsageSamples.length < MAX_GAME_START_LOGS) {
+            gameStartUsageSamples.push({
+              conditionId: market.conditionId,
+              question: market.question,
+              source: market.source,
+              gameStartTime: market.gameStartTime,
+              derivedExpiry: expiry,
+            });
+          }
+        } else {
+          gameStartSkipped += 1;
+          if (gameStartSkipSamples.length < MAX_GAME_START_LOGS) {
+            const parsed = Date.parse(market.gameStartTime);
+            gameStartSkipSamples.push({
+              conditionId: market.conditionId,
+              question: market.question,
+              source: market.source,
+              gameStartTime: market.gameStartTime,
+              derivedExpiry: expiry,
+              derivedExpirySource: market.derivedExpirySource ?? '<unset>',
+              reason: Number.isNaN(parsed)
+                ? 'gameStartTime invalid'
+                : 'higher-priority source selected',
+            });
+          }
+        }
+      }
 
       if (!isWithinExecutionWindow(expiry, windowStartDate, windowEndDate)) {
         skippedExpiry += 1;
@@ -1234,6 +1258,23 @@ export class PolymarketAPI {
     );
     if (skippedExpirySamples.length > 0) {
       console.info('[Polymarket] Skipping by expiry (sample):', skippedExpirySamples);
+    }
+    if (gameStartUsed || gameStartSkipped) {
+      console.info(
+        `[Polymarket] gameStartTime-derived expiries: used=${gameStartUsed}, skipped=${gameStartSkipped}.`
+      );
+    }
+    if (gameStartUsageSamples.length) {
+      console.info(
+        '[Polymarket] Sample markets using gameStartTime for expiry:',
+        gameStartUsageSamples
+      );
+    }
+    if (gameStartSkipSamples.length) {
+      console.info(
+        '[Polymarket] gameStartTime present but not used (sample):',
+        gameStartSkipSamples
+      );
     }
 
     return markets;

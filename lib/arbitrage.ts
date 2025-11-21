@@ -14,6 +14,17 @@ interface ArbitragePair {
   profitMargin: number;
 }
 
+export interface ArbitrageScanResult {
+  opportunities: ArbitrageOpportunity[];
+  matchCount: number;
+  profitableCount: number;
+}
+
+export interface ArbitrageScanOptions {
+  label?: string;
+  silent?: boolean;
+}
+
 /**
  * Finds arbitrage opportunities between two sets of markets
  * Uses sophisticated market matching to find identical markets
@@ -24,20 +35,54 @@ export function findArbitrageOpportunities(
   markets2: Market[],
   minProfitMargin: number
 ): ArbitrageOpportunity[] {
+  return runArbitrageScan(markets1, markets2, minProfitMargin, {
+    label: 'legacy',
+    silent: false,
+  }).opportunities;
+}
+
+export function scanArbitrageOpportunities(
+  markets1: Market[],
+  markets2: Market[],
+  minProfitMargin: number,
+  options: ArbitrageScanOptions = {}
+): ArbitrageScanResult {
+  return runArbitrageScan(markets1, markets2, minProfitMargin, options);
+}
+
+function runArbitrageScan(
+  markets1: Market[],
+  markets2: Market[],
+  minProfitMargin: number,
+  options: ArbitrageScanOptions = {}
+): ArbitrageScanResult {
   const opportunities: ArbitrageOpportunity[] = [];
+  const labelPrefix = options.label
+    ? `[ArbMatch:${options.label}]`
+    : '[ArbMatch]';
 
   // Use sophisticated matching (70% similarity threshold)
   const matches = findMatchingMarkets(markets1, markets2, 0.7);
-  
-  console.log(`Found ${matches.length} matching markets across platforms`);
+
+  if (!options.silent) {
+    console.log(
+      `${labelPrefix} Found ${matches.length} matching markets across platforms`
+    );
+  }
+
+  let profitableCount = 0;
 
   // Check each matched pair for arbitrage
   for (const match of matches) {
     const { market1, market2, similarity, flipSides } = match;
-    
+
     // Log high-quality matches for monitoring
-    if (similarity > 0.85) {
-      console.log(`High-quality match (${(similarity * 100).toFixed(1)}%):`);
+    if (!options.silent && similarity > 0.85) {
+      console.log(
+        `${labelPrefix} High-quality match (${(similarity * 100).toFixed(
+          1
+        )}%):`
+      );
       console.log(`  ${market1.platform}: ${market1.title}`);
       console.log(`  ${market2.platform}: ${market2.title}`);
       if (flipSides) {
@@ -47,7 +92,7 @@ export function findArbitrageOpportunities(
 
     // Determine which side combinations to try based on market direction
     let combinations: ArbitragePair[];
-    
+
     if (flipSides) {
       // Markets have opposing directions (e.g., "above 70" vs "below 70")
       // Only try same-side combinations (YES-YES and NO-NO)
@@ -65,6 +110,7 @@ export function findArbitrageOpportunities(
 
     for (const combo of combinations) {
       if (combo.profitMargin >= minProfitMargin) {
+        profitableCount += 1;
         const profit = combo.guaranteedReturn - combo.totalCost;
         opportunities.push({
           id: uuidv4(),
@@ -74,27 +120,42 @@ export function findArbitrageOpportunities(
           side2: combo.market2Side,
           profitMargin: combo.profitMargin,
           profitPercentage: combo.profitMargin,
-          betSize1: combo.totalCost / 2, // Split evenly for now
+          betSize1: combo.totalCost / 2,
           betSize2: combo.totalCost / 2,
           expectedProfit: profit,
           netProfit: profit,
           timestamp: new Date(),
         });
-        
-        // Log the opportunity
-        console.log(
-          `✅ Arbitrage found (${combo.profitMargin.toFixed(2)}% profit):\n` +
-          `  ${combo.market1.platform} ${combo.market1Side.toUpperCase()}: ${combo.market1.title}\n` +
-          `  ${combo.market2.platform} ${combo.market2Side.toUpperCase()}: ${combo.market2.title}`
-        );
+
+        if (!options.silent) {
+          console.log(
+            `${labelPrefix} ✅ Arbitrage found (${combo.profitMargin.toFixed(
+              2
+            )}% profit):\n` +
+              `  ${combo.market1.platform} ${combo.market1Side.toUpperCase()}: ${combo.market1.title}\n` +
+              `  ${combo.market2.platform} ${combo.market2Side.toUpperCase()}: ${combo.market2.title}`
+          );
+        }
       }
     }
   }
 
-  // Sort by profit margin (highest first)
-  return opportunities.sort((a, b) => b.profitMargin - a.profitMargin);
-}
+  const sorted = opportunities.sort(
+    (a, b) => b.profitMargin - a.profitMargin
+  );
 
+  if (!options.silent) {
+    console.log(
+      `${labelPrefix} ${sorted.length} profitable combination(s) met minProfitMargin=${minProfitMargin}%`
+    );
+  }
+
+  return {
+    opportunities: sorted,
+    matchCount: matches.length,
+    profitableCount,
+  };
+}
 function calculateArbitrage(
   market1: Market,
   market2: Market,

@@ -37,6 +37,13 @@ const redisClient =
 let redisWarningEmitted = false;
 const diskReadCache = new Map<MarketPlatform, MarketSnapshot>();
 
+export type SnapshotSource = 'redis' | 'disk';
+
+export interface LoadedSnapshot {
+  snapshot: MarketSnapshot | null;
+  source?: SnapshotSource;
+}
+
 interface SnapshotWriteOptions {
   maxDaysToExpiry?: number;
   adapterId?: string;
@@ -169,6 +176,10 @@ async function writeSnapshotToDisk(
   );
 }
 
+function getSnapshotRedisKey(platform: MarketPlatform): string {
+  return `${MARKET_SNAPSHOT_KV_PREFIX}:${platform}`;
+}
+
 async function writeSnapshotToRedis(
   platform: MarketPlatform,
   snapshot: MarketSnapshot
@@ -184,7 +195,7 @@ async function writeSnapshotToRedis(
   }
 
   try {
-    const key = `${MARKET_SNAPSHOT_KV_PREFIX}:${platform}`;
+    const key = getSnapshotRedisKey(platform);
     await redisClient.set(key, snapshot, {
       ex: MARKET_SNAPSHOT_TTL_SECONDS,
     });
@@ -204,7 +215,7 @@ async function readSnapshotFromRedis(
   }
 
   try {
-    const key = `${MARKET_SNAPSHOT_KV_PREFIX}:${platform}`;
+    const key = getSnapshotRedisKey(platform);
     const snapshot = await redisClient.get<MarketSnapshot>(key);
     if (!snapshot) {
       return null;
@@ -271,11 +282,22 @@ async function readSnapshotFromDisk(
 export async function loadMarketSnapshot(
   platform: MarketPlatform
 ): Promise<MarketSnapshot | null> {
+  const { snapshot } = await loadMarketSnapshotWithSource(platform);
+  return snapshot;
+}
+
+export async function loadMarketSnapshotWithSource(
+  platform: MarketPlatform
+): Promise<LoadedSnapshot> {
   const redisSnapshot = await readSnapshotFromRedis(platform);
   if (redisSnapshot) {
-    return redisSnapshot;
+    return { snapshot: redisSnapshot, source: 'redis' };
   }
-  return readSnapshotFromDisk(platform);
+  const diskSnapshot = await readSnapshotFromDisk(platform);
+  if (diskSnapshot) {
+    return { snapshot: diskSnapshot, source: 'disk' };
+  }
+  return { snapshot: null, source: undefined };
 }
 
 export async function loadMarketsFromSnapshot(
@@ -308,6 +330,14 @@ export function isSnapshotFresh(
     return false;
   }
   return Date.now() - fetchedAt <= maxAgeMs;
+}
+
+export function getSnapshotAgeMs(snapshot: MarketSnapshot): number | null {
+  const fetchedAt = Date.parse(snapshot.fetchedAt);
+  if (Number.isNaN(fetchedAt)) {
+    return null;
+  }
+  return Date.now() - fetchedAt;
 }
 
 export function validateMarketSnapshot(

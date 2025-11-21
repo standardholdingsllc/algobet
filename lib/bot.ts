@@ -1,15 +1,24 @@
 import { KalshiAPI } from './markets/kalshi';
 import { PolymarketAPI } from './markets/polymarket';
 import { SXBetAPI } from './markets/sxbet';
-import { findArbitrageOpportunities, calculateBetSizes, validateOpportunity } from './arbitrage';
+import { scanArbitrageOpportunities, calculateBetSizes, validateOpportunity } from './arbitrage';
 import { AdaptiveScanner, detectLiveEvents } from './adaptive-scanner';
 import { HotMarketTracker } from './hot-market-tracker';
 import { KVStorage } from './kv-storage';
 import { MarketFeedService } from './market-feed-service';
 import { MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { sendBalanceAlert } from './email';
-import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog } from '@/types';
+import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog, BotConfig, TrackedMarket, MarketFilterInput } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
+
+interface PlatformMarketSummary {
+  platform: Market['platform'];
+  total: number;
+  withinWindow: number;
+  expired: number;
+  beyondWindow: number;
+  invalidExpiry: number;
+}
 
 export class ArbitrageBotEngine {
   private kalshi: KalshiAPI;
@@ -159,6 +168,7 @@ export class ArbitrageBotEngine {
     // Note: We fetch more markets than we'll execute on to find opportunities
     // Execution is filtered by maxDaysToExpiry in executeBet()
     const filters = this.marketFeedService.buildFiltersFromConfig(config);
+    this.logConfigSummary(config, filters);
     const cachedMarkets = await this.marketFeedService.loadCachedMarkets(filters, {
       maxAgeMs: MARKET_SNAPSHOT_TTL_SECONDS * 1000,
       fallbackToLiveFetch: true,
@@ -184,6 +194,16 @@ export class ArbitrageBotEngine {
       );
     }
 
+    const platformSummaries = this.computePlatformSummaries(
+      {
+        kalshi: kalshiMarkets,
+        polymarket: polymarketMarkets,
+        sxbet: sxbetMarkets,
+      },
+      config.maxDaysToExpiry
+    );
+    platformSummaries.forEach((summary) => this.logPlatformSummary(summary));
+
     console.log(
       `Found ${kalshiMarkets.length} Kalshi, ${polymarketMarkets.length} Polymarket, ` +
       `and ${sxbetMarkets.length} sx.bet markets`
@@ -207,22 +227,34 @@ export class ArbitrageBotEngine {
       `🎯 Tracking ${trackingStats.totalTracked} markets across platforms ` +
       `(${trackingStats.liveTracked} live, ${trackingStats.totalPlatformCombinations} platform combinations)`
     );
+    const trackedMarkets = this.hotMarketTracker.getAllTrackedMarkets();
+    const crossPlatformPairs = this.countCrossPlatformPairs(trackedMarkets);
+    console.log(
+      `[ArbMatch] Cross-platform candidate pairs=${crossPlatformPairs} across ${trackedMarkets.length} tracked market(s)`
+    );
+    if (trackingStats.totalTracked === 0) {
+      this.logEmptyTrackerHint(platformSummaries);
+    }
 
     // STRATEGY 1: Check all tracked markets (priority)
     // For each market that exists on multiple platforms, check ALL platform combinations
     let trackedOpportunities: ArbitrageOpportunity[] = [];
-    const trackedMarkets = this.hotMarketTracker.getAllTrackedMarkets();
+    let trackedCandidateCount = 0;
+    let trackedProfitableCount = 0;
     
     for (const trackedMarket of trackedMarkets) {
       const combinations = this.hotMarketTracker.getAllCombinations(trackedMarket);
       
       for (const [market1, market2] of combinations) {
-        const opps = findArbitrageOpportunities(
+        const scanResult = scanArbitrageOpportunities(
           [market1],
           [market2],
-          config.minProfitMargin
+          config.minProfitMargin,
+          { label: 'tracked', silent: true }
         );
-        
+        trackedCandidateCount += scanResult.matchCount;
+        trackedProfitableCount += scanResult.profitableCount;
+        const opps = scanResult.opportunities;
         if (opps.length > 0) {
           console.log(
             `🔥 Found ${opps.length} arb(s) for tracked market: ${trackedMarket.displayTitle} ` +
@@ -232,12 +264,22 @@ export class ArbitrageBotEngine {
         }
       }
     }
+    console.log(
+      `[ArbMatch] Tracked combinations summary: candidates=${trackedCandidateCount}, ` +
+        `profitablePairs=${trackedProfitableCount} (minProfitMargin=${config.minProfitMargin}%)`
+    );
 
     // STRATEGY 2: General scan for new markets we haven't found yet
-    const generalOpportunities = findArbitrageOpportunities(
+    const generalScan = scanArbitrageOpportunities(
       allMarkets,
       allMarkets,
-      config.minProfitMargin
+      config.minProfitMargin,
+      { label: 'general', silent: true }
+    );
+    const generalOpportunities = generalScan.opportunities;
+    console.log(
+      `[ArbMatch] General scan summary: candidates=${generalScan.matchCount}, ` +
+        `profitablePairs=${generalScan.profitableCount} (minProfitMargin=${config.minProfitMargin}%)`
     );
 
     // Combine and deduplicate opportunities (tracked markets have priority)
@@ -490,6 +532,110 @@ export class ArbitrageBotEngine {
       await this.kalshi.cancelOrder(orderId);
     }
     // Polymarket cancellation would go here
+  }
+
+  private logConfigSummary(config: BotConfig, filters: MarketFilterInput): void {
+    const filterSummary = {
+      sportsOnly: config.marketFilters?.sportsOnly ?? false,
+      categories: config.marketFilters?.categories?.length ?? 0,
+      eventTypes: config.marketFilters?.eventTypes?.length ?? 0,
+      leagueTickers: config.marketFilters?.leagueTickers?.length ?? 0,
+      maxMarkets:
+        typeof config.marketFilters?.maxMarkets === 'number'
+          ? config.marketFilters?.maxMarkets
+          : '∞',
+    };
+    console.log(
+      `[BotConfig] maxDaysToExpiry=${config.maxDaysToExpiry}d, minProfitMargin=${config.minProfitMargin}%, ` +
+        `maxBetPercentage=${config.maxBetPercentage}%, simulationMode=${config.simulationMode}. ` +
+        `Snapshot window: ${filters.windowStart} → ${filters.windowEnd}. ` +
+        `Filters: sportsOnly=${filterSummary.sportsOnly}, categories=${filterSummary.categories}, ` +
+        `eventTypes=${filterSummary.eventTypes}, leagues=${filterSummary.leagueTickers}, ` +
+        `maxMarkets=${filterSummary.maxMarkets}`
+    );
+  }
+
+  private computePlatformSummaries(
+    perPlatform: Record<Market['platform'], Market[]>,
+    maxDaysToExpiry: number
+  ): PlatformMarketSummary[] {
+    return (Object.entries(perPlatform) as [Market['platform'], Market[]][])
+      .map(([platform, markets]) =>
+        this.summarizePlatformMarket(platform, markets, maxDaysToExpiry)
+      )
+      .sort((a, b) => a.platform.localeCompare(b.platform));
+  }
+
+  private summarizePlatformMarket(
+    platform: Market['platform'],
+    markets: Market[],
+    maxDaysToExpiry: number
+  ): PlatformMarketSummary {
+    const now = Date.now();
+    const windowMs = Math.max(maxDaysToExpiry, 0) * 24 * 60 * 60 * 1000;
+    const cutoff = now + windowMs;
+
+    let withinWindow = 0;
+    let expired = 0;
+    let beyondWindow = 0;
+    let invalidExpiry = 0;
+
+    for (const market of markets) {
+      const expiryTs = Date.parse(market.expiryDate);
+      if (Number.isNaN(expiryTs)) {
+        invalidExpiry += 1;
+        continue;
+      }
+      if (expiryTs < now) {
+        expired += 1;
+        continue;
+      }
+      if (expiryTs > cutoff) {
+        beyondWindow += 1;
+        continue;
+      }
+      withinWindow += 1;
+    }
+
+    return {
+      platform,
+      total: markets.length,
+      withinWindow,
+      expired,
+      beyondWindow,
+      invalidExpiry,
+    };
+  }
+
+  private logPlatformSummary(summary: PlatformMarketSummary): void {
+    console.log(
+      `[MarketFilter] ${summary.platform}: total=${summary.total}, ` +
+        `withinExecutionWindow=${summary.withinWindow}, expired=${summary.expired}, ` +
+        `beyondWindow=${summary.beyondWindow}, invalidExpiry=${summary.invalidExpiry}`
+    );
+  }
+
+  private countCrossPlatformPairs(trackedMarkets: TrackedMarket[]): number {
+    return trackedMarkets.reduce(
+      (sum, tracked) =>
+        sum + this.hotMarketTracker.getAllCombinations(tracked).length,
+      0
+    );
+  }
+
+  private logEmptyTrackerHint(
+    summaries: PlatformMarketSummary[]
+  ): void {
+    if (!summaries.length) {
+      return;
+    }
+    const breakdown = summaries
+      .map((summary) => `${summary.platform}=${summary.total}`)
+      .join(', ');
+    console.warn(
+      `[Bot] No cross-platform candidates after filters; per-platform totals ${breakdown}. ` +
+        'If this persists, review filter config or snapshot freshness.'
+    );
   }
 
   /**
