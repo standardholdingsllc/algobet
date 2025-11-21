@@ -51,7 +51,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
   - A secondary `kalshi:events` adapter targets `/events/{ticker}/markets` for league-specific feeds (driven by `leagueTickers` filter tokens).
 - **Polymarket**
   - Default adapter remains `polymarket:hybrid`, which leans on the battle-tested hybrid Gamma/CLOB client (`lib/markets/polymarket.ts`) so we retain per-page caching, fallbacks, and pricing normalization. Future overrides can switch to a pure Gamma adapter without touching the bot.
-  - Expiry derivation now always prefers `gameStartTime` when present—even if `sportsMarketType` or `gameId` are `null`—then falls back to `eventStartTime`, then UMA/end dates. The adapter logs sampled examples of where `gameStartTime` was applied or ignored so we can see why sports inventories drop out of the execution window.
+  - Expiry derivation now classifies markets as “sports” when the upstream metadata advertises a sports type/`gameId`, when `gameStartTime` and the closing window are within 48 hours, or when the question title clearly matches `vs.`/“win on” patterns. Only those sports-like markets prefer `gameStartTime`; all others fall back to `eventStartTime`/UMA/end dates so “by November 30” style markets remain inside the execution window. Logging records how many snapshots used `gameStartTime` vs. how many ignored it as non-sports, along with samples of each.
 - **SX.bet**
   - Adapter metadata captures the USDC base token requirement and documents `/orders/odds/best` fallback semantics. The handler wraps `SXBetAPI.getOpenMarkets`, so fee/odds logic stays centralized.
 

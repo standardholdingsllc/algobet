@@ -4,7 +4,8 @@ interface TestCase {
   name: string;
   fields: Parameters<typeof derivePolymarketExpiry>[0];
   expectedSource: string | undefined;
-  expectedIsoPrefix: string | null;
+  expectedIso: string | null;
+  assertAfterWindowStart?: string;
 }
 
 function assert(condition: unknown, message: string): void {
@@ -13,51 +14,15 @@ function assert(condition: unknown, message: string): void {
   }
 }
 
-const now = new Date();
-const later = new Date(now.getTime() + 60 * 60 * 1000);
-
 const testCases: TestCase[] = [
   {
-    name: 'uses gameStartTime even without sports metadata',
+    name: 'non-sports MrBeast market prefers endDateIso',
     fields: {
-      gameStartTime: later.toISOString(),
-      eventStartTime: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
-      endDate: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-      endDateIso: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-      umaEndDate: null,
-      umaEndDateIso: null,
-      startDate: null,
-      startDateIso: null,
-      sportsMarketType: null,
-      gameId: null,
-    },
-    expectedSource: 'gameStartTime',
-    expectedIsoPrefix: later.toISOString().slice(0, 16),
-  },
-  {
-    name: 'falls back to eventStartTime when gameStartTime missing',
-    fields: {
-      gameStartTime: null,
-      eventStartTime: later.toISOString(),
-      endDate: null,
-      endDateIso: null,
-      umaEndDate: null,
-      umaEndDateIso: null,
-      startDate: null,
-      startDateIso: null,
-      sportsMarketType: 'nfl',
-      gameId: 'abc',
-    },
-    expectedSource: 'eventStartTime',
-    expectedIsoPrefix: later.toISOString().slice(0, 16),
-  },
-  {
-    name: 'uses endDateIso when no sports timestamps available',
-    fields: {
-      gameStartTime: null,
+      question: 'Will another MrBeast video get 100m+ week 1 views by November 30?',
+      gameStartTime: '2025-09-26T15:49:00.000Z',
       eventStartTime: null,
-      endDateIso: later.toISOString(),
-      endDate: later.toISOString(),
+      endDateIso: '2025-11-30T00:00:00.000Z',
+      endDate: '2025-11-30T00:00:00.000Z',
       umaEndDate: null,
       umaEndDateIso: null,
       startDate: null,
@@ -66,7 +31,45 @@ const testCases: TestCase[] = [
       gameId: null,
     },
     expectedSource: 'endDateIso',
-    expectedIsoPrefix: later.toISOString().slice(0, 16),
+    expectedIso: '2025-11-30T00:00:00.000Z',
+    assertAfterWindowStart: '2025-11-21T06:15:23.644Z',
+  },
+  {
+    name: 'non-sports Bitcoin-by-date ignores gameStartTime',
+    fields: {
+      question: 'Another S&P 500 Company buys Bitcoin by November 30?',
+      gameStartTime: '2025-11-04T21:21:00.000Z',
+      eventStartTime: null,
+      endDateIso: '2025-11-30T00:00:00.000Z',
+      endDate: '2025-11-30T00:00:00.000Z',
+      umaEndDate: null,
+      umaEndDateIso: null,
+      startDate: null,
+      startDateIso: null,
+      sportsMarketType: null,
+      gameId: null,
+    },
+    expectedSource: 'endDateIso',
+    expectedIso: '2025-11-30T00:00:00.000Z',
+    assertAfterWindowStart: '2025-11-21T06:15:23.644Z',
+  },
+  {
+    name: 'sports Preston market still uses gameStartTime',
+    fields: {
+      question: 'Will Preston North End FC win on 2025-11-21?',
+      gameStartTime: '2025-11-21T20:00:00.000Z',
+      eventStartTime: null,
+      endDateIso: '2025-11-21T00:00:00.000Z',
+      endDate: '2025-11-21T00:00:00.000Z',
+      umaEndDate: null,
+      umaEndDateIso: null,
+      startDate: null,
+      startDateIso: null,
+      sportsMarketType: null,
+      gameId: null,
+    },
+    expectedSource: 'gameStartTime',
+    expectedIso: '2025-11-21T20:00:00.000Z',
   },
 ];
 
@@ -78,10 +81,16 @@ testCases.forEach((testCase) => {
     result.source === testCase.expectedSource,
     `[${testCase.name}] Expected source ${testCase.expectedSource}, received ${result.source}`
   );
-  if (testCase.expectedIsoPrefix && result.iso) {
+  assert(
+    result.iso === testCase.expectedIso,
+    `[${testCase.name}] Expected iso ${testCase.expectedIso}, received ${result.iso}`
+  );
+  if (testCase.assertAfterWindowStart) {
+    const expiryTs = result.iso ? Date.parse(result.iso) : NaN;
+    const windowStartTs = Date.parse(testCase.assertAfterWindowStart);
     assert(
-      result.iso.startsWith(testCase.expectedIsoPrefix),
-      `[${testCase.name}] Expected iso to start with ${testCase.expectedIsoPrefix}, received ${result.iso}`
+      !Number.isNaN(expiryTs) && expiryTs > windowStartTs,
+      `[${testCase.name}] Expected expiry ${result.iso} to be after windowStart ${testCase.assertAfterWindowStart}`
     );
   }
 });
