@@ -33,6 +33,16 @@ export default async function handler(
         filters: snapshot?.filters ?? null,
         ageMs: snapshot ? getSnapshotAgeMs(snapshot) : null,
         diagnostics: diagnostics ?? {},
+        stats: snapshot?.meta
+          ? {
+              rawMarkets: snapshot.meta.rawMarkets ?? null,
+              withinWindow: snapshot.meta.withinWindow ?? null,
+              hydratedWithOdds: snapshot.meta.hydratedWithOdds ?? null,
+              stopReason: snapshot.meta.stopReason ?? null,
+              pagesFetched: snapshot.meta.pagesFetched ?? null,
+              writer: snapshot.meta.writer ?? null,
+            }
+          : null,
       };
     })
   );

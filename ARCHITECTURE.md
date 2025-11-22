@@ -43,6 +43,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
   2. `loadCachedMarkets` – reads validated snapshots from Redis/disk and, if configured, falls back to live fetches when cache is stale/missing. When the bot opts into `persistOnFallback`, any live payload collected during that fallback is written back to Redis + disk immediately so the next run can reuse it even if the worker is offline.
   3. `persistSnapshots` – writes adapter metadata + filters back to the snapshot layer with schema versioning.
 - Shared helpers convert normalized filters into query params based on adapter `filterBindings`. Dates are coerced to ISO, CSV lists respect `joinWith`, and boolean bindings obey `trueValue/falseValue/omitIfFalse`.
+- Adapter configs can advertise a `minMarkets` expectation (e.g., SX.bet requires ≥100). If a cached snapshot falls below that threshold (based on `totalMarkets` or the `rawMarkets` metadata), the service logs `[MarketFeed] Snapshot for <platform> flagged as suspect`, forces a live refetch, and—when canonical filters are in play—self-heals the Redis/disk entry so the next cron invocation sees the fuller universe instead of continuing with a tiny snapshot.
 
 ### 2.3 Platform-specific behavior
 - **Kalshi**
@@ -55,6 +56,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - **SX.bet**
   - Adapter metadata now documents `/markets/active` pagination knobs (pageSize=50, paginationKey/nextKey) so the handler can walk every page before hydrating odds. Typical runs ingest several hundred active markets unless a `maxPages` cap is configured for safety.
   - `/orders/odds/best` remains the only place we apply the USDC base token filter; `/markets/active` is kept wide open per the docs. The handler wraps `SXBetAPI.getOpenMarkets`, so fee/odds logic stays centralized and logs summarize page-by-page counts.
+  - The platform’s `rest-active` adapter declares `minMarkets=100`. If cached snapshots report fewer than that (or the `rawMarkets` metadata drops below the threshold), MarketFeedService forces a live refetch and self-heals Redis/disk, preventing the bot from silently trading on a 25-market slice when the upstream exchange actually has ~2k active contracts.
 
 ---
 
@@ -72,6 +74,14 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
     filters?: MarketFilterInput;
     totalMarkets: number;
     markets: Market[];
+  meta?: {
+    rawMarkets?: number;
+    withinWindow?: number;
+    hydratedWithOdds?: number;
+    stopReason?: string;
+    pagesFetched?: number;
+    writer?: string;
+  };
   }
   ```
 - Validation (`validateMarketSnapshot`) runs before every write and after every read:
@@ -82,6 +92,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - `saveMarketSnapshots` now accepts per-platform metadata (adapter ID, filters, schema version) so downstream consumers know exactly which adapter produced a given snapshot.
 - The snapshot worker logs each successful write via `[SnapshotWorker] Saved snapshot ...` including adapter ID, schema version, Redis key, and disk path so it is obvious where the payload landed.
 - Ops can hit `/api/snapshots/debug` to inspect freshness, schema version, adapter metadata, and diagnostics (e.g., “missing in redis”) for each platform without triggering a bot scan.
+- Snapshot metadata (`meta`) captures adapter stats so debugging SX.bet is trivial: `rawMarkets` counts the direct `/markets/active` rows, `withinWindow` counts markets that survived the execution window, `hydratedWithOdds` reflects odds coverage, `stopReason` records why pagination ended (e.g., `maxPages cap (40)`), `pagesFetched` mirrors the adapter log, and `writer` indicates whether the snapshot came from the always-on worker or the bot’s self-healing fallback.
 
 ### 3.4 Self-healing snapshot seeding
 
@@ -213,7 +224,8 @@ Each route reuses the same modules that power the bot/worker, so behavior stays 
 - `scripts/test-*` helpers verify authentication, parameter formatting, and market normalization for each platform.
 - `npm run test-polymarket-expiry` and `npm run test-snapshot-health` provide quick guards for the Polymarket expiry prioritization and snapshot freshness helpers respectively.
 - `npm run test-cross-matching` exercises the semantic matcher across Kalshi, Polymarket, and sx.bet markets so “0 candidates” scenarios can be reproduced locally with deterministic fixtures.
-- `/api/snapshots/debug` surfaces live snapshot diagnostics (source, age, schema) for each platform, making it easy to confirm whether the bot is reading Redis or disk and why a snapshot might be skipped.
+- `/api/snapshots/debug` surfaces live snapshot diagnostics (source, age, schema) plus per-platform stats (`rawMarkets`, `withinWindow`, `hydratedWithOdds`, `stopReason`, `pagesFetched`, `writer`). Use it to confirm SX.bet is ingesting ≈2k markets; anything ≪100 means the snapshot worker is stale or pointing at the wrong Redis instance.
+- SX.bet small-snapshot runbook: (1) hit `/api/snapshots/debug` and inspect the SX.bet row (`rawMarkets`, `stopReason`). (2) Ensure the snapshot-worker host runs the same commit + env vars as Vercel (KV + SX creds). (3) If needed, delete the `market-snapshots:sxbet` key once—on the next cron run the bot will flag the missing snapshot, fetch all `/markets/active` pages via the paginated adapter, record the counts in metadata, and self-heal Redis/disk automatically.
 
 ---
 

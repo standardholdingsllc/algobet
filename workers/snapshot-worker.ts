@@ -51,7 +51,8 @@ class SnapshotWorker {
     const savedSnapshots = await this.feedService.persistSnapshots(
       payloads,
       filters,
-      config.maxDaysToExpiry
+      config.maxDaysToExpiry,
+      'snapshot-worker'
     );
     const snapshotDir = await getSnapshotDirectory();
     const timestamp = new Date().toISOString();
@@ -60,11 +61,15 @@ class SnapshotWorker {
         const diskPath = snapshotDir
           ? path.join(snapshotDir, `${platform}.json`)
           : 'disabled';
+        const meta = snapshot.meta;
+        const metaInfo = meta
+          ? `rawMarkets=${meta.rawMarkets ?? 'n/a'}, withinWindow=${meta.withinWindow ?? 'n/a'}, stopReason=${meta.stopReason ?? 'n/a'}, writer=${meta.writer ?? 'unknown'}`
+          : 'no meta';
         console.info(
           `[SnapshotWorker] Saved snapshot for ${platform} at ${timestamp} ` +
             `(totalMarkets=${snapshot.totalMarkets}, adapterId=${
               snapshot.adapterId ?? 'n/a'
-            }, schemaVersion=${snapshot.schemaVersion})`
+            }, schemaVersion=${snapshot.schemaVersion}, ${metaInfo})`
         );
         console.info(
           `[SnapshotWorker] Redis key=${MARKET_SNAPSHOT_KV_PREFIX}:${platform}, diskPath=${diskPath}`

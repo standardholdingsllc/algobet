@@ -174,6 +174,7 @@ const DEFAULT_MARKET_SOURCE_CONFIG: MarketSourceConfig = {
           nextCursorPath: 'data.nextKey',
           maxPages: 40,
         },
+        minMarkets: 100,
         notes:
           'Adapter walks every /markets/active page (pageSize≤50) until nextKey is empty so we ingest the full active universe; baseToken filtering happens when hydrating odds.',
       },

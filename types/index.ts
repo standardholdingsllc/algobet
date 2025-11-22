@@ -54,6 +54,15 @@ export interface AdapterPaginationConfig {
   limit?: number;
 }
 
+export interface SnapshotMeta {
+  rawMarkets?: number;
+  withinWindow?: number;
+  hydratedWithOdds?: number;
+  stopReason?: string;
+  pagesFetched?: number;
+  writer?: string;
+}
+
 export interface MarketAdapterConfig {
   id: string;
   name: string;
@@ -64,6 +73,7 @@ export interface MarketAdapterConfig {
   staticParams?: Record<string, string | number | boolean>;
   filterBindings?: Partial<Record<MarketFilterToken, FilterBinding>>;
   pagination?: AdapterPaginationConfig;
+  minMarkets?: number;
   notes?: string;
 }
 
@@ -237,4 +247,5 @@ export interface MarketSnapshot {
   filters?: MarketFilterInput;
   totalMarkets: number;
   markets: Market[];
+  meta?: SnapshotMeta;
 }

@@ -1,7 +1,13 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Redis } from '@upstash/redis';
-import { Market, MarketSnapshot, MarketFilterInput, MarketPlatform } from '@/types';
+import {
+  Market,
+  MarketSnapshot,
+  MarketFilterInput,
+  MarketPlatform,
+  SnapshotMeta,
+} from '@/types';
 import {
   MARKET_SNAPSHOT_KV_PREFIX,
   MARKET_SNAPSHOT_TTL_SECONDS,
@@ -72,6 +78,7 @@ interface SnapshotWriteOptions {
   adapterId?: string;
   filters?: MarketFilterInput;
   schemaVersion?: number;
+  meta?: SnapshotMeta;
 }
 
 export interface SnapshotLoadOptions {
@@ -143,6 +150,7 @@ async function writeSnapshot(
     filters: options.filters,
     totalMarkets: markets.length,
     markets,
+    meta: options.meta,
   };
 
   const validation = validateMarketSnapshot(snapshot);
@@ -178,6 +186,7 @@ export async function saveMarketSnapshots(
         filters: platformOverride.filters ?? options.filters,
         adapterId: platformOverride.adapterId,
         schemaVersion: platformOverride.schemaVersion,
+        meta: platformOverride.meta,
       });
       return [platform, snapshot] as const;
     });

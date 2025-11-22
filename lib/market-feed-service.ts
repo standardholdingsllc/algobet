@@ -6,6 +6,7 @@ import {
   MarketPlatform,
   MarketAdapterConfig,
   BotConfig,
+  SnapshotMeta,
 } from '@/types';
 import { MarketSourceConfigStore } from './market-source-config';
 import {
@@ -31,6 +32,7 @@ const SELF_HEAL_TOKEN = Symbol('market-feed-service.selfHealToken');
 interface AdapterResult {
   adapterId: string;
   markets: Market[];
+  stats?: SnapshotMeta;
 }
 
 interface LoadOptions {
@@ -66,7 +68,12 @@ const SNAPSHOT_DEFAULT_MAX_AGE_MS = MARKET_SNAPSHOT_TTL_SECONDS * 1000;
 type AdapterHandler = (
   adapterConfig: MarketAdapterConfig,
   filters: MarketFilterInput
-) => Promise<Market[]>;
+) => Promise<AdapterHandlerResult>;
+
+interface AdapterHandlerResult {
+  markets: Market[];
+  stats?: SnapshotMeta;
+}
 
 export class MarketFeedService {
   private polymarketApi = new PolymarketAPI();
@@ -147,8 +154,8 @@ export class MarketFeedService {
       );
     }
 
-    const markets = await handler(adapterConfig, filters);
-    return { adapterId: resolvedAdapterId, markets };
+    const { markets, stats } = await handler(adapterConfig, filters);
+    return { adapterId: resolvedAdapterId, markets, stats };
   }
 
   getSxBetFetchStats(): SXBetMarketFetchStats | null {
@@ -176,6 +183,16 @@ export class MarketFeedService {
     }
 
     for (const platform of platforms) {
+      const platformConfig = config[platform];
+      if (!platformConfig) {
+        console.warn(
+          `[MarketFeed] No MarketSourceConfig entry for ${platform}; skipping snapshot load.`
+        );
+        continue;
+      }
+      const defaultAdapterConfig =
+        platformConfig.adapters[platformConfig.defaultAdapter];
+
       const { snapshot, source, diagnostics } =
         await loadMarketSnapshotWithSource(platform, { maxAgeMs });
       const snapshotAgeMs = snapshot ? getSnapshotAgeMs(snapshot) : null;
@@ -184,7 +201,7 @@ export class MarketFeedService {
       const schemaMismatch =
         snapshot &&
         snapshot.schemaVersion !== MARKET_SNAPSHOT_SCHEMA_VERSION;
-      const usableSnapshot = Boolean(snapshot && isFresh && !schemaMismatch);
+      let usableSnapshot = Boolean(snapshot && isFresh && !schemaMismatch);
 
       const reasonParts: string[] = [];
       if (!snapshot) {
@@ -209,6 +226,26 @@ export class MarketFeedService {
         const diagSummary = summarizeDiagnostics(diagnostics);
         if (diagSummary) {
           reasonParts.push(diagSummary);
+        }
+      }
+
+      if (snapshot && usableSnapshot) {
+        const adapterIdForSnapshot =
+          snapshot.adapterId ?? platformConfig.defaultAdapter;
+        const adapterConfigForSnapshot =
+          platformConfig.adapters[adapterIdForSnapshot] ||
+          defaultAdapterConfig;
+        const suspectReason = this.getSnapshotSuspicionReason(
+          platform,
+          snapshot,
+          adapterConfigForSnapshot
+        );
+        if (suspectReason) {
+          usableSnapshot = false;
+          reasonParts.push(suspectReason);
+          console.warn(
+            `[MarketFeed] Snapshot for ${platform} flagged as suspect (${suspectReason}); will fetch live data instead.`
+          );
         }
       }
 
@@ -268,7 +305,8 @@ export class MarketFeedService {
           await this.persistSnapshots(
             fallbackSnapshots,
             filters,
-            persistMaxDays
+            persistMaxDays,
+            'bot-self-heal'
           );
           console.info(
             `[MarketFeed] Persisted fallback snapshots for ${fallbackPlatforms.join(
@@ -292,7 +330,8 @@ export class MarketFeedService {
   async persistSnapshots(
     payloads: Partial<Record<MarketPlatform, AdapterResult>>,
     filters: MarketFilterInput,
-    maxDaysToExpiry: number
+    maxDaysToExpiry: number,
+    writer?: string
   ): Promise<Partial<Record<MarketPlatform, MarketSnapshot>>> {
     const platformMarkets: Partial<Record<MarketPlatform, Market[]>> = {};
     const perPlatformOptions: Partial<
@@ -303,6 +342,7 @@ export class MarketFeedService {
           filters?: MarketFilterInput;
           maxDaysToExpiry?: number;
           schemaVersion?: number;
+          meta?: SnapshotMeta;
         }
       >
     > = {};
@@ -310,11 +350,19 @@ export class MarketFeedService {
     (Object.entries(payloads) as [MarketPlatform, AdapterResult][])
       .forEach(([platform, payload]) => {
         platformMarkets[platform] = payload.markets;
+        let meta: SnapshotMeta | undefined;
+        if (payload.stats) {
+          meta = { ...payload.stats };
+        }
+        if (writer) {
+          meta = { ...(meta ?? {}), writer };
+        }
         perPlatformOptions[platform] = {
           adapterId: payload.adapterId,
           filters,
           maxDaysToExpiry,
           schemaVersion: MARKET_SNAPSHOT_SCHEMA_VERSION,
+          meta,
         };
       });
 
@@ -328,32 +376,33 @@ export class MarketFeedService {
   private async handleKalshiMarkets(
     adapterConfig: MarketAdapterConfig,
     filters: MarketFilterInput
-  ): Promise<Market[]> {
+  ): Promise<AdapterHandlerResult> {
     const params = this.buildQueryParams(adapterConfig, filters);
     const pagination = adapterConfig.pagination;
     const maxMarkets =
       filters.maxMarkets ?? Number.POSITIVE_INFINITY;
     this.normalizeKalshiMarketParams(params);
 
-    return this.fetchKalshiMarketsFromEndpoint(
+    const markets = await this.fetchKalshiMarketsFromEndpoint(
       adapterConfig.endpoint,
       params,
       pagination,
       filters,
       maxMarkets
     );
+    return { markets };
   }
 
   private async handleKalshiEvents(
     adapterConfig: MarketAdapterConfig,
     filters: MarketFilterInput
-  ): Promise<Market[]> {
+  ): Promise<AdapterHandlerResult> {
     const tickers = filters.leagueTickers || [];
     if (!tickers.length) {
       console.warn(
         '[MarketFeed] Kalshi events adapter requires leagueTickers filter.'
       );
-      return [];
+      return { markets: [] };
     }
 
     const aggregated: Market[] = [];
@@ -370,21 +419,21 @@ export class MarketFeedService {
       );
       aggregated.push(...markets);
     }
-    return aggregated;
+    return { markets: aggregated };
   }
 
   private async handlePolymarketHybrid(
     _adapterConfig: MarketAdapterConfig,
     filters: MarketFilterInput
-  ): Promise<Market[]> {
+  ): Promise<AdapterHandlerResult> {
     const markets = await this.polymarketApi.getOpenMarkets(filters);
-    return this.applyExpiryFilter(markets, filters);
+    return { markets: this.applyExpiryFilter(markets, filters) };
   }
 
   private async handleSxBetRest(
     adapterConfig: MarketAdapterConfig,
     filters: MarketFilterInput
-  ): Promise<Market[]> {
+  ): Promise<AdapterHandlerResult> {
     const maxDays = this.getMaxDaysFromFilters(filters);
     const pageSize =
       adapterConfig.pagination?.limit &&
@@ -399,7 +448,20 @@ export class MarketFeedService {
       maxMarkets: filters.maxMarkets,
       staticParams: adapterConfig.staticParams,
     });
-    return this.applyExpiryFilter(markets, filters);
+    const sxbetStats = this.sxbetApi.getLastFetchStats();
+    const meta: SnapshotMeta | undefined = sxbetStats
+      ? {
+          rawMarkets: sxbetStats.rawMarkets,
+          withinWindow: sxbetStats.withinWindow,
+          hydratedWithOdds: sxbetStats.hydratedWithOdds,
+          stopReason: sxbetStats.stopReason,
+          pagesFetched: sxbetStats.pagesFetched,
+        }
+      : undefined;
+    return {
+      markets: this.applyExpiryFilter(markets, filters),
+      stats: meta,
+    };
   }
 
   private async fetchKalshiMarketsFromEndpoint(
@@ -743,6 +805,35 @@ export class MarketFeedService {
     );
   }
 
+  private getSnapshotSuspicionReason(
+    platform: MarketPlatform,
+    snapshot: MarketSnapshot,
+    adapterConfig?: MarketAdapterConfig
+  ): string | undefined {
+    const minMarkets = adapterConfig?.minMarkets;
+    if (!minMarkets || minMarkets <= 0) {
+      return undefined;
+    }
+    const totalMarkets =
+      snapshot.totalMarkets ?? snapshot.markets?.length ?? 0;
+    if (totalMarkets < minMarkets) {
+      return `markets=${totalMarkets} below expected minimum ${minMarkets}`;
+    }
+    if (
+      snapshot.meta?.rawMarkets !== undefined &&
+      snapshot.meta.rawMarkets < minMarkets
+    ) {
+      return `rawMarkets=${snapshot.meta.rawMarkets} below expected minimum ${minMarkets}`;
+    }
+    if (
+      snapshot.meta?.withinWindow !== undefined &&
+      snapshot.meta.withinWindow < minMarkets
+    ) {
+      return `withinWindow=${snapshot.meta.withinWindow} below expected minimum ${minMarkets}`;
+    }
+    return undefined;
+  }
+
   private applyExpiryFilter(
     markets: Market[],
     filters: MarketFilterInput
@@ -844,6 +935,9 @@ function logSnapshotHit(
     : '';
   const totalMarkets =
     snapshot.totalMarkets ?? snapshot.markets?.length ?? 0;
+  const metaInfo = snapshot.meta
+    ? `, rawMarkets=${snapshot.meta.rawMarkets ?? 'n/a'}, withinWindow=${snapshot.meta.withinWindow ?? 'n/a'}, writer=${snapshot.meta.writer ?? 'unknown'}, stopReason=${snapshot.meta.stopReason ?? 'n/a'}`
+    : '';
   console.info(
     `[MarketFeed] Using ${source ?? 'unknown'} snapshot for ${platform}: fetched ${formatDuration(
       ageMs
@@ -851,7 +945,7 @@ function logSnapshotHit(
       maxAgeMs
     )}) at ${snapshot.fetchedAt}, schema v${
       snapshot.schemaVersion
-    }, markets=${snapshot.markets.length}/${totalMarkets}${adapterInfo}${maxDaysInfo}${filterInfo}`
+    }, markets=${snapshot.markets.length}/${totalMarkets}${adapterInfo}${maxDaysInfo}${filterInfo}${metaInfo}`
   );
 }
 
