@@ -53,7 +53,8 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
   - Default adapter remains `polymarket:hybrid`, which leans on the battle-tested hybrid Gamma/CLOB client (`lib/markets/polymarket.ts`) so we retain per-page caching, fallbacks, and pricing normalization. Future overrides can switch to a pure Gamma adapter without touching the bot.
   - Expiry derivation now classifies markets as “sports” when the upstream metadata advertises a sports type/`gameId`, when `gameStartTime` and the closing window are within 48 hours, or when the question title clearly matches `vs.`/“win on” patterns. Only those sports-like markets prefer `gameStartTime`; all others fall back to `eventStartTime`/UMA/end dates so “by November 30” style markets remain inside the execution window. Logging records how many snapshots used `gameStartTime` vs. how many ignored it as non-sports, along with samples of each.
 - **SX.bet**
-  - Adapter metadata captures the USDC base token requirement and documents `/orders/odds/best` fallback semantics. The handler wraps `SXBetAPI.getOpenMarkets`, so fee/odds logic stays centralized.
+  - Adapter metadata now documents `/markets/active` pagination knobs (pageSize=50, paginationKey/nextKey) so the handler can walk every page before hydrating odds. Typical runs ingest several hundred active markets unless a `maxPages` cap is configured for safety.
+  - `/orders/odds/best` remains the only place we apply the USDC base token filter; `/markets/active` is kept wide open per the docs. The handler wraps `SXBetAPI.getOpenMarkets`, so fee/odds logic stays centralized and logs summarize page-by-page counts.
 
 ---
 
@@ -152,9 +153,10 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - Order placement signs EIP-712 payloads and posts them to the CLOB order endpoint.
 
 ### SX.bet (`lib/markets/sxbet.ts`, `services/sxbet.ts`)
-- Fetches `/markets/active` filtered by USDC base token and derives expiry from `gameTime`.
-- `fetchBestOddsMap` hydrates top-of-book odds via `/orders/odds/best`, falling back to `/orders` when necessary.
-- Odds are converted from SX.bet's probability representation to decimal odds before populating `Market` entries.
+- Fetches `/markets/active` with `pageSize=50` and follows `paginationKey` → `nextKey` until the cursor is empty (or a `maxPages` safety cap hits) so we routinely ingest the full active universe (hundreds of markets depending on season).
+- Derives expiry from `gameTime` and applies the same execution window the bot uses; cached stats log how many markets survive that filter plus how many hydrate with odds.
+- `fetchBestOddsMap` hydrates top-of-book odds via `/orders/odds/best` (with the mainnet USDC base token), falling back to `/orders` when necessary—USDC filtering only happens at this odds layer per the docs.
+- Odds are converted from SX.bet's percentage representation to decimal odds before populating `Market` entries, and adapter logs summarize per-page counts for observability.
 
 All integrations return the shared `Market` interface so arbitrage logic remains platform-agnostic.
 

@@ -158,7 +158,7 @@ const DEFAULT_MARKET_SOURCE_CONFIG: MarketSourceConfig = {
     platform: 'sxbet',
     docUrl: 'https://api.docs.sx.bet',
     defaultAdapter: 'rest-active',
-    supportedFilters: ['windowStart', 'windowEnd', 'categories'],
+    supportedFilters: ['windowStart', 'windowEnd', 'categories', 'maxMarkets'],
     adapters: {
       'rest-active': {
         id: 'rest-active',
@@ -166,10 +166,16 @@ const DEFAULT_MARKET_SOURCE_CONFIG: MarketSourceConfig = {
         adapterType: 'sxbet:rest',
         endpoint: '/markets/active',
         description:
-          'REST feed for SX.bet markets filtered by USDC base token; odds resolved via /orders/odds/best.',
-        staticParams: {
-          baseToken: '0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B',
+          'REST feed for SX.bet markets; pagination via paginationKey/nextKey and odds resolved via /orders/odds/best with the mainnet USDC token.',
+        pagination: {
+          limitParam: 'pageSize',
+          limit: 50,
+          cursorParam: 'paginationKey',
+          nextCursorPath: 'data.nextKey',
+          maxPages: 40,
         },
+        notes:
+          'Adapter walks every /markets/active page (pageSize≤50) until nextKey is empty so we ingest the full active universe; baseToken filtering happens when hydrating odds.',
       },
     },
   },

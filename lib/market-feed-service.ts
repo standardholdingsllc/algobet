@@ -20,7 +20,7 @@ import {
 } from './market-snapshots';
 import { KALSHI_API_BASE, MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { PolymarketAPI } from './markets/polymarket';
-import { SXBetAPI } from './markets/sxbet';
+import { SXBetAPI, SXBetMarketFetchStats } from './markets/sxbet';
 
 type CanonicalFilterInput = MarketFilterInput & {
   __selfHealToken?: symbol;
@@ -149,6 +149,10 @@ export class MarketFeedService {
 
     const markets = await handler(adapterConfig, filters);
     return { adapterId: resolvedAdapterId, markets };
+  }
+
+  getSxBetFetchStats(): SXBetMarketFetchStats | null {
+    return this.sxbetApi.getLastFetchStats();
   }
 
   async loadCachedMarkets(
@@ -378,11 +382,23 @@ export class MarketFeedService {
   }
 
   private async handleSxBetRest(
-    _adapterConfig: MarketAdapterConfig,
+    adapterConfig: MarketAdapterConfig,
     filters: MarketFilterInput
   ): Promise<Market[]> {
     const maxDays = this.getMaxDaysFromFilters(filters);
-    const markets = await this.sxbetApi.getOpenMarkets(maxDays);
+    const pageSize =
+      adapterConfig.pagination?.limit &&
+      adapterConfig.pagination.limit > 0
+        ? adapterConfig.pagination.limit
+        : undefined;
+    const markets = await this.sxbetApi.getOpenMarkets({
+      maxDaysToExpiry: maxDays,
+      endpoint: adapterConfig.endpoint,
+      pageSize,
+      maxPages: adapterConfig.pagination?.maxPages,
+      maxMarkets: filters.maxMarkets,
+      staticParams: adapterConfig.staticParams,
+    });
     return this.applyExpiryFilter(markets, filters);
   }
 

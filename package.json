@@ -12,6 +12,7 @@
     "test-sxbet": "node scripts/test-sxbet-api.js",
     "test-sxbet-params": "node scripts/test-sxbet-params.js",
     "test-sxbet-ws": "node scripts/test-sxbet-websocket.js",
+    "test-sxbet-markets": "node -r esbuild-register scripts/test-sxbet-markets.ts",
     "test-market-details": "node scripts/test-market-details.js",
     "test-fees": "node -r esbuild-register scripts/test-fee-calculations.js",
     "test-matching": "node -r esbuild-register scripts/test-market-matching.js",

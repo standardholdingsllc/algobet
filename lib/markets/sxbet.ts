@@ -2,8 +2,10 @@ import axios from 'axios';
 import { ethers } from 'ethers';
 import { Market } from '@/types';
 
-const BASE_URL = 'https://api.sx.bet';
+const BASE_URL = process.env.SXBET_API_BASE || 'https://api.sx.bet';
 const SXBET_BEST_ODDS_CHUNK = 25;
+const SXBET_MAX_PAGE_SIZE = 50;
+const DAY_MS = 86_400_000;
 
 // ERC20 ABI for balance queries
 const erc20ABI = [
@@ -74,6 +76,27 @@ interface SXBetFixture {
   awayTeam: string;
 }
 
+interface SXBetMarketFetchOptions {
+  maxDaysToExpiry: number;
+  endpoint?: string;
+  pageSize?: number;
+  maxPages?: number;
+  maxMarkets?: number;
+  staticParams?: Record<string, string | number | boolean | undefined>;
+}
+
+export interface SXBetMarketFetchStats {
+  endpoint: string;
+  pagesFetched: number;
+  rawMarkets: number;
+  withinWindow: number;
+  hydratedWithOdds: number;
+  stopReason: string;
+  pageSize: number;
+  maxPages?: number;
+  maxMarkets?: number;
+}
+
 /**
  * SX.bet API Integration
  * Documentation: https://api.docs.sx.bet/#introduction
@@ -91,18 +114,29 @@ interface SXBetFixture {
  * - Odds format: percentage odds / 10^20
  * - USDC on SX Network (not mainnet)
  * - 0% fees (both maker and taker)
+ *
+ * Doc divergence notes:
+ * - /markets/active ignores baseToken filters, so USDC filtering must happen when
+ *   hydrating odds via /orders/odds/best.
+ * - Pagination is cursor-based via pageSize + paginationKey → nextKey; this
+ *   implementation walks every page instead of stopping after the first payload.
  */
 export class SXBetAPI {
   private apiKey: string;
   private baseToken: string; // USDC address on SX Network
   private walletAddress: string;
   private privateKey: string;
+  private lastFetchStats: SXBetMarketFetchStats | null = null;
 
   constructor() {
     this.apiKey = process.env.SXBET_API_KEY || '';
     this.baseToken = '0x6629Ce1Cf35Cc1329ebB4F63202F3f197b3F050B'; // USDC on SX mainnet
     this.walletAddress = process.env.SXBET_WALLET_ADDRESS || '';
     this.privateKey = process.env.SXBET_PRIVATE_KEY || '';
+  }
+
+  getLastFetchStats(): SXBetMarketFetchStats | null {
+    return this.lastFetchStats;
   }
 
   /**
@@ -184,20 +218,116 @@ export class SXBetAPI {
   /**
    * Get active markets within expiry window
    */
-  async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
+  async getOpenMarkets(
+    maxDaysOrOptions: number | SXBetMarketFetchOptions
+  ): Promise<Market[]> {
     try {
-      const marketsResponse = await axios.get(`${BASE_URL}/markets/active`, {
-        headers: this.getHeaders(),
-        params: {
-          baseToken: this.baseToken,
-        },
-      });
+      const options: SXBetMarketFetchOptions =
+        typeof maxDaysOrOptions === 'number'
+          ? { maxDaysToExpiry: maxDaysOrOptions }
+          : maxDaysOrOptions;
 
-      const fixtureMap = new Map<string, SXBetFixture>();
-      const marketsData: SXBetMarket[] = marketsResponse.data.data?.markets || [];
-      console.log(`[sx.bet] Retrieved ${marketsData.length} active markets`);
+      const endpoint = options.endpoint || '/markets/active';
+      const pageSize = Math.min(
+        SXBET_MAX_PAGE_SIZE,
+        Math.max(1, options.pageSize ?? SXBET_MAX_PAGE_SIZE)
+      );
+      const maxPages =
+        typeof options.maxPages === 'number' && options.maxPages > 0
+          ? options.maxPages
+          : undefined;
+      const maxMarkets =
+        typeof options.maxMarkets === 'number' && options.maxMarkets > 0
+          ? options.maxMarkets
+          : undefined;
+      const staticParams = options.staticParams || {};
 
-      const marketHashes = marketsData.map((market) => market.marketHash);
+      const allMarkets: SXBetMarket[] = [];
+      let paginationKey: string | undefined;
+      let page = 0;
+      let stopReason = 'nextKey empty';
+      const seenKeys = new Set<string>();
+
+      while (true) {
+        if (maxPages && page >= maxPages) {
+          stopReason = `maxPages cap (${maxPages})`;
+          break;
+        }
+
+        page += 1;
+        const params: Record<string, string | number | boolean> = {
+          pageSize,
+        };
+        for (const [key, value] of Object.entries(staticParams)) {
+          if (value !== undefined && value !== null) {
+            params[key] = value;
+          }
+        }
+        if (paginationKey) {
+          params.paginationKey = paginationKey;
+        }
+
+        console.info(
+          `[sx.bet] /markets/active page ${page} → requesting params=${JSON.stringify(
+            {
+              pageSize,
+              paginationKey: paginationKey ?? '∅',
+            }
+          )}`
+        );
+
+        try {
+          const response = await axios.get(`${BASE_URL}${endpoint}`, {
+            headers: this.getHeaders(),
+            params,
+          });
+          const pageMarkets: SXBetMarket[] =
+            response.data?.data?.markets || [];
+          const nextKey: string | null | undefined =
+            response.data?.data?.nextKey;
+
+          console.info(
+            `[sx.bet] /markets/active page ${page} ← pageMarkets=${pageMarkets.length}, nextKey=${
+              nextKey ?? '∅'
+            }`
+          );
+
+          allMarkets.push(...pageMarkets);
+
+          if (maxMarkets && allMarkets.length >= maxMarkets) {
+            stopReason = `maxMarkets cap (${maxMarkets})`;
+            break;
+          }
+
+          if (!nextKey) {
+            stopReason = 'nextKey empty';
+            break;
+          }
+
+          if (seenKeys.has(nextKey)) {
+            stopReason = `nextKey repeated (${nextKey})`;
+            break;
+          }
+
+          seenKeys.add(nextKey);
+          paginationKey = nextKey;
+        } catch (pageError: any) {
+          stopReason = `request failed on page ${page}`;
+          console.error(
+            `[sx.bet] /markets/active page ${page} failed:`,
+            pageError?.response?.status ||
+              pageError?.message ||
+              pageError
+          );
+          break;
+        }
+      }
+
+      console.info(
+        `[sx.bet] Collected ${allMarkets.length} active markets across ${page} page(s) (stop=${stopReason}).`
+      );
+
+      const marketHashes = allMarkets.map((market) => market.marketHash);
       const bestOddsMap = await this.fetchBestOddsMap(marketHashes);
 
       let fallbackOrders: SXBetOrder[] | null = null;
@@ -214,7 +344,9 @@ export class SXBetAPI {
           });
           const orders: SXBetOrder[] = response.data?.data || [];
           fallbackOrders = orders;
-          console.log(`[sx.bet] Retrieved ${orders.length} active orders (fallback)`);
+          console.log(
+            `[sx.bet] Retrieved ${orders.length} active orders (fallback)`
+          );
         } catch (error: any) {
           console.warn(
             `[sx.bet] Orders endpoint failed (${error.response?.status}) - no fallback order data available`
@@ -225,29 +357,42 @@ export class SXBetAPI {
       };
 
       const markets: Market[] = [];
-      const maxDate = new Date();
-      maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
+      const now = new Date();
+      const maxDays = Math.max(1, options.maxDaysToExpiry ?? 5);
+      const maxDate = new Date(now.getTime() + maxDays * DAY_MS);
+      let withinWindow = 0;
+      let hydratedWithOdds = 0;
 
-      for (const market of marketsData) {
-        const fixture = fixtureMap.get(market.sportXeventId);
-        const expiryDate = this.deriveExpiryDate(market, fixture);
+      for (const market of allMarkets) {
+        const expiryDate = this.deriveExpiryDate(market);
 
         if (!expiryDate) {
-          console.warn(`[sx.bet] Skipping market ${market.marketHash} - no start time available`);
           continue;
         }
 
-        if (expiryDate > maxDate || expiryDate < new Date()) continue;
+        if (expiryDate > maxDate || expiryDate < now) {
+          continue;
+        }
+
+        withinWindow += 1;
 
         const bestOdds = bestOddsMap.get(market.marketHash);
 
         let outcomeOneOdds =
-          bestOdds?.outcomeOne?.percentageOdds !== null && bestOdds?.outcomeOne?.percentageOdds
-            ? this.convertToDecimalOdds(bestOdds.outcomeOne.percentageOdds, false)
+          bestOdds?.outcomeOne?.percentageOdds !== null &&
+          bestOdds?.outcomeOne?.percentageOdds
+            ? this.convertToDecimalOdds(
+                bestOdds.outcomeOne.percentageOdds,
+                false
+              )
             : null;
         let outcomeTwoOdds =
-          bestOdds?.outcomeTwo?.percentageOdds !== null && bestOdds?.outcomeTwo?.percentageOdds
-            ? this.convertToDecimalOdds(bestOdds.outcomeTwo.percentageOdds, false)
+          bestOdds?.outcomeTwo?.percentageOdds !== null &&
+          bestOdds?.outcomeTwo?.percentageOdds
+            ? this.convertToDecimalOdds(
+                bestOdds.outcomeTwo.percentageOdds,
+                false
+              )
             : null;
 
         if (!outcomeOneOdds || !outcomeTwoOdds) {
@@ -268,24 +413,32 @@ export class SXBetAPI {
           );
 
           const bestOutcomeOne = outcomeOneOrders.sort(
-            (a: SXBetOrder, b: SXBetOrder) => Number(a.percentageOdds) - Number(b.percentageOdds)
+            (a: SXBetOrder, b: SXBetOrder) =>
+              Number(a.percentageOdds) - Number(b.percentageOdds)
           )[0];
 
           const bestOutcomeTwo = outcomeTwoOrders.sort(
-            (a: SXBetOrder, b: SXBetOrder) => Number(a.percentageOdds) - Number(b.percentageOdds)
+            (a: SXBetOrder, b: SXBetOrder) =>
+              Number(a.percentageOdds) - Number(b.percentageOdds)
           )[0];
 
           if (!bestOutcomeOne || !bestOutcomeTwo) continue;
 
-          outcomeOneOdds = this.convertToDecimalOdds(bestOutcomeOne.percentageOdds, true);
-          outcomeTwoOdds = this.convertToDecimalOdds(bestOutcomeTwo.percentageOdds, true);
+          outcomeOneOdds = this.convertToDecimalOdds(
+            bestOutcomeOne.percentageOdds,
+            true
+          );
+          outcomeTwoOdds = this.convertToDecimalOdds(
+            bestOutcomeTwo.percentageOdds,
+            true
+          );
         }
 
         if (!outcomeOneOdds || !outcomeTwoOdds) continue;
 
-        const title = fixture
-          ? this.createMarketTitle(market, fixture)
-          : this.createFallbackTitle(market);
+        hydratedWithOdds += 1;
+
+        const title = this.createFallbackTitle(market);
 
         markets.push({
           id: market.marketHash,
@@ -300,9 +453,26 @@ export class SXBetAPI {
         });
       }
 
+      this.lastFetchStats = {
+        endpoint,
+        pagesFetched: page,
+        rawMarkets: allMarkets.length,
+        withinWindow,
+        hydratedWithOdds,
+        stopReason,
+        pageSize,
+        maxPages,
+        maxMarkets,
+      };
+
+      console.info(
+        `[sx.bet] Markets within window=${withinWindow}, with USDC odds=${hydratedWithOdds}`
+      );
+
       return markets;
     } catch (error) {
       console.error('Error fetching sx.bet markets:', error);
+      this.lastFetchStats = null;
       return [];
     }
   }
