@@ -40,7 +40,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
   - `sxbet:rest` (wraps the SX.bet REST integration).
 - Provides three key methods:
   1. `fetchLiveMarketsForPlatform/Platforms` – hits upstream APIs through adapters (used by the snapshot worker and as a bot fallback).
-  2. `loadCachedMarkets` – reads validated snapshots from Redis/disk and, if configured, falls back to live fetches when cache is stale/missing.
+  2. `loadCachedMarkets` – reads validated snapshots from Redis/disk and, if configured, falls back to live fetches when cache is stale/missing. When the bot opts into `persistOnFallback`, any live payload collected during that fallback is written back to Redis + disk immediately so the next run can reuse it even if the worker is offline.
   3. `persistSnapshots` – writes adapter metadata + filters back to the snapshot layer with schema versioning.
 - Shared helpers convert normalized filters into query params based on adapter `filterBindings`. Dates are coerced to ISO, CSV lists respect `joinWith`, and boolean bindings obey `trueValue/falseValue/omitIfFalse`.
 
@@ -82,6 +82,21 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - The snapshot worker logs each successful write via `[SnapshotWorker] Saved snapshot ...` including adapter ID, schema version, Redis key, and disk path so it is obvious where the payload landed.
 - Ops can hit `/api/snapshots/debug` to inspect freshness, schema version, adapter metadata, and diagnostics (e.g., “missing in redis”) for each platform without triggering a bot scan.
 
+### 3.4 Self-healing snapshot seeding
+
+- `MarketFeedService.loadCachedMarkets` can optionally persist live fallback payloads back to the snapshot store. This self-healing mode is gated behind an internal token that is only attached when `buildFiltersFromConfig` is used, preventing debug scripts from overwriting canonical snapshots with ad-hoc filters.
+- The cron bot enables `persistOnFallback` with the same filters the snapshot worker would use. The very first cron run in a brand-new environment therefore seeds `market-snapshots:*` in Upstash (and `/tmp/market-snapshots/*.json` on disk) even if `npm run snapshot-worker` isn’t running yet. Subsequent runs immediately benefit from cached payloads.
+- The snapshot worker remains the primary, always-on refresher. The bot’s persistence is intentionally opportunistic—it keeps trading when caches are cold and gives operators breathing room to restart the worker.
+
+**Verification flow**
+1. Trigger one bot invocation (e.g., hit `/api/bot/cron` via Vercel Scheduler or run `curl -X POST https://<deployment>/api/bot/cron` locally with the right auth headers).
+2. Call `/api/snapshots/debug` in the same environment (dashboard button or `curl https://<deployment>/api/snapshots/debug`).
+3. Confirm each platform shows a Redis or disk snapshot with:
+   - `schemaVersion=2`
+   - `filters.windowStart/windowEnd` that match the active `BotConfig` window (≈ `maxDaysToExpiry`)
+   - Adapter IDs that reflect the active registry (`kalshi:markets`, `polymarket:hybrid`, etc.)
+4. Start (or keep running) `npm run snapshot-worker` on your long-lived Node host. Watch its `[SnapshotWorker] Saved snapshot ...` logs to verify it keeps refreshing the same keys and directories; the bot will automatically fall back to the worker-provided snapshots on subsequent scans.
+
 ---
 
 ## 4. Background Snapshot Worker (`workers/snapshot-worker.ts`)
@@ -104,6 +119,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 2. Builds normalized filter preferences (window start/end, sports-only toggles) and calls `MarketFeedService.loadCachedMarkets`:
    - Prefers validated snapshots.
    - Falls back to live fetches if snapshots are stale or missing (with warnings so ops can address the worker).
+   - Immediately persists those live payloads back into the snapshot store so subsequent cron runs stop hammering live APIs even if the worker is still down.
 3. Logs per-platform counts and warns when a snapshot is empty.
    - Config + filter summaries, per-platform execution-window breakdowns, cross-platform candidate counts, and arbitrage scan stats are all emitted with `[BotConfig]`, `[MarketFilter]`, and `[ArbMatch]` tags so “Tracking 0 markets” situations can be diagnosed without digging into code.
 4. Flows markets into `HotMarketTracker`, removes expired entries, and runs the two-stage arbitrage search (tracked combinations first, general cross-scan second).

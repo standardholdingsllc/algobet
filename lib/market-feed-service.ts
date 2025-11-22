@@ -22,6 +22,12 @@ import { KALSHI_API_BASE, MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { PolymarketAPI } from './markets/polymarket';
 import { SXBetAPI } from './markets/sxbet';
 
+type CanonicalFilterInput = MarketFilterInput & {
+  __selfHealToken?: symbol;
+};
+
+const SELF_HEAL_TOKEN = Symbol('market-feed-service.selfHealToken');
+
 interface AdapterResult {
   adapterId: string;
   markets: Market[];
@@ -31,6 +37,13 @@ interface LoadOptions {
   platforms?: MarketPlatform[];
   maxAgeMs?: number;
   fallbackToLiveFetch?: boolean;
+  /**
+   * persistOnFallback is reserved for canonical filters that originate from
+   * buildFiltersFromConfig. We stamp those filters with an internal token and
+   * silently ignore persistence if the token is missing.
+   */
+  persistOnFallback?: boolean;
+  persistMaxDaysToExpiry?: number;
 }
 
 interface KalshiMarket {
@@ -71,7 +84,7 @@ export class MarketFeedService {
     const now = new Date();
     const maxDate = new Date(now.getTime() + config.maxDaysToExpiry * DAY_MS);
     const preferences = config.marketFilters || {};
-    const filterInput: MarketFilterInput = {
+    const filterInput: CanonicalFilterInput = {
       windowStart: now.toISOString(),
       windowEnd: maxDate.toISOString(),
       sportsOnly: preferences.sportsOnly,
@@ -82,6 +95,7 @@ export class MarketFeedService {
     if (typeof preferences.maxMarkets === 'number') {
       filterInput.maxMarkets = preferences.maxMarkets;
     }
+    filterInput.__selfHealToken = SELF_HEAL_TOKEN;
     return filterInput;
   }
 
@@ -145,8 +159,17 @@ export class MarketFeedService {
     const platforms =
       options.platforms ?? (Object.keys(config) as MarketPlatform[]);
     const results: Partial<Record<MarketPlatform, Market[]>> = {};
+    const fallbackSnapshots: Partial<Record<MarketPlatform, AdapterResult>> = {};
 
     const maxAgeMs = options.maxAgeMs ?? SNAPSHOT_DEFAULT_MAX_AGE_MS;
+    const allowPersistence =
+      Boolean(options.persistOnFallback) && this.hasCanonicalSelfHealToken(filters);
+
+    if (options.persistOnFallback && !allowPersistence) {
+      console.warn(
+        '[MarketFeed] persistOnFallback requested with non-canonical filters; persistence disabled for this call.'
+      );
+    }
 
     for (const platform of platforms) {
       const { snapshot, source, diagnostics } =
@@ -214,6 +237,9 @@ export class MarketFeedService {
             filters
           );
           results[platform] = live.markets;
+          if (allowPersistence) {
+            fallbackSnapshots[platform] = live;
+          }
         } catch (error: any) {
           console.error(
             `[MarketFeed] Failed live fallback for ${platform}:`,
@@ -226,24 +252,56 @@ export class MarketFeedService {
       }
     }
 
+    if (allowPersistence) {
+      const fallbackPlatforms = Object.keys(
+        fallbackSnapshots
+      ) as MarketPlatform[];
+      if (fallbackPlatforms.length > 0) {
+        const persistMaxDays =
+          options.persistMaxDaysToExpiry ??
+          this.getMaxDaysFromFilters(filters);
+        try {
+          await this.persistSnapshots(
+            fallbackSnapshots,
+            filters,
+            persistMaxDays
+          );
+          console.info(
+            `[MarketFeed] Persisted fallback snapshots for ${fallbackPlatforms.join(
+              ', '
+            )} (${fallbackPlatforms.length} total).`
+          );
+        } catch (error: any) {
+          console.error(
+            `[MarketFeed] Failed to persist fallback snapshots for ${fallbackPlatforms.join(
+              ', '
+            )}:`,
+            error?.message || error
+          );
+        }
+      }
+    }
+
     return results as Record<MarketPlatform, Market[]>;
   }
 
   async persistSnapshots(
-    payloads: Record<MarketPlatform, AdapterResult>,
+    payloads: Partial<Record<MarketPlatform, AdapterResult>>,
     filters: MarketFilterInput,
     maxDaysToExpiry: number
-  ): Promise<Record<MarketPlatform, MarketSnapshot>> {
-    const platformMarkets: Record<string, Market[]> = {};
-    const perPlatformOptions: Record<
-      MarketPlatform,
-      {
-        adapterId?: string;
-        filters?: MarketFilterInput;
-        maxDaysToExpiry?: number;
-        schemaVersion?: number;
-      }
-    > = {} as any;
+  ): Promise<Partial<Record<MarketPlatform, MarketSnapshot>>> {
+    const platformMarkets: Partial<Record<MarketPlatform, Market[]>> = {};
+    const perPlatformOptions: Partial<
+      Record<
+        MarketPlatform,
+        {
+          adapterId?: string;
+          filters?: MarketFilterInput;
+          maxDaysToExpiry?: number;
+          schemaVersion?: number;
+        }
+      >
+    > = {};
 
     (Object.entries(payloads) as [MarketPlatform, AdapterResult][])
       .forEach(([platform, payload]) => {
@@ -659,6 +717,14 @@ export class MarketFeedService {
       yesPrice: derivedYes,
       noPrice: derivedNo,
     };
+  }
+
+  private hasCanonicalSelfHealToken(
+    filters: MarketFilterInput
+  ): filters is CanonicalFilterInput {
+    return (
+      (filters as CanonicalFilterInput).__selfHealToken === SELF_HEAL_TOKEN
+    );
   }
 
   private applyExpiryFilter(

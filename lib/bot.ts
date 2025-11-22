@@ -172,6 +172,8 @@ export class ArbitrageBotEngine {
     const cachedMarkets = await this.marketFeedService.loadCachedMarkets(filters, {
       maxAgeMs: MARKET_SNAPSHOT_TTL_SECONDS * 1000,
       fallbackToLiveFetch: true,
+      persistOnFallback: true,
+      persistMaxDaysToExpiry: config.maxDaysToExpiry,
     });
 
     const kalshiMarkets = cachedMarkets.kalshi || [];

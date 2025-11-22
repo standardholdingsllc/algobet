@@ -162,27 +162,29 @@ async function writeSnapshot(
 }
 
 export async function saveMarketSnapshots(
-  platformMarkets: Record<string, Market[]>,
+  platformMarkets: Partial<Record<MarketPlatform, Market[]>>,
   options: {
     maxDaysToExpiry?: number;
     filters?: MarketFilterInput;
     perPlatformOptions?: Partial<Record<MarketPlatform, SnapshotWriteOptions>>;
   } = {}
-): Promise<Record<MarketPlatform, MarketSnapshot>> {
-  const tasks = Object.entries(platformMarkets).map(async ([platform, markets]) => {
-    const platformKey = platform as MarketPlatform;
-    const platformOverride = options.perPlatformOptions?.[platformKey] ?? {};
-    const snapshot = await writeSnapshot(platformKey, markets, {
-      maxDaysToExpiry:
-        platformOverride.maxDaysToExpiry ?? options.maxDaysToExpiry,
-      filters: platformOverride.filters ?? options.filters,
-      adapterId: platformOverride.adapterId,
-      schemaVersion: platformOverride.schemaVersion,
+): Promise<Partial<Record<MarketPlatform, MarketSnapshot>>> {
+  const tasks = (Object.entries(platformMarkets) as [MarketPlatform, Market[]][])
+    .map(async ([platform, markets]) => {
+      const platformOverride = options.perPlatformOptions?.[platform] ?? {};
+      const snapshot = await writeSnapshot(platform, markets, {
+        maxDaysToExpiry:
+          platformOverride.maxDaysToExpiry ?? options.maxDaysToExpiry,
+        filters: platformOverride.filters ?? options.filters,
+        adapterId: platformOverride.adapterId,
+        schemaVersion: platformOverride.schemaVersion,
+      });
+      return [platform, snapshot] as const;
     });
-    return [platformKey, snapshot] as const;
-  });
   const entries = await Promise.all(tasks);
-  return Object.fromEntries(entries) as Record<MarketPlatform, MarketSnapshot>;
+  return Object.fromEntries(entries) as Partial<
+    Record<MarketPlatform, MarketSnapshot>
+  >;
 }
 
 async function writeSnapshotToDisk(
