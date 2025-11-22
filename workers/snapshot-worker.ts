@@ -63,7 +63,7 @@ class SnapshotWorker {
           : 'disabled';
         const meta = snapshot.meta;
         const metaInfo = meta
-          ? `rawMarkets=${meta.rawMarkets ?? 'n/a'}, withinWindow=${meta.withinWindow ?? 'n/a'}, stopReason=${meta.stopReason ?? 'n/a'}, writer=${meta.writer ?? 'unknown'}`
+          ? `rawMarkets=${meta.rawMarkets ?? 'n/a'}, withinWindow=${meta.withinWindow ?? 'n/a'}, hydratedWithOdds=${meta.hydratedWithOdds ?? 'n/a'}, reusedOdds=${meta.reusedOdds ?? 'n/a'}, stopReason=${meta.stopReason ?? 'n/a'}, writer=${meta.writer ?? 'unknown'}`
           : 'no meta';
         console.info(
           `[SnapshotWorker] Saved snapshot for ${platform} at ${timestamp} ` +

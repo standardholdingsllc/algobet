@@ -38,6 +38,7 @@ export default async function handler(
               rawMarkets: snapshot.meta.rawMarkets ?? null,
               withinWindow: snapshot.meta.withinWindow ?? null,
               hydratedWithOdds: snapshot.meta.hydratedWithOdds ?? null,
+              reusedOdds: snapshot.meta.reusedOdds ?? null,
               stopReason: snapshot.meta.stopReason ?? null,
               pagesFetched: snapshot.meta.pagesFetched ?? null,
               writer: snapshot.meta.writer ?? null,

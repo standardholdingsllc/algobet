@@ -5,6 +5,10 @@ import { Market } from '@/types';
 const BASE_URL = process.env.SXBET_API_BASE || 'https://api.sx.bet';
 const SXBET_BEST_ODDS_CHUNK = 25;
 const SXBET_MAX_PAGE_SIZE = 50;
+const SXBET_ODDS_CHUNK_DELAY_MS = 75;
+const SXBET_RATE_LIMIT_BACKOFF_MS = 500;
+const SXBET_MAX_CHUNK_RETRIES = 3;
+const SXBET_ODDS_REUSE_MAX_MS = 5 * 60 * 1000; // 5 minutes
 const DAY_MS = 86_400_000;
 
 // ERC20 ABI for balance queries
@@ -76,6 +80,12 @@ interface SXBetFixture {
   awayTeam: string;
 }
 
+interface PreviousOddsEntry {
+  yesPrice: number;
+  noPrice: number;
+  oddsAsOf?: string;
+}
+
 interface SXBetMarketFetchOptions {
   maxDaysToExpiry: number;
   endpoint?: string;
@@ -83,6 +93,7 @@ interface SXBetMarketFetchOptions {
   maxPages?: number;
   maxMarkets?: number;
   staticParams?: Record<string, string | number | boolean | undefined>;
+  previousMarkets?: Market[];
 }
 
 export interface SXBetMarketFetchStats {
@@ -91,6 +102,7 @@ export interface SXBetMarketFetchStats {
   rawMarkets: number;
   withinWindow: number;
   hydratedWithOdds: number;
+  reusedOdds: number;
   stopReason: string;
   pageSize: number;
   maxPages?: number;
@@ -184,35 +196,178 @@ export class SXBetAPI {
 
   private async fetchBestOddsMap(
     marketHashes: string[]
-  ): Promise<Map<string, SXBetBestOddsEntry>> {
+  ): Promise<{
+    map: Map<string, SXBetBestOddsEntry>;
+    processed: number;
+    stoppedEarly: boolean;
+  }> {
     const bestOddsMap = new Map<string, SXBetBestOddsEntry>();
-    if (marketHashes.length === 0) {
-      return bestOddsMap;
+    if (!marketHashes.length) {
+      return { map: bestOddsMap, processed: 0, stoppedEarly: false };
     }
 
+    let processed = 0;
     for (let i = 0; i < marketHashes.length; i += SXBET_BEST_ODDS_CHUNK) {
       const chunk = marketHashes.slice(i, i + SXBET_BEST_ODDS_CHUNK);
-      try {
-        const response = await axios.get(`${BASE_URL}/orders/odds/best`, {
-          headers: this.getHeaders(),
-          params: {
-            marketHashes: chunk.join(','),
-            baseToken: this.baseToken,
-          },
-        });
+      let attempt = 0;
+      while (true) {
+        try {
+          const response = await axios.get(`${BASE_URL}/orders/odds/best`, {
+            headers: this.getHeaders(),
+            params: {
+              marketHashes: chunk.join(','),
+              baseToken: this.baseToken,
+            },
+          });
 
-        const bestOdds: SXBetBestOddsEntry[] = response.data?.data?.bestOdds || [];
-        for (const entry of bestOdds) {
-          bestOddsMap.set(entry.marketHash, entry);
+          const bestOdds: SXBetBestOddsEntry[] =
+            response.data?.data?.bestOdds || [];
+          for (const entry of bestOdds) {
+            bestOddsMap.set(entry.marketHash, entry);
+          }
+          processed += chunk.length;
+          if (SXBET_ODDS_CHUNK_DELAY_MS > 0) {
+            await this.sleep(SXBET_ODDS_CHUNK_DELAY_MS);
+          }
+          break;
+        } catch (error: any) {
+          const status = error?.response?.status;
+          if (status === 429) {
+            attempt += 1;
+            const retryMs =
+              this.getRetryAfterMs(error?.response?.headers) ??
+              SXBET_RATE_LIMIT_BACKOFF_MS * attempt;
+            console.warn(
+              `[sx.bet] Rate limited while hydrating odds (chunk=${chunk.length}, attempt=${attempt}); retrying in ${retryMs}ms.`
+            );
+            if (attempt >= SXBET_MAX_CHUNK_RETRIES) {
+              const remaining = marketHashes.length - i;
+              console.warn(
+                `[sx.bet] Odds hydration aborted for ${remaining} market(s) due to persistent 429 responses.`
+              );
+              return {
+                map: bestOddsMap,
+                processed,
+                stoppedEarly: true,
+              };
+            }
+            await this.sleep(retryMs);
+            continue;
+          }
+
+          console.warn(
+            `[sx.bet] Best odds chunk failed (${status ?? 'unknown'}) for ${
+              chunk.length
+            } market(s); skipping chunk.`
+          );
+          processed += chunk.length;
+          break;
         }
-      } catch (error: any) {
-        console.warn(
-          `[sx.bet] Best odds chunk failed (${error.response?.status}) for ${chunk.length} market(s)`
-        );
       }
     }
 
-    return bestOddsMap;
+    return { map: bestOddsMap, processed, stoppedEarly: false };
+  }
+
+  private getRetryAfterMs(
+    headers?: Record<string, string | number>
+  ): number | null {
+    if (!headers) {
+      return null;
+    }
+    const retryHeader =
+      (headers['retry-after'] as string | undefined) ??
+      (headers['Retry-After'] as string | undefined);
+    if (!retryHeader) {
+      return null;
+    }
+    const numericValue = Number(retryHeader);
+    if (Number.isFinite(numericValue)) {
+      return Math.max(0, numericValue) * 1000;
+    }
+    const retryDate = Date.parse(retryHeader);
+    if (!Number.isNaN(retryDate)) {
+      const delta = retryDate - Date.now();
+      return delta > 0 ? delta : 0;
+    }
+    return null;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    if (ms <= 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private buildPreviousOddsMap(
+    previousMarkets?: Market[]
+  ): Map<string, PreviousOddsEntry> {
+    const map = new Map<string, PreviousOddsEntry>();
+    if (!previousMarkets) {
+      return map;
+    }
+    for (const market of previousMarkets) {
+      if (
+        typeof market.yesPrice === 'number' &&
+        typeof market.noPrice === 'number' &&
+        market.oddsAsOf
+      ) {
+        map.set(market.id, {
+          yesPrice: market.yesPrice,
+          noPrice: market.noPrice,
+          oddsAsOf: market.oddsAsOf,
+        });
+      }
+    }
+    return map;
+  }
+
+  private tryReuseOdds(
+    market: SXBetMarket,
+    expiry: Date,
+    previousOddsMap: Map<string, PreviousOddsEntry>,
+    nowTs: number
+  ): Market | null {
+    const cached = previousOddsMap.get(market.marketHash);
+    if (!cached || !cached.oddsAsOf) {
+      return null;
+    }
+    const oddsTimestamp = Date.parse(cached.oddsAsOf);
+    if (Number.isNaN(oddsTimestamp)) {
+      return null;
+    }
+    if (nowTs - oddsTimestamp > SXBET_ODDS_REUSE_MAX_MS) {
+      return null;
+    }
+    return this.createMarketPayload(
+      market,
+      expiry,
+      cached.yesPrice,
+      cached.noPrice,
+      cached.oddsAsOf
+    );
+  }
+
+  private createMarketPayload(
+    market: SXBetMarket,
+    expiry: Date,
+    yesPrice: number,
+    noPrice: number,
+    oddsAsOf?: string
+  ): Market {
+    return {
+      id: market.marketHash,
+      platform: 'sxbet',
+      ticker: market.marketHash.substring(0, 16),
+      marketType: 'sportsbook',
+      title: this.createFallbackTitle(market),
+      yesPrice,
+      noPrice,
+      expiryDate: expiry.toISOString(),
+      volume: 0,
+      oddsAsOf,
+    };
   }
 
   /**
@@ -327,8 +482,9 @@ export class SXBetAPI {
         `[sx.bet] Collected ${allMarkets.length} active markets across ${page} page(s) (stop=${stopReason}).`
       );
 
-      const marketHashes = allMarkets.map((market) => market.marketHash);
-      const bestOddsMap = await this.fetchBestOddsMap(marketHashes);
+      const previousOddsMap = this.buildPreviousOddsMap(
+        options.previousMarkets
+      );
 
       let fallbackOrders: SXBetOrder[] | null = null;
       const loadFallbackOrders = async (): Promise<SXBetOrder[]> => {
@@ -356,26 +512,77 @@ export class SXBetAPI {
         return fallbackOrders;
       };
 
-      const markets: Market[] = [];
+      const hydratedMarketsById = new Map<string, Market>();
       const now = new Date();
+      const nowTs = now.getTime();
       const maxDays = Math.max(1, options.maxDaysToExpiry ?? 5);
       const maxDate = new Date(now.getTime() + maxDays * DAY_MS);
-      let withinWindow = 0;
-      let hydratedWithOdds = 0;
+
+      const prioritizedMarkets: {
+        market: SXBetMarket;
+        expiry: Date;
+      }[] = [];
 
       for (const market of allMarkets) {
         const expiryDate = this.deriveExpiryDate(market);
-
         if (!expiryDate) {
           continue;
         }
-
         if (expiryDate > maxDate || expiryDate < now) {
           continue;
         }
+        prioritizedMarkets.push({ market, expiry: expiryDate });
+      }
 
-        withinWindow += 1;
+      prioritizedMarkets.sort(
+        (a, b) => a.expiry.getTime() - b.expiry.getTime()
+      );
 
+      const marketsNeedingOdds: {
+        market: SXBetMarket;
+        expiry: Date;
+      }[] = [];
+
+      for (const entry of prioritizedMarkets) {
+        const reused = this.tryReuseOdds(
+          entry.market,
+          entry.expiry,
+          previousOddsMap,
+          nowTs
+        );
+        if (reused) {
+          hydratedMarketsById.set(entry.market.marketHash, reused);
+        } else {
+          marketsNeedingOdds.push(entry);
+        }
+      }
+
+      const withinWindow = prioritizedMarkets.length;
+      const reusedOdds = hydratedMarketsById.size;
+
+      console.info(
+        `[sx.bet] Odds hydration starting: totalInWindow=${withinWindow}, reusedFromSnapshot=${reusedOdds}, toFetch=${marketsNeedingOdds.length}`
+      );
+
+      let hydratedWithOdds = hydratedMarketsById.size;
+
+      const { map: bestOddsMap, processed, stoppedEarly } =
+        await this.fetchBestOddsMap(
+          marketsNeedingOdds.map((entry) => entry.market.marketHash)
+        );
+
+      if (stoppedEarly) {
+        const remaining = Math.max(
+          0,
+          marketsNeedingOdds.length - processed
+        );
+        console.warn(
+          `[sx.bet] Odds hydration stopped early due to rate limits; hydrated ${processed} market(s), remaining=${remaining}.`
+        );
+      }
+
+      for (const entry of marketsNeedingOdds) {
+        const { market, expiry } = entry;
         const bestOdds = bestOddsMap.get(market.marketHash);
 
         let outcomeOneOdds =
@@ -436,22 +643,26 @@ export class SXBetAPI {
 
         if (!outcomeOneOdds || !outcomeTwoOdds) continue;
 
-        hydratedWithOdds += 1;
-
-        const title = this.createFallbackTitle(market);
-
-        markets.push({
-          id: market.marketHash,
-          platform: 'sxbet',
-          ticker: market.marketHash.substring(0, 16),
-          marketType: 'sportsbook',
-          title,
-          yesPrice: outcomeOneOdds,
-          noPrice: outcomeTwoOdds,
-          expiryDate: expiryDate.toISOString(),
-          volume: 0,
-        });
+        hydratedMarketsById.set(
+          market.marketHash,
+          this.createMarketPayload(
+            market,
+            expiry,
+            outcomeOneOdds,
+            outcomeTwoOdds,
+            new Date().toISOString()
+          )
+        );
       }
+
+      const finalMarkets: Market[] = [];
+      for (const entry of prioritizedMarkets) {
+        const hydrated = hydratedMarketsById.get(entry.market.marketHash);
+        if (hydrated) {
+          finalMarkets.push(hydrated);
+        }
+      }
+      hydratedWithOdds = hydratedMarketsById.size;
 
       this.lastFetchStats = {
         endpoint,
@@ -459,6 +670,7 @@ export class SXBetAPI {
         rawMarkets: allMarkets.length,
         withinWindow,
         hydratedWithOdds,
+        reusedOdds,
         stopReason,
         pageSize,
         maxPages,
@@ -466,10 +678,10 @@ export class SXBetAPI {
       };
 
       console.info(
-        `[sx.bet] Markets within window=${withinWindow}, with USDC odds=${hydratedWithOdds}`
+        `[sx.bet] Markets within window=${withinWindow}, with USDC odds=${hydratedWithOdds} (reused=${reusedOdds})`
       );
 
-      return markets;
+      return finalMarkets;
     } catch (error) {
       console.error('Error fetching sx.bet markets:', error);
       this.lastFetchStats = null;

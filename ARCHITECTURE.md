@@ -56,6 +56,8 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - **SX.bet**
   - Adapter metadata now documents `/markets/active` pagination knobs (pageSize=50, paginationKey/nextKey) so the handler can walk every page before hydrating odds. Typical runs ingest several hundred active markets unless a `maxPages` cap is configured for safety.
   - `/orders/odds/best` remains the only place we apply the USDC base token filter; `/markets/active` is kept wide open per the docs. The handler wraps `SXBetAPI.getOpenMarkets`, so fee/odds logic stays centralized and logs summarize page-by-page counts.
+  - Odds hydration is rate-limit aware: markets are sorted by earliest expiry, odds are reused from the previous snapshot when they’re ≤5 minutes old (`oddsAsOf` on each market), and `/orders/odds/best` chunks run sequentially with small delays/exponential backoff. If SX.bet returns 429 after the configured retries, the adapter logs the remaining market count, stops requesting, and still returns the odds it already collected so we never lose the whole run.
+  - Snapshot metadata records `rawMarkets`, `withinWindow`, `hydratedWithOdds`, `reusedOdds`, `pagesFetched`, and `stopReason`. The suspicious-snapshot guard treats SX.bet snapshots with <100 `rawMarkets`/`withinWindow`/`hydratedWithOdds` as suspect and automatically refetches + self-heals Redis/disk on the next cron invocation.
   - The platform’s `rest-active` adapter declares `minMarkets=100`. If cached snapshots report fewer than that (or the `rawMarkets` metadata drops below the threshold), MarketFeedService forces a live refetch and self-heals Redis/disk, preventing the bot from silently trading on a 25-market slice when the upstream exchange actually has ~2k active contracts.
 
 ---
@@ -92,6 +94,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - `saveMarketSnapshots` now accepts per-platform metadata (adapter ID, filters, schema version) so downstream consumers know exactly which adapter produced a given snapshot.
 - The snapshot worker logs each successful write via `[SnapshotWorker] Saved snapshot ...` including adapter ID, schema version, Redis key, and disk path so it is obvious where the payload landed.
 - Ops can hit `/api/snapshots/debug` to inspect freshness, schema version, adapter metadata, and diagnostics (e.g., “missing in redis”) for each platform without triggering a bot scan.
+- Snapshot metadata (`meta`) captures adapter stats so debugging SX.bet is trivial: `rawMarkets` counts the direct `/markets/active` rows, `withinWindow` counts markets that survived the execution window, `hydratedWithOdds` reports how many markets actually have USDC odds, `reusedOdds` shows how many of those odds were carried forward from the previous snapshot, and `stopReason`/`pagesFetched` document the pagination status. Each `Market` now carries an `oddsAsOf` timestamp so odds reuse is bounded (currently 5 minutes).
 - Snapshot metadata (`meta`) captures adapter stats so debugging SX.bet is trivial: `rawMarkets` counts the direct `/markets/active` rows, `withinWindow` counts markets that survived the execution window, `hydratedWithOdds` reflects odds coverage, `stopReason` records why pagination ended (e.g., `maxPages cap (40)`), `pagesFetched` mirrors the adapter log, and `writer` indicates whether the snapshot came from the always-on worker or the bot’s self-healing fallback.
 
 ### 3.4 Self-healing snapshot seeding
@@ -222,6 +225,7 @@ Each route reuses the same modules that power the bot/worker, so behavior stays 
 - `logs.txt` captures recent bot runs (balances, page counts, adaptive scanner decisions) for regression debugging.
 - `scripts/dump-markets.ts` can still backfill local snapshots, but the preferred path is running `npm run snapshot-worker`.
 - `scripts/test-*` helpers verify authentication, parameter formatting, and market normalization for each platform.
+- `scripts/test-sxbet-markets.ts --twice` runs two consecutive SX.bet fetches, persisting the first snapshot so the second run demonstrates odds reuse (watch `reusedOdds` climb while `/orders/odds/best` calls drop).
 - `npm run test-polymarket-expiry` and `npm run test-snapshot-health` provide quick guards for the Polymarket expiry prioritization and snapshot freshness helpers respectively.
 - `npm run test-cross-matching` exercises the semantic matcher across Kalshi, Polymarket, and sx.bet markets so “0 candidates” scenarios can be reproduced locally with deterministic fixtures.
 - `/api/snapshots/debug` surfaces live snapshot diagnostics (source, age, schema) plus per-platform stats (`rawMarkets`, `withinWindow`, `hydratedWithOdds`, `stopReason`, `pagesFetched`, `writer`). Use it to confirm SX.bet is ingesting ≈2k markets; anything ≪100 means the snapshot worker is stale or pointing at the wrong Redis instance.

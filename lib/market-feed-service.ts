@@ -13,6 +13,7 @@ import {
   MARKET_SNAPSHOT_SCHEMA_VERSION,
   saveMarketSnapshots,
   loadMarketSnapshotWithSource,
+  loadMarketSnapshot,
   isSnapshotFresh,
   getSnapshotAgeMs,
   SnapshotSource,
@@ -440,13 +441,15 @@ export class MarketFeedService {
       adapterConfig.pagination.limit > 0
         ? adapterConfig.pagination.limit
         : undefined;
-    const markets = await this.sxbetApi.getOpenMarkets({
+    const previousSnapshot = await loadMarketSnapshot('sxbet');
+    const marketsResult = await this.sxbetApi.getOpenMarkets({
       maxDaysToExpiry: maxDays,
       endpoint: adapterConfig.endpoint,
       pageSize,
       maxPages: adapterConfig.pagination?.maxPages,
       maxMarkets: filters.maxMarkets,
       staticParams: adapterConfig.staticParams,
+      previousMarkets: previousSnapshot?.markets,
     });
     const sxbetStats = this.sxbetApi.getLastFetchStats();
     const meta: SnapshotMeta | undefined = sxbetStats
@@ -454,12 +457,13 @@ export class MarketFeedService {
           rawMarkets: sxbetStats.rawMarkets,
           withinWindow: sxbetStats.withinWindow,
           hydratedWithOdds: sxbetStats.hydratedWithOdds,
+          reusedOdds: sxbetStats.reusedOdds,
           stopReason: sxbetStats.stopReason,
           pagesFetched: sxbetStats.pagesFetched,
         }
       : undefined;
     return {
-      markets: this.applyExpiryFilter(markets, filters),
+      markets: this.applyExpiryFilter(marketsResult, filters),
       stats: meta,
     };
   }
@@ -831,6 +835,12 @@ export class MarketFeedService {
     ) {
       return `withinWindow=${snapshot.meta.withinWindow} below expected minimum ${minMarkets}`;
     }
+    if (
+      snapshot.meta?.hydratedWithOdds !== undefined &&
+      snapshot.meta.hydratedWithOdds < minMarkets
+    ) {
+      return `hydratedWithOdds=${snapshot.meta.hydratedWithOdds} below expected minimum ${minMarkets}`;
+    }
     return undefined;
   }
 
@@ -936,7 +946,7 @@ function logSnapshotHit(
   const totalMarkets =
     snapshot.totalMarkets ?? snapshot.markets?.length ?? 0;
   const metaInfo = snapshot.meta
-    ? `, rawMarkets=${snapshot.meta.rawMarkets ?? 'n/a'}, withinWindow=${snapshot.meta.withinWindow ?? 'n/a'}, writer=${snapshot.meta.writer ?? 'unknown'}, stopReason=${snapshot.meta.stopReason ?? 'n/a'}`
+    ? `, rawMarkets=${snapshot.meta.rawMarkets ?? 'n/a'}, withinWindow=${snapshot.meta.withinWindow ?? 'n/a'}, hydratedWithOdds=${snapshot.meta.hydratedWithOdds ?? 'n/a'}, reusedOdds=${snapshot.meta.reusedOdds ?? 'n/a'}, writer=${snapshot.meta.writer ?? 'unknown'}, stopReason=${snapshot.meta.stopReason ?? 'n/a'}`
     : '';
   console.info(
     `[MarketFeed] Using ${source ?? 'unknown'} snapshot for ${platform}: fetched ${formatDuration(

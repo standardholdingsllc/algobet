@@ -11,6 +11,7 @@ export interface Market {
   expiryDate: string;
   volume?: number;
   liquidity?: number;
+  oddsAsOf?: string;
 }
 
 export type MarketPlatform = Market['platform'];
@@ -60,6 +61,7 @@ export interface SnapshotMeta {
   hydratedWithOdds?: number;
   stopReason?: string;
   pagesFetched?: number;
+  reusedOdds?: number;
   writer?: string;
 }
 
