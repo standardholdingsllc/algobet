@@ -214,6 +214,7 @@ All integrations return the shared `Market` interface so arbitrage logic remains
 | `/api/balances`, `/api/balances/refresh` | Serve cached balances + trigger on-demand refresh. |
 | `/api/bets`, `/api/opportunity-logs`, `/api/export`, `/api/export-opportunities` | Reporting endpoints powering dashboard exports. |
 | `/api/config`, `/api/data` | Read/write bot configuration stored in KV. |
+| `/api/snapshots/raw` | Streams the latest cached MarketSnapshot JSON (per platform) without hitting upstream vendors. |
 
 Each route reuses the same modules that power the bot/worker, so behavior stays consistent across deployment targets.
 
@@ -229,6 +230,7 @@ Each route reuses the same modules that power the bot/worker, so behavior stays 
 - `npm run test-polymarket-expiry` and `npm run test-snapshot-health` provide quick guards for the Polymarket expiry prioritization and snapshot freshness helpers respectively.
 - `npm run test-cross-matching` exercises the semantic matcher across Kalshi, Polymarket, and sx.bet markets so “0 candidates” scenarios can be reproduced locally with deterministic fixtures.
 - `/api/snapshots/debug` surfaces live snapshot diagnostics (source, age, schema) plus per-platform stats (`rawMarkets`, `withinWindow`, `hydratedWithOdds`, `stopReason`, `pagesFetched`, `writer`). Use it to confirm SX.bet is ingesting ≈2k markets; anything ≪100 means the snapshot worker is stale or pointing at the wrong Redis instance.
+- `/api/snapshots/raw?platform=<id>` downloads the full cached snapshot JSON (Kalshi/Polymarket/SX.bet) so ops can diff payloads locally without shell access.
 - SX.bet small-snapshot runbook: (1) hit `/api/snapshots/debug` and inspect the SX.bet row (`rawMarkets`, `stopReason`). (2) Ensure the snapshot-worker host runs the same commit + env vars as Vercel (KV + SX creds). (3) If needed, delete the `market-snapshots:sxbet` key once—on the next cron run the bot will flag the missing snapshot, fetch all `/markets/active` pages via the paginated adapter, record the counts in metadata, and self-heal Redis/disk automatically.
 
 ---

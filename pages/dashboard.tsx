@@ -4,7 +4,7 @@ import StatsCard from '@/components/StatsCard';
 import ProfitChart from '@/components/ProfitChart';
 import BetsTable from '@/components/BetsTable';
 import ConfigPanel from '@/components/ConfigPanel';
-import { Bet, DailyStats, AccountBalance } from '@/types';
+import { Bet, DailyStats, AccountBalance, MarketPlatform } from '@/types';
 import { TrendingUp, Activity, Wallet, RefreshCw } from 'lucide-react';
 
 interface BotHealth {
@@ -37,6 +37,12 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false);
   const [exportPeriod, setExportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  // Snapshot download buttons fetch cached MarketSnapshot JSON via the raw API route.
+  const snapshotDownloadLinks: { platform: MarketPlatform; label: string }[] = [
+    { platform: 'kalshi', label: 'Download Kalshi JSON' },
+    { platform: 'polymarket', label: 'Download Polymarket JSON' },
+    { platform: 'sxbet', label: 'Download SX.bet JSON' },
+  ];
 
   useEffect(() => {
     // Load data on mount
@@ -356,6 +362,25 @@ export default function DashboardPage() {
             >
               {exporting ? 'Exporting...' : '📥 Export'}
             </button>
+          </div>
+        </div>
+
+        {/* Snapshot Downloads - allows grabbing the cached snapshots from Redis/KV */}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-2">Download latest snapshots</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Downloads the latest cached MarketSnapshot JSON directly from Redis / KV for offline inspection.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {snapshotDownloadLinks.map(({ platform, label }) => (
+              <a
+                key={platform}
+                href={`/api/snapshots/raw?platform=${platform}`}
+                className="inline-flex items-center justify-center px-4 py-3 rounded-lg bg-gray-900 text-white font-semibold hover:bg-gray-800 transition-colors text-center"
+              >
+                {label}
+              </a>
+            ))}
           </div>
         </div>
 
