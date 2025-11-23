@@ -251,3 +251,20 @@ export interface MarketSnapshot {
   markets: Market[];
   meta?: SnapshotMeta;
 }
+
+export interface LlmReadyMarket {
+  id: string;
+  platform: MarketPlatform;
+  type: 'prediction' | 'sportsbook';
+  title: string;
+  expiry: string;
+  category?: string;
+  leagueOrTopic?: string;
+}
+
+export interface LlmReadySnapshot {
+  platform: MarketPlatform;
+  generatedAt: string;
+  totalMarkets: number;
+  markets: LlmReadyMarket[];
+}

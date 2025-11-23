@@ -103,6 +103,12 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - The cron bot enables `persistOnFallback` with the same filters the snapshot worker would use. The very first cron run in a brand-new environment therefore seeds `market-snapshots:*` in Upstash (and `/tmp/market-snapshots/*.json` on disk) even if `npm run snapshot-worker` isn’t running yet. Subsequent runs immediately benefit from cached payloads.
 - The snapshot worker remains the primary, always-on refresher. The bot’s persistence is intentionally opportunistic—it keeps trading when caches are cold and gives operators breathing room to restart the worker.
 
+### 3.5 LLM-ready snapshot derivations
+
+- `/api/snapshots/llm` streams a stripped, download-only JSON payload that is derived from cached snapshots via `loadMarketSnapshotWithSource` (never by hitting upstream vendors).
+- `lib/llm-snapshots.ts` converts a `MarketSnapshot` into the slimmer `LlmReadySnapshot`, keeping only the semantic fields DeepSeek needs (`id`, `platform`, market type, title, expiry ± optional taxonomy) and recording a fresh `generatedAt` timestamp for each download.
+- The dashboard exposes a “Download LLM-ready snapshots” card with the same styling as the raw snapshot card so operators can grab either the full JSON or the token-efficient version without leaving the UI.
+
 **Verification flow**
 1. Trigger one bot invocation (e.g., hit `/api/bot/cron` via Vercel Scheduler or run `curl -X POST https://<deployment>/api/bot/cron` locally with the right auth headers).
 2. Call `/api/snapshots/debug` in the same environment (dashboard button or `curl https://<deployment>/api/snapshots/debug`).
