@@ -108,6 +108,7 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - `/api/snapshots/llm` streams a stripped, download-only JSON payload that is derived from cached snapshots via `loadMarketSnapshotWithSource` (never by hitting upstream vendors).
 - `lib/llm-snapshots.ts` converts a `MarketSnapshot` into the slimmer `LlmReadySnapshot`, keeping only the semantic fields DeepSeek needs (`id`, `platform`, market type, title, expiry ± optional taxonomy) and recording a fresh `generatedAt` timestamp for each download.
 - The dashboard exposes a “Download LLM-ready snapshots” card with the same styling as the raw snapshot card so operators can grab either the full JSON or the token-efficient version without leaving the UI.
+- LLM-ready Kalshi payloads automatically drop the noisy `KXMVESPORTSMULTIGAMEEXTENDED-*` multi-leg markets so the matcher doesn’t waste tokens on combinatorial tickets. Canonical snapshots still retain them for other tooling.
 
 **Verification flow**
 1. Trigger one bot invocation (e.g., hit `/api/bot/cron` via Vercel Scheduler or run `curl -X POST https://<deployment>/api/bot/cron` locally with the right auth headers).

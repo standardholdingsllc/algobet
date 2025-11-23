@@ -1,4 +1,11 @@
-import { LlmReadyMarket, LlmReadySnapshot, MarketSnapshot } from '@/types';
+import {
+  LlmReadyMarket,
+  LlmReadySnapshot,
+  Market,
+  MarketSnapshot,
+} from '@/types';
+
+const KALSHI_MULTI_GAME_PREFIX = 'KXMVESPORTSMULTIGAMEEXTENDED';
 
 function normalizeExpiryDate(
   value: string | undefined,
@@ -16,11 +23,22 @@ function normalizeExpiryDate(
   return new Date(timestamp).toISOString();
 }
 
+function shouldIncludeInLlmSnapshot(
+  snapshot: MarketSnapshot,
+  market: Market
+): boolean {
+  if (snapshot.platform === 'kalshi') {
+    if (market.ticker?.startsWith(KALSHI_MULTI_GAME_PREFIX)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function toLlmReadyMarket(
   snapshot: MarketSnapshot,
-  marketIndex: number
+  market: Market
 ): LlmReadyMarket {
-  const market = snapshot.markets[marketIndex];
   return {
     id: market.id,
     platform: snapshot.platform,
@@ -31,12 +49,16 @@ function toLlmReadyMarket(
 }
 
 export function toLlmReadySnapshot(snapshot: MarketSnapshot): LlmReadySnapshot {
+  const filteredMarkets = snapshot.markets.filter((market) =>
+    shouldIncludeInLlmSnapshot(snapshot, market)
+  );
+
   return {
     platform: snapshot.platform,
     generatedAt: new Date().toISOString(),
-    totalMarkets: snapshot.markets.length,
-    markets: snapshot.markets.map((_, index) =>
-      toLlmReadyMarket(snapshot, index)
+    totalMarkets: filteredMarkets.length,
+    markets: filteredMarkets.map((market) =>
+      toLlmReadyMarket(snapshot, market)
     ),
   };
 }
