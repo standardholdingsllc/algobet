@@ -4,7 +4,13 @@ import StatsCard from '@/components/StatsCard';
 import ProfitChart from '@/components/ProfitChart';
 import BetsTable from '@/components/BetsTable';
 import ConfigPanel from '@/components/ConfigPanel';
-import { Bet, DailyStats, AccountBalance, MarketPlatform } from '@/types';
+import {
+  Bet,
+  DailyStats,
+  AccountBalance,
+  MarketPlatform,
+  MatchGraph,
+} from '@/types';
 import { TrendingUp, Activity, Wallet, RefreshCw } from 'lucide-react';
 
 interface BotHealth {
@@ -37,6 +43,9 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false);
   const [exportPeriod, setExportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  const [isRunningMatch, setIsRunningMatch] = useState(false);
+  const [arbableSummary, setArbableSummary] = useState<MatchGraph | null>(null);
+  const [matchError, setMatchError] = useState<string | null>(null);
   // Snapshot download buttons fetch cached MarketSnapshot JSON via the raw API route.
   const snapshotDownloadLinks: { platform: MarketPlatform; label: string }[] = [
     { platform: 'kalshi', label: 'Download Kalshi JSON' },
@@ -147,6 +156,28 @@ export default function DashboardPage() {
       console.error('Error exporting data:', error);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleRunMatch = async () => {
+    setIsRunningMatch(true);
+    setMatchError(null);
+    try {
+      const response = await fetch('/api/match-graph/preview');
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = data?.error || data?.message || `HTTP ${response.status}`;
+        throw new Error(message);
+      }
+      if (!data?.graph) {
+        throw new Error('Response did not include a match graph.');
+      }
+      setArbableSummary(data.graph as MatchGraph);
+    } catch (error: any) {
+      console.error('Failed to run match-graph preview:', error);
+      setMatchError(error?.message || 'Failed to run Gemini match');
+    } finally {
+      setIsRunningMatch(false);
     }
   };
 
@@ -406,6 +437,50 @@ export default function DashboardPage() {
               </a>
             ))}
           </div>
+        </div>
+
+        {/* Gemini Arbable Markets (On Demand) */}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold mb-2">Gemini Arbable Markets (On Demand)</h2>
+              <p className="text-sm text-gray-600">
+                Run the same Gemini-based matcher that powers the nightly cron. Defaults to a preview run that does not overwrite the canonical graph.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRunMatch}
+              disabled={isRunningMatch}
+              className="px-3 py-2 rounded border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isRunningMatch ? 'Running…' : 'Run LLM match now'}
+            </button>
+          </div>
+          {arbableSummary && (
+            <div className="mt-2 text-xs text-gray-600">
+              Last on-demand run:{' '}
+              {new Date(arbableSummary.generatedAt).toLocaleString(undefined, {
+                timeZone: 'UTC',
+              })}{' '}
+              UTC — {arbableSummary.edges.length} arbable edges
+            </div>
+          )}
+          {matchError && (
+            <div className="mt-2 text-xs text-red-600">
+              Error: {matchError}
+            </div>
+          )}
+          {arbableSummary && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs underline">
+                Show arbable JSON
+              </summary>
+              <pre className="mt-2 max-h-80 overflow-auto text-xs bg-gray-900 text-gray-100 p-2 rounded">
+                {JSON.stringify(arbableSummary.edges, null, 2)}
+              </pre>
+            </details>
+          )}
         </div>
 
         {/* Configuration Panel */}

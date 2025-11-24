@@ -13,6 +13,10 @@
     {
       "path": "/api/bot/watchdog",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/match-graph/run",
+      "schedule": "0 5 * * *"
     }
   ],
   "github": {

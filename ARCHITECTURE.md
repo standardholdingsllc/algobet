@@ -119,6 +119,33 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
    - Adapter IDs that reflect the active registry (`kalshi:markets`, `polymarket:hybrid`, etc.)
 4. Start (or keep running) `npm run snapshot-worker` on your long-lived Node host. Watch its `[SnapshotWorker] Saved snapshot ...` logs to verify it keeps refreshing the same keys and directories; the bot will automatically fall back to the worker-provided snapshots on subsequent scans.
 
+### 3.6 Gemini-powered match graph (daily)
+
+- `pages/api/match-graph/run.ts` is a dedicated Vercel cron endpoint (schedule it once per day, e.g., noon UTC) that orchestrates an LLM-only job. It requires `MATCH_GRAPH_CRON_SECRET` (falls back to `CRON_SECRET`) and can be dry-run with `?persist=false`.
+- `lib/gemini-match-graph.ts` drives the workflow:
+  1. Loads the latest cached snapshots for `kalshi`, `polymarket`, and `sxbet`, converts them to their `LlmReadySnapshot` form (id, title, type, expiry only), and optionally trims the set with `maxMarketsPerPlatform`.
+  2. Builds a single JSON payload `{ "kalshi":[{key,title,type,expiry}], ... }` plus a natural-language instruction block that defines the allowed edge types (`same_event`, `same_outcome`, `opposite_outcome`, `subset`), explains the market key convention (`<platform>:<id>`), and embeds the response schema.
+  3. Calls **Gemini 2.0 Flash** through `@google/generative-ai` with `responseMimeType=application/json`, low temperature, and a 1 M-token context (ample for ≈430 k-token inputs).
+  4. Parses the JSON response, clamps confidences into `[0,1]`, dedupes `MarketKey`s, and assigns deterministic IDs to every cluster/edge before stamping `MatchGraph.version=1`.
+  5. Persists the graph through `lib/match-graph-store.ts`, which mirrors the snapshot storage pattern: the graph is written to Upstash (`match-graph:latest`, TTL 24 h) and to disk (`data/match-graph.json` locally or `/tmp/match-graph/match-graph.json` on Vercel).
+- `lib/match-graph-store.ts` also exposes `loadMatchGraph(maxAgeMs?)` so the bot (or any report) can pull the most recent graph using the same Redis→disk fallback logic as snapshots. Graph metadata tracks the model name plus per-platform market counts, making it easy to verify that the prompt contained full inventories.
+- Configure `GOOGLE_GEMINI_API_KEY` in Vercel/CI secrets; without it the worker throws a descriptive error before issuing any network calls.
+- Scheduled execution is defined in `vercel.json` via `{"path":"/api/match-graph/run","schedule":"0 5 * * *"}`. Vercel Cron runs that GET once per day at 05:00 UTC (midnight Eastern).
+- Authentication: the endpoint requires `Authorization: Bearer <secret>` where `<secret>` is `MATCH_GRAPH_CRON_SECRET` (if set) otherwise `CRON_SECRET`. Vercel Cron should be configured with the same secret; manual runs can use `curl -X POST https://<host>/api/match-graph/run -H "Authorization: Bearer $MATCH_GRAPH_CRON_SECRET"`.
+- `/api/match-graph/run` accepts both GET and POST. Cron jobs rely on GET; POST remains available for manual re-runs with optional `persist`/`maxMarkets` query parameters.
+- `/api/match-graph/preview` is a GET-only route wired to the dashboard’s “Gemini Arbable Markets (On Demand)” card. It calls the same Gemini worker with `persist=false` by default, returns the fresh `MatchGraph` JSON (including `edges`) for inspection, and allows power users to opt into `?persist=true&maxMarkets=500` without touching the nightly cron output.
+- `types/index.ts` now codifies the structure the bot consumes:
+
+```
+MatchGraph {
+  version: 1;
+  generatedAt: ISO timestamp;
+  clusters: Array<{ id; label?; markets: MarketKey[] }>;
+  edges: Array<{ id; type; markets: MarketKey[]; confidence; annotation? }>;
+  metadata?: { model?: string; requestMarkets?: Record<platform, count>; notes?: string[] };
+}
+```
+
 ---
 
 ## 4. Background Snapshot Worker (`workers/snapshot-worker.ts`)
@@ -190,6 +217,7 @@ All integrations return the shared `Market` interface so arbitrage logic remains
 | **Vercel KV / Upstash** | `lib/kv-storage.ts` | Balances, configuration (including new `marketFilters` preferences), bets, arbitrage groups, opportunity logs, daily stats. |
 | **Market snapshots** | `lib/market-snapshots.ts` | Schema-validated JSON (Upstash + disk) consumed by the bot. |
 | **Market source config** | `lib/market-source-config.ts` | Authoritative schema describing adapters, filter bindings, doc links, and pagination knobs per platform. |
+| **Match graph** | `lib/match-graph-store.ts` | Gemini-built `MatchGraph` (clusters + edges) stored in Upstash + disk for bot consumption. |
 | **Local JSON** | `data/storage.json`, `data/bot-status.json`, `data/market-snapshots/*.json` | Dev defaults plus snapshot mirrors for offline debugging. |
 | **GitHub storage** | `lib/github-storage.ts` | Historical data for the older long-running worker. |
 
@@ -222,6 +250,7 @@ All integrations return the shared `Market` interface so arbitrage logic remains
 | `/api/bets`, `/api/opportunity-logs`, `/api/export`, `/api/export-opportunities` | Reporting endpoints powering dashboard exports. |
 | `/api/config`, `/api/data` | Read/write bot configuration stored in KV. |
 | `/api/snapshots/raw` | Streams the latest cached MarketSnapshot JSON (per platform) without hitting upstream vendors. |
+| `/api/match-graph/run` | Gemini-powered daily matcher; builds/persists the latest `MatchGraph`. |
 
 Each route reuses the same modules that power the bot/worker, so behavior stays consistent across deployment targets.
 

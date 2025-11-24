@@ -268,3 +268,39 @@ export interface LlmReadySnapshot {
   totalMarkets: number;
   markets: LlmReadyMarket[];
 }
+
+export type MarketKey = `${MarketPlatform}:${string}`;
+
+export type MatchEdgeType =
+  | 'same_event'
+  | 'same_outcome'
+  | 'opposite_outcome'
+  | 'subset';
+
+export interface MatchEdge {
+  id: string;
+  type: MatchEdgeType;
+  markets: MarketKey[];
+  confidence: number;
+  annotation?: string;
+}
+
+export interface EventCluster {
+  id: string;
+  label?: string;
+  markets: MarketKey[];
+}
+
+export interface MatchGraphMetadata {
+  model?: string;
+  requestMarkets?: Record<MarketPlatform, number>;
+  notes?: string[];
+}
+
+export interface MatchGraph {
+  version: number;
+  generatedAt: string;
+  clusters: EventCluster[];
+  edges: MatchEdge[];
+  metadata?: MatchGraphMetadata;
+}
