@@ -70,7 +70,7 @@ export async function generateMatchGraphWithGemini(
   const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
     model: 'gemini-2.0-flash',
     systemInstruction:
-      'You are an expert arbitrage analyst working with three platforms: Kalshi, Polymarket, and SX.bet. Cluster markets from these platforms that describe the same underlying event and classify their relationships. Output strict JSON only.',
+      'I am looking to find identical events being offerend on 2 or more of the three platforms (Kalshi, Polymarket, and Sxbet)\n\nHere are all the markets offered for the next several days on these platforms. Some of the events will go by similar but not perfectly matching names, but they are the same event. Find only the same underlying events available on 2 or more of the platforms and group their entries together. Output strict JSON only.',
   });
 
   const start = Date.now();
