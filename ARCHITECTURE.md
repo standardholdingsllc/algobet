@@ -134,6 +134,8 @@ The cron bot, snapshot worker, and dashboard all share the same market clients, 
 - Authentication: the endpoint requires `Authorization: Bearer <secret>` where `<secret>` is `MATCH_GRAPH_CRON_SECRET` (if set) otherwise `CRON_SECRET`. Vercel Cron should be configured with the same secret; manual runs can use `curl -X POST https://<host>/api/match-graph/run -H "Authorization: Bearer $MATCH_GRAPH_CRON_SECRET"`.
 - `/api/match-graph/run` accepts both GET and POST. Cron jobs rely on GET; POST remains available for manual re-runs with optional `persist`/`maxMarkets` query parameters.
 - `/api/match-graph/preview` is a GET-only route wired to the dashboard’s “Gemini Arbable Markets (On Demand)” card. It calls the same Gemini worker with `persist=false` by default, returns the fresh `MatchGraph` JSON (including `edges`) for inspection, and allows power users to opt into `?persist=true&maxMarkets=500` without touching the nightly cron output.
+- `/api/match-graph/import` is a POST-only escape hatch for manual uploads. Operators paste the Gemini UI’s `[ { event_name, markets: [{ platform, id }] } ]` payload, the handler converts it into a canonical `MatchGraph`, and `saveMatchGraph` persists it to Upstash + disk with metadata noting the manual import.
+- The dashboard’s “Manual Match Graph Import” card exposes a textarea + “Save manual match graph” button wired to the same endpoint so overwriting the live graph is a single-step, in-browser workflow (useful while Gemini API access is paused).
 - `types/index.ts` now codifies the structure the bot consumes:
 
 ```

@@ -46,6 +46,10 @@ export default function DashboardPage() {
   const [isRunningMatch, setIsRunningMatch] = useState(false);
   const [arbableSummary, setArbableSummary] = useState<MatchGraph | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
+  const [manualJson, setManualJson] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   // Snapshot download buttons fetch cached MarketSnapshot JSON via the raw API route.
   const snapshotDownloadLinks: { platform: MarketPlatform; label: string }[] = [
     { platform: 'kalshi', label: 'Download Kalshi JSON' },
@@ -178,6 +182,41 @@ export default function DashboardPage() {
       setMatchError(error?.message || 'Failed to run Gemini match');
     } finally {
       setIsRunningMatch(false);
+    }
+  };
+
+  const handleImportMatchGraph = async () => {
+    setIsImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      let parsed;
+      try {
+        parsed = JSON.parse(manualJson);
+      } catch (error) {
+        throw new Error('Pasted text is not valid JSON');
+      }
+
+      const response = await fetch('/api/match-graph/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: parsed }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
+      }
+
+      setImportResult(
+        `Imported ${data.clusters} clusters and ${data.edges} edges at ${data.generatedAt}`
+      );
+    } catch (error: any) {
+      console.error('Failed to import manual match graph:', error);
+      setImportError(error?.message || 'Failed to import manual match graph');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -437,6 +476,40 @@ export default function DashboardPage() {
               </a>
             ))}
           </div>
+        </div>
+
+        {/* Manual Match Graph Import */}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-2">Manual Match Graph Import</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            Paste JSON output from the Gemini UI (array of events with platforms/ids) and save it
+            as the current MatchGraph. This overwrites the existing graph in Upstash.
+          </p>
+          <textarea
+            value={manualJson}
+            onChange={(event) => setManualJson(event.target.value)}
+            rows={10}
+            className="w-full text-xs font-mono border rounded p-2 mb-3"
+            placeholder='[{ "event_name": "...", "markets": [{ "platform": "sxbet", "id": "..." }] }]'
+          />
+          <button
+            type="button"
+            onClick={handleImportMatchGraph}
+            disabled={isImporting}
+            className="px-3 py-2 rounded border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isImporting ? 'Saving…' : 'Save manual match graph'}
+          </button>
+          {importResult && (
+            <p className="mt-2 text-xs text-green-700">
+              {importResult}
+            </p>
+          )}
+          {importError && (
+            <p className="mt-2 text-xs text-red-600">
+              Error: {importError}
+            </p>
+          )}
         </div>
 
         {/* Gemini Arbable Markets (On Demand) */}
