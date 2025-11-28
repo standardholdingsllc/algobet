@@ -17,7 +17,6 @@ import {
   DryFireTradeStatus,
   SafetySnapshot,
   isDryFireMode,
-  getDryFireConfig,
 } from '@/types/dry-fire';
 import {
   createDryFireLog,
