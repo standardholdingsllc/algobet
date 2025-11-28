@@ -686,11 +686,18 @@ export default function LiveArbPage() {
       if (!res.ok) throw new Error('Failed to fetch bot status');
       const data = await res.json();
       setBotStatus({
-        isRunning: data.isScanning || data.status === 'running',
-        lastScanAt: data.lastScanAt,
-        opportunitiesFound: data.lastScanOpportunities,
-        mode: process.env.NEXT_PUBLIC_DRY_FIRE_MODE === 'true' ? 'DRY_FIRE' : 
-              data.simulationMode ? 'SIMULATION' : 'LIVE',
+        isRunning: Boolean(
+          data.running ??
+          data.isScanning ??
+          (typeof data.status === 'string' ? data.status === 'running' : data.status?.running)
+        ),
+        lastScanAt: data.lastScan || data.lastSuccessfulScan || data.lastUpdated,
+        opportunitiesFound: data.lastScanOpportunities ?? data.opportunitiesFound,
+        mode: process.env.NEXT_PUBLIC_DRY_FIRE_MODE === 'true'
+          ? 'DRY_FIRE'
+          : data.simulationMode
+            ? 'SIMULATION'
+            : 'LIVE',
       });
     } catch (err: any) {
       console.error('Failed to fetch bot status:', err);
