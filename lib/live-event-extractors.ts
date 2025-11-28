@@ -20,7 +20,7 @@ import {
   EventMarketType,
 } from '@/types/live-events';
 import { Market } from '@/types';
-import { parseTeamsFromTitle } from './live-event-matcher';
+import { parseTeamsFromTitle, normalizeTeamName } from './live-event-matcher';
 import { addOrUpdateEvent, markEventEnded } from './live-event-registry';
 
 // ============================================================================
@@ -225,30 +225,28 @@ export function extractSxBetEvent(
   title: string,
   metadata?: Record<string, unknown>
 ): VendorEvent | null {
-  // Parse teams from title or metadata
-  // NOTE: SX.bet provides outcomeOneName/outcomeTwoName for team names
-  let home: string | undefined;
-  let away: string | undefined;
-  let teams: string[] = [];
-  
-  if (metadata?.outcomeOneName && metadata?.outcomeTwoName) {
-    home = String(metadata.outcomeOneName);
-    away = String(metadata.outcomeTwoName);
-    teams = [home, away];
-  } else {
-    const parsed = parseTeamsFromTitle(title);
-    home = parsed.home;
-    away = parsed.away;
-    teams = parsed.teams;
-  }
-  
-  // Detect sport
-  // NOTE: SX.bet provides sportLabel and leagueLabel fields
+  // Detect sport using provided labels first
   const sportLabel = metadata?.sportLabel ? String(metadata.sportLabel) : '';
   const leagueLabel = metadata?.leagueLabel ? String(metadata.leagueLabel) : '';
   const sportResult = detectSport(`${sportLabel} ${leagueLabel} ${title}`, {
     sport: leagueLabel || sportLabel,
   });
+
+  // Parse teams from metadata or title
+  let home: string | undefined;
+  let away: string | undefined;
+  let teams: string[] = [];
+
+  if (metadata?.outcomeOneName && metadata?.outcomeTwoName) {
+    home = normalizeTeamName(String(metadata.outcomeOneName), sportResult.sport);
+    away = normalizeTeamName(String(metadata.outcomeTwoName), sportResult.sport);
+    teams = [home, away];
+  } else {
+    const parsed = parseTeamsFromTitle(title, sportResult.sport);
+    home = parsed.home;
+    away = parsed.away;
+    teams = parsed.teams;
+  }
   
   // Skip non-sports or low confidence
   if (sportResult.sport === 'OTHER' && sportResult.confidence < 0.5) {
@@ -366,11 +364,11 @@ export function extractPolymarketEvent(
     tags.some(t => /sport|nba|nfl|nhl|mlb|soccer|football|basketball|baseball|hockey/i.test(t)) ||
     /sport/i.test(category);
   
-  // Parse teams from title
-  const { home, away, teams } = parseTeamsFromTitle(title);
-  
   // Detect sport
   const sportResult = detectSport(title, { sport: category });
+  
+  // Parse teams from title with sport context
+  const { home, away, teams } = parseTeamsFromTitle(title, sportResult.sport);
   
   // For Polymarket, we need sports tag or good detection with teams
   if (!isSports && sportResult.sport === 'OTHER') {
@@ -499,14 +497,14 @@ export function extractKalshiEvent(
   const eventTicker = metadata?.event_ticker as string | undefined;
   const isSportsEvent = eventTicker && KALSHI_SPORTS_PATTERNS.some(p => p.test(eventTicker));
   
-  // Parse teams from title
-  const { home, away, teams } = parseTeamsFromTitle(title);
-  
   // Detect sport from ticker first, then title
   let sportResult = detectSport(ticker, metadata);
   if (sportResult.sport === 'OTHER') {
     sportResult = detectSport(title, metadata);
   }
+  
+  // Parse teams from title with sport context
+  const { home, away, teams } = parseTeamsFromTitle(title, sportResult.sport);
   
   // Need sports ticker or good detection with teams
   if (!isSportsTicker && !isSportsEvent && sportResult.sport === 'OTHER') {

@@ -31,7 +31,14 @@ import { getSnapshot, getCurrentEvents } from './live-event-registry';
  * Map of team name aliases to canonical names
  * Add entries as needed for common variations
  */
-const TEAM_ALIAS_MAP: Record<string, string> = {
+type TeamAliasValue =
+  | string
+  | {
+      default: string;
+      perSport?: Partial<Record<Sport, string>>;
+    };
+
+const TEAM_ALIAS_MAP: Record<string, TeamAliasValue> = {
   // NBA
   'ny knicks': 'new york knicks',
   'knicks': 'new york knicks',
@@ -59,17 +66,32 @@ const TEAM_ALIAS_MAP: Record<string, string> = {
   'nets': 'brooklyn nets',
   'blazers': 'portland trail blazers',
   'trailblazers': 'portland trail blazers',
-  'wolves': 'minnesota timberwolves',
+  'wolves': {
+    default: 'minnesota timberwolves',
+    perSport: {
+      EPL: 'wolverhampton wanderers',
+    },
+  },
   'timberwolves': 'minnesota timberwolves',
   'pacers': 'indiana pacers',
-  'hawks': 'atlanta hawks',
+  'hawks': {
+    default: 'atlanta hawks',
+    perSport: {
+      NHL: 'chicago blackhawks',
+    },
+  },
   'wizards': 'washington wizards',
   'bulls': 'chicago bulls',
   'raptors': 'toronto raptors',
   'magic': 'orlando magic',
   'pistons': 'detroit pistons',
   'hornets': 'charlotte hornets',
-  'spurs': 'san antonio spurs',
+  'spurs': {
+    default: 'san antonio spurs',
+    perSport: {
+      EPL: 'tottenham hotspur',
+    },
+  },
   'jazz': 'utah jazz',
   'rockets': 'houston rockets',
   'grizzlies': 'memphis grizzlies',
@@ -147,9 +169,13 @@ const TEAM_ALIAS_MAP: Record<string, string> = {
   'wings': 'detroit red wings',
   'red wings': 'detroit red wings',
   'blackhawks': 'chicago blackhawks',
-  'hawks': 'chicago blackhawks',
   'wild': 'minnesota wild',
-  'blues': 'st louis blues',
+  'blues': {
+    default: 'st louis blues',
+    perSport: {
+      EPL: 'chelsea fc',
+    },
+  },
   'avs': 'colorado avalanche',
   'avalanche': 'colorado avalanche',
   'oilers': 'edmonton oilers',
@@ -195,7 +221,12 @@ const TEAM_ALIAS_MAP: Record<string, string> = {
   'royals': 'kansas city royals',
   'guardians': 'cleveland guardians',
   'indians': 'cleveland guardians',
-  'reds': 'cincinnati reds',
+  'reds': {
+    default: 'cincinnati reds',
+    perSport: {
+      EPL: 'liverpool fc',
+    },
+  },
   'brewers': 'milwaukee brewers',
   'pirates': 'pittsburgh pirates',
   'dbacks': 'arizona diamondbacks',
@@ -215,18 +246,13 @@ const TEAM_ALIAS_MAP: Record<string, string> = {
   'arsenal': 'arsenal fc',
   'gunners': 'arsenal fc',
   'chelsea': 'chelsea fc',
-  'blues': 'chelsea fc',
   'cfc': 'chelsea fc',
   'liverpool': 'liverpool fc',
-  'reds': 'liverpool fc',
   'lfc': 'liverpool fc',
-  'spurs': 'tottenham hotspur',
   'tottenham': 'tottenham hotspur',
   'thfc': 'tottenham hotspur',
   'villa': 'aston villa',
   'avfc': 'aston villa',
-  'wolves': 'wolverhampton wanderers',
-  'wolves': 'wolverhampton wanderers',
   'newcastle': 'newcastle united',
   'nufc': 'newcastle united',
   'toon': 'newcastle united',
@@ -266,11 +292,32 @@ function normalizeText(text: string): string {
 }
 
 /**
+ * Resolve alias entry to canonical name
+ */
+function resolveAliasValue(value: TeamAliasValue, sport?: Sport): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (sport && value.perSport?.[sport]) {
+    return value.perSport[sport]!;
+  }
+
+  return value.default;
+}
+
+/**
  * Normalize a team name using the alias map
  */
-function normalizeTeamName(name: string): string {
+export function normalizeTeamName(name: string, sport?: Sport): string {
   const normalized = normalizeText(name);
-  return TEAM_ALIAS_MAP[normalized] || normalized;
+  const alias = TEAM_ALIAS_MAP[normalized];
+
+  if (!alias) {
+    return normalized;
+  }
+
+  return resolveAliasValue(alias, sport);
 }
 
 /**
@@ -281,7 +328,7 @@ function normalizeTeamName(name: string): string {
  * - "Team A - Team B"
  * - "Team A v Team B"
  */
-export function parseTeamsFromTitle(rawTitle: string): {
+export function parseTeamsFromTitle(rawTitle: string, sport?: Sport): {
   home?: string;
   away?: string;
   teams: string[];
@@ -294,8 +341,8 @@ export function parseTeamsFromTitle(rawTitle: string): {
   for (const sep of separators) {
     const parts = title.split(sep);
     if (parts.length === 2) {
-      const team1 = normalizeTeamName(parts[0].trim());
-      const team2 = normalizeTeamName(parts[1].trim());
+      const team1 = normalizeTeamName(parts[0].trim(), sport);
+      const team2 = normalizeTeamName(parts[1].trim(), sport);
       
       // For @ or "at", team2 is home
       if (sep === ' @ ' || sep === ' at ') {
@@ -315,7 +362,7 @@ export function parseTeamsFromTitle(rawTitle: string): {
     // Try single word
     const singleWord = words[i];
     if (TEAM_ALIAS_MAP[singleWord]) {
-      foundTeams.push(TEAM_ALIAS_MAP[singleWord]);
+      foundTeams.push(resolveAliasValue(TEAM_ALIAS_MAP[singleWord]!, sport));
       continue;
     }
     
@@ -323,7 +370,7 @@ export function parseTeamsFromTitle(rawTitle: string): {
     if (i < words.length - 1) {
       const twoWords = `${words[i]} ${words[i + 1]}`;
       if (TEAM_ALIAS_MAP[twoWords]) {
-        foundTeams.push(TEAM_ALIAS_MAP[twoWords]);
+        foundTeams.push(resolveAliasValue(TEAM_ALIAS_MAP[twoWords]!, sport));
         continue;
       }
     }
@@ -332,7 +379,7 @@ export function parseTeamsFromTitle(rawTitle: string): {
     if (i < words.length - 2) {
       const threeWords = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
       if (TEAM_ALIAS_MAP[threeWords]) {
-        foundTeams.push(TEAM_ALIAS_MAP[threeWords]);
+        foundTeams.push(resolveAliasValue(TEAM_ALIAS_MAP[threeWords]!, sport));
       }
     }
   }
@@ -370,9 +417,9 @@ function stringSimilarity(a: string, b: string): number {
 /**
  * Check if two team names match
  */
-function teamsMatch(team1: string, team2: string, minSimilarity: number): boolean {
-  const norm1 = normalizeTeamName(team1);
-  const norm2 = normalizeTeamName(team2);
+function teamsMatch(team1: string, team2: string, minSimilarity: number, sport?: Sport): boolean {
+  const norm1 = normalizeTeamName(team1, sport);
+  const norm2 = normalizeTeamName(team2, sport);
   
   // Exact match after normalization
   if (norm1 === norm2) return true;
@@ -425,8 +472,8 @@ function eventsMatch(
   }
   
   // Check team matching
-  const teams1 = event1.teams.map(normalizeTeamName);
-  const teams2 = event2.teams.map(normalizeTeamName);
+  const teams1 = event1.teams.map(team => normalizeTeamName(team, event1.sport));
+  const teams2 = event2.teams.map(team => normalizeTeamName(team, event2.sport));
   
   if (teams1.length < 2 || teams2.length < 2) {
     // Not enough teams to match
@@ -440,7 +487,7 @@ function eventsMatch(
   for (const t1 of teams1) {
     for (let i = 0; i < teams2.length; i++) {
       if (matchedFrom2.has(i)) continue;
-      if (teamsMatch(t1, teams2[i], config.minTeamSimilarity)) {
+      if (teamsMatch(t1, teams2[i], config.minTeamSimilarity, event1.sport)) {
         matchedTeams++;
         matchedFrom2.add(i);
         break;
@@ -489,7 +536,7 @@ function generateEventKey(events: VendorEvent[]): string {
   // Collect all teams and normalize
   const allTeams = new Set<string>();
   for (const e of events) {
-    e.teams.forEach(t => allTeams.add(normalizeTeamName(t)));
+    e.teams.forEach(t => allTeams.add(normalizeTeamName(t, e.sport)));
   }
   
   // Sort for consistency
@@ -608,7 +655,7 @@ export function updateMatches(snapshot?: LiveEventRegistrySnapshot): void {
     let status: VendorEventStatus = 'PRE';
     
     for (const e of events) {
-      e.teams.forEach(t => allTeams.add(normalizeTeamName(t)));
+      e.teams.forEach(t => allTeams.add(normalizeTeamName(t, e.sport)));
       if (!canonicalStartTime && e.startTime) {
         canonicalStartTime = e.startTime;
       }
