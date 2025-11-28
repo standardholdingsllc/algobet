@@ -116,7 +116,7 @@ export function createDryFireLog(
       ? 1 / price1 
       : price1 / 100,
     quantity: betSizes?.quantity1 || 1,
-    estimatedFee: fee1Result.fees,
+    estimatedFee: fee1Result.fee,
     marketType: opportunity.market1.marketType,
     expiryDate: opportunity.market1.expiryDate,
   };
@@ -133,7 +133,7 @@ export function createDryFireLog(
       ? 1 / price2 
       : price2 / 100,
     quantity: betSizes?.quantity2 || 1,
-    estimatedFee: fee2Result.fees,
+    estimatedFee: fee2Result.fee,
     marketType: opportunity.market2.marketType,
     expiryDate: opportunity.market2.expiryDate,
   };
