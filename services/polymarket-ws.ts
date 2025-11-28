@@ -33,6 +33,9 @@ interface PolymarketWsMessage {
   data?: any;
   market?: string;
   asset_id?: string;
+  bids?: Array<{ price: string; size: string }>;
+  asks?: Array<{ price: string; size: string }>;
+  price?: string;
 }
 
 interface PolymarketBookUpdate {

@@ -59,11 +59,11 @@ const ABLY_WS_URL_PATTERN = 'wss://realtime.ably.io';
 // ============================================================================
 
 interface SxBetWsMessage {
-  type: string;
+  type?: string | number;
   channel?: string;
   data?: any;
-  action?: string;
-  name?: string; // Ably message name
+  action?: string | number;
+  name?: string | number; // Ably message name
 }
 
 interface SxBetOddsUpdate {

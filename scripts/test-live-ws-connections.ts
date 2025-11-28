@@ -23,12 +23,46 @@
  *   5. Gracefully disconnect on SIGINT
  */
 
-import { config } from 'dotenv';
 import { resolve } from 'path';
+import { existsSync, readFileSync } from 'fs';
 
-// Load environment variables
-config({ path: resolve(__dirname, '../.env.local') });
-config({ path: resolve(__dirname, '../.env') });
+function loadEnvFile(relativePath: string): void {
+  const filePath = resolve(__dirname, relativePath);
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  const contents = readFileSync(filePath, 'utf-8');
+  for (const rawLine of contents.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+
+    const eqIndex = line.indexOf('=');
+    if (eqIndex === -1) {
+      continue;
+    }
+
+    const key = line.slice(0, eqIndex).trim();
+    let value = line.slice(eqIndex + 1).trim();
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    if (!(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+}
+
+// Load environment variables similar to dotenv (but without dependency)
+loadEnvFile('../.env.local');
+loadEnvFile('../.env');
 
 import { getSxBetWsClient, resetSxBetWsClient } from '../services/sxbet-ws';
 import { getPolymarketWsClient, resetPolymarketWsClient } from '../services/polymarket-ws';
