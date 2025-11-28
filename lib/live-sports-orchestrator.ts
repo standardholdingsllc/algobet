@@ -332,7 +332,8 @@ export function getUptimeMs(): number {
 export function logOrchestratorState(): void {
   console.log('\n=== Live Sports Orchestrator State ===');
   console.log(`Running: ${isRunning}`);
-  console.log(`Uptime: ${isRunning ? ((Date.now() - startedAt) / 1000).toFixed(0)}s : 'N/A'}`);
+  const uptimeSeconds = ((Date.now() - startedAt) / 1000).toFixed(0);
+  console.log(`Uptime: ${isRunning ? `${uptimeSeconds}s` : 'N/A'}`);
   console.log(`Last market refresh: ${lastMarketRefreshAt ? new Date(lastMarketRefreshAt).toISOString() : 'never'}`);
   
   logRegistryState();
