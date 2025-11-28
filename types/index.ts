@@ -304,3 +304,6 @@ export interface MatchGraph {
   edges: MatchEdge[];
   metadata?: MatchGraphMetadata;
 }
+
+// Re-export live-arb types for convenience
+export * from './live-arb';

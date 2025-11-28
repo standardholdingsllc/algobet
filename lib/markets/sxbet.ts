@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { ethers } from 'ethers';
 import { Market } from '@/types';
+import { isDryFireMode } from '@/types/dry-fire';
 
 const BASE_URL = process.env.SXBET_API_BASE || 'https://api.sx.bet';
 const SXBET_BEST_ODDS_CHUNK = 25;
@@ -11,11 +12,139 @@ const SXBET_MAX_CHUNK_RETRIES = 3;
 const SXBET_ODDS_REUSE_MAX_MS = 5 * 60 * 1000; // 5 minutes
 const DAY_MS = 86_400_000;
 
+// SX Network chain ID (mainnet)
+const SX_NETWORK_CHAIN_ID = 4162;
+
+// SX Network RPC URL
+const SX_NETWORK_RPC = process.env.SX_NETWORK_RPC_URL || 'https://rpc.sx-rollup.gelato.digital';
+
 // ERC20 ABI for balance queries
 const erc20ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function decimals() view returns (uint8)',
 ];
+
+// ============================================================================
+// SX.bet EIP-712 Signing Implementation
+// ============================================================================
+
+/**
+ * EIP-712 Domain for SX.bet order signing
+ * Per SX.bet API documentation
+ */
+const SXBET_EIP712_DOMAIN = {
+  name: 'SX.bet',
+  version: '1.0',
+  chainId: SX_NETWORK_CHAIN_ID,
+};
+
+/**
+ * EIP-712 Types for Fill Order
+ * Based on SX.bet API documentation
+ */
+const SXBET_FILL_ORDER_TYPES = {
+  FillOrder: [
+    { name: 'orderHash', type: 'bytes32' },
+    { name: 'takerAmount', type: 'uint256' },
+    { name: 'fillSalt', type: 'uint256' },
+    { name: 'taker', type: 'address' },
+    { name: 'baseToken', type: 'address' },
+    { name: 'expiry', type: 'uint256' },
+  ],
+};
+
+/**
+ * Parameters for building an SX.bet fill order
+ */
+export interface SxBetFillOrderParams {
+  /** Hash of the order to fill */
+  orderHash: string;
+  /** Amount to fill (in USDC wei, 6 decimals) */
+  takerAmount: bigint;
+  /** Random salt for uniqueness */
+  fillSalt: bigint;
+  /** Taker's wallet address */
+  taker: string;
+  /** Base token address (USDC) */
+  baseToken: string;
+  /** Order expiry timestamp (Unix seconds) */
+  expiry: number;
+}
+
+/**
+ * Signed fill order ready for submission
+ */
+export interface SignedSxBetFillOrder {
+  orderHash: string;
+  takerAmount: string;
+  fillSalt: string;
+  taker: string;
+  baseToken: string;
+  expiry: number;
+  signature: string;
+}
+
+/**
+ * Generate a random salt for order fills
+ */
+function generateFillSalt(): bigint {
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
+  let salt = BigInt(0);
+  for (let i = 0; i < 32; i++) {
+    salt = (salt << BigInt(8)) | BigInt(randomBytes[i]);
+  }
+  return salt;
+}
+
+/**
+ * Sign an SX.bet fill order using EIP-712
+ *
+ * @param wallet ethers.js Wallet with private key
+ * @param params Fill order parameters
+ * @returns Signed fill order
+ */
+async function signSxBetFillOrder(
+  wallet: ethers.Wallet,
+  params: SxBetFillOrderParams
+): Promise<SignedSxBetFillOrder> {
+  // Build the EIP-712 message
+  const message = {
+    orderHash: params.orderHash,
+    takerAmount: params.takerAmount.toString(),
+    fillSalt: params.fillSalt.toString(),
+    taker: params.taker,
+    baseToken: params.baseToken,
+    expiry: params.expiry,
+  };
+
+  // Sign using EIP-712
+  const signature = await wallet.signTypedData(
+    SXBET_EIP712_DOMAIN,
+    SXBET_FILL_ORDER_TYPES,
+    message
+  );
+
+  return {
+    orderHash: params.orderHash,
+    takerAmount: params.takerAmount.toString(),
+    fillSalt: params.fillSalt.toString(),
+    taker: params.taker,
+    baseToken: params.baseToken,
+    expiry: params.expiry,
+    signature,
+  };
+}
+
+/**
+ * Result of a fill order submission
+ */
+export interface SxBetFillResult {
+  success: boolean;
+  fillHash?: string;
+  error?: string;
+  details?: any;
+}
 
 interface SXBetMarket {
   status: string;
@@ -804,43 +933,177 @@ export class SXBetAPI {
   }
 
   /**
-   * Place a bet on sx.bet
-   * Note: This is simplified - full implementation requires EIP712 signing
+   * Place a bet on sx.bet using EIP-712 signed order fills
+   *
+   * Flow:
+   * 1. Get best orders for the market (opposite side from desired bet)
+   * 2. Build and sign EIP-712 fill order
+   * 3. Submit fill to SX.bet API
+   *
+   * @param marketHash The market hash to bet on
+   * @param side 'yes' = outcome one, 'no' = outcome two
+   * @param price Target price (used for order selection, not directly in fill)
+   * @param quantity Number of contracts to buy
+   * @returns Success/failure with order ID if successful
    */
   async placeBet(
     marketHash: string,
     side: 'yes' | 'no', // yes = outcome one, no = outcome two
-    price: number, // in cents (0-100)
+    price: number, // in cents (0-100) - used for order matching
     quantity: number // number of contracts
   ): Promise<{ success: boolean; orderId?: string; error?: string }> {
+    // DRY-FIRE GUARD: Never place real orders in dry-fire mode
+    if (isDryFireMode()) {
+      const error = '[SX.bet DRY-FIRE GUARD] Attempted to place real order in DRY_FIRE_MODE!';
+      console.error(error);
+      return { success: false, error };
+    }
+
     try {
-      // sx.bet uses a more complex order flow:
-      // 1. Get best orders for the market
-      // 2. Sign an EIP712 message
-      // 3. Submit fill request
+      // Validate configuration
+      if (!this.privateKey) {
+        return {
+          success: false,
+          error: 'SXBET_PRIVATE_KEY not configured - cannot sign orders',
+        };
+      }
+
+      if (!this.walletAddress) {
+        return {
+          success: false,
+          error: 'SXBET_WALLET_ADDRESS not configured - cannot place orders',
+        };
+      }
+
+      // Get best orders for the market (opposite side)
+      const orders = await this.getOrdersForMarket(marketHash, side);
       
-      // This is a placeholder - full implementation requires:
-      // - EIP712 signing with private key
-      // - Order matching logic
-      // - Fill submission
-      
-      console.warn('sx.bet betting not fully implemented - requires EIP712 signing');
-      
-      return {
-        success: false,
-        error: 'sx.bet integration requires EIP712 signing implementation'
+      if (orders.length === 0) {
+        return {
+          success: false,
+          error: 'No liquidity available for this market',
+        };
+      }
+
+      // Use the best order (first one after sorting)
+      const bestOrder = orders[0];
+
+      // Calculate fill amount based on quantity
+      // SX.bet amounts are in wei (18 decimals for the bet token)
+      const fillAmountWei = BigInt(quantity) * BigInt('1000000000000000000');
+
+      // Create wallet for signing
+      const provider = new ethers.JsonRpcProvider(SX_NETWORK_RPC);
+      const wallet = new ethers.Wallet(this.privateKey, provider);
+
+      // Build fill order parameters
+      const fillParams: SxBetFillOrderParams = {
+        orderHash: bestOrder.orderHash,
+        takerAmount: fillAmountWei,
+        fillSalt: generateFillSalt(),
+        taker: this.walletAddress,
+        baseToken: this.baseToken,
+        expiry: Math.floor(Date.now() / 1000) + 300, // 5 minute expiry
       };
-      
-      // TODO: Implement full betting flow:
-      // 1. const orders = await this.getOrdersForMarket(marketHash, side);
-      // 2. const signature = await this.signEIP712(order, walletAddress);
-      // 3. const result = await this.submitFill(orders, signature, quantity);
-      // 4. return result;
-      
+
+      // Sign the fill order using EIP-712
+      console.log(`[sx.bet] Signing fill order for market ${marketHash}...`);
+      const signedOrder = await signSxBetFillOrder(wallet, fillParams);
+
+      // Submit the fill to SX.bet API
+      console.log(`[sx.bet] Submitting fill order...`);
+      const fillResult = await this.submitFillOrder(signedOrder, [bestOrder.orderHash]);
+
+      if (fillResult.success) {
+        console.log(`[sx.bet] ✅ Order filled successfully: ${fillResult.fillHash}`);
+        return {
+          success: true,
+          orderId: fillResult.fillHash,
+        };
+      } else {
+        console.error(`[sx.bet] ❌ Fill failed: ${fillResult.error}`);
+        return {
+          success: false,
+          error: fillResult.error,
+        };
+      }
     } catch (error: any) {
-      console.error('Error placing sx.bet bet:', error);
+      console.error('[sx.bet] Error placing bet:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Submit a signed fill order to SX.bet
+   */
+  private async submitFillOrder(
+    signedOrder: SignedSxBetFillOrder,
+    orderHashes: string[]
+  ): Promise<SxBetFillResult> {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/orders/fill`,
+        {
+          orderHashes,
+          takerAmounts: [signedOrder.takerAmount],
+          taker: signedOrder.taker,
+          fillSalt: signedOrder.fillSalt,
+          signature: signedOrder.signature,
+          baseToken: signedOrder.baseToken,
+          expiry: signedOrder.expiry,
+        },
+        {
+          headers: this.getHeaders(),
+        }
+      );
+
+      const data = response.data;
+      
+      if (data.status === 'success' || data.data?.fillHash) {
+        return {
+          success: true,
+          fillHash: data.data?.fillHash || data.fillHash,
+          details: data,
+        };
+      } else {
+        return {
+          success: false,
+          error: data.error || data.message || 'Unknown error from SX.bet',
+          details: data,
+        };
+      }
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const errorData = error?.response?.data;
+
+      console.error(`[sx.bet] Fill submission failed (${status}):`, errorData || error.message);
+
+      return {
+        success: false,
+        error: errorData?.message || errorData?.error || error.message,
+        details: errorData,
+      };
+    }
+  }
+
+  /**
+   * Calculate the cost in USDC for a bet
+   * Uses SX.bet odds format (percentage odds / 10^20)
+   *
+   * @param percentageOdds Raw percentage odds from SX.bet
+   * @param quantity Number of contracts
+   * @returns Cost in USDC (6 decimals)
+   */
+  calculateBetCost(percentageOdds: string, quantity: number): bigint {
+    const oddsWei = BigInt(percentageOdds);
+    const divisor = BigInt('100000000000000000000'); // 10^20
+    
+    // Cost = quantity * implied probability
+    // Implied probability = odds / 10^20
+    // Cost in USDC = quantity * (odds / 10^20) * 10^6 (USDC decimals)
+    const costWei = (BigInt(quantity) * oddsWei * BigInt(1_000_000)) / divisor;
+    
+    return costWei;
   }
 
   /**

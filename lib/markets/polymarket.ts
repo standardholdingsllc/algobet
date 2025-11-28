@@ -283,6 +283,7 @@ interface GammaMarket {
 /* -------------------------------------------------------------------------- */
 
 import { Market, MarketFilterInput } from '@/types';
+import { isDryFireMode } from '@/types/dry-fire';
 import axios from 'axios';
 import { ethers, parseUnits } from 'ethers';
 
@@ -1527,6 +1528,13 @@ export class PolymarketAPI {
     price: number,
     size: number
   ): Promise<{ success: boolean; orderId?: string; error?: string }> {
+    // DRY-FIRE GUARD: Never place real orders in dry-fire mode
+    if (isDryFireMode()) {
+      const error = '[Polymarket DRY-FIRE GUARD] Attempted to place real order in DRY_FIRE_MODE!';
+      console.error(error);
+      return { success: false, error };
+    }
+
     try {
       if (!this.privateKey || !this.walletAddress) {
         return { success: false, error: 'Private key and wallet address required for CLOB orders' };

@@ -283,10 +283,618 @@ Each route reuses the same modules that power the bot/worker, so behavior stays 
 
 ---
 
-## 12. Future Work Hooks
+## 12. Live-Event Arbitrage System
+
+The live-event arbitrage subsystem provides real-time price streaming and low-latency opportunity detection for in-play/live markets. It runs alongside the existing snapshot + cron-bot architecture without replacing it.
+
+### 12.1 Architecture Overview
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **LivePriceCache** | `lib/live-price-cache.ts` | In-memory cache for real-time prices from WebSocket feeds |
+| **LiveArbManager** | `lib/live-arb-manager.ts` | Orchestrates WS clients, subscription management, and arb detection |
+| **LiveArbSafetyChecker** | `lib/live-arb-safety.ts` | Circuit breakers and safety checks for live execution |
+| **LiveArbIntegration** | `lib/live-arb-integration.ts` | Integration hooks between live system and existing bot |
+| **WebSocket Clients** | `services/sxbet-ws.ts`, `polymarket-ws.ts`, `kalshi-ws.ts` | Platform-specific WS connections |
+
+### 12.2 LivePriceCache (`lib/live-price-cache.ts`)
+
+- **In-memory, per-process cache** for real-time price data
+- Stores prices by `{platform, marketId, outcomeId}` key
+- Automatically tracks price age for staleness detection
+- Separate storage for live scores (SX.bet only)
+- **Multi-process behavior**: Each process maintains its own cache and WS connections. For multi-container deployments, run a dedicated live-arb worker with `LIVE_ARB_WORKER=true`.
+
+Key methods:
+- `updateLivePrice(update)`: Called by WS handlers to push new prices
+- `getEffectivePrice(market, side, maxAgeMs)`: Returns live price if fresh, snapshot fallback otherwise
+- `getEffectiveMarketPrices(market)`: Get both YES/NO with source indicators
+
+### 12.3 WebSocket Clients
+
+Each platform has a dedicated WebSocket client following the same pattern:
+
+**Common features:**
+- Connection state machine: `disconnected` → `connecting` → `connected` → `reconnecting` → `error`
+- Exponential backoff reconnection (configurable base delay, max delay, max attempts)
+- Heartbeat/ping to detect stale connections
+- Subscription management with pending queue for pre-connection subscriptions
+- State change handlers for monitoring
+
+**SX.bet (`services/sxbet-ws.ts`)**
+- Connects to SX.bet's real-time feed (may use Ably in production)
+- Subscribes to global feeds: best-odds, live-scores, line-changes
+- Also subscribes to individual markets via `subscribeToMarket(marketHash)`
+- Handles odds updates, line changes, and score updates
+- Converts SX.bet percentage odds (/ 10^20) to decimal odds
+
+**Polymarket (`services/polymarket-ws.ts`)**
+- Connects to Polymarket CLOB WebSocket
+- Subscribes to orderbook updates and last trade prices per market
+- Extracts best bid/ask to compute mid-prices
+- Prices normalized to cents (0-100)
+
+**Kalshi (`services/kalshi-ws.ts`)**
+- Connects to Kalshi's WebSocket feed
+- Subscribes to orderbook deltas and ticker updates
+- Maintains local orderbook state to reconstruct from deltas
+- Prices in cents (0-100)
+
+### 12.4 Smart Subscription Management
+
+To avoid subscribing to everything (thousands of markets), `LiveArbManager` implements intelligent subscription scoping:
+
+1. **HotMarketTracker integration**: Only subscribes to markets that exist on 2+ platforms
+2. **Debouncing**: Subscription updates are debounced (default 1s) to prevent thrashing
+3. **Priority ordering**: Live events first, then by time-to-expiry
+4. **Per-platform limits**: Configurable max subscriptions per platform (default 100)
+5. **Live events only mode**: Optional filter via `LIVE_ARB_LIVE_EVENTS_ONLY=true`
+
+Subscription flow:
+```
+HotMarketTracker populated → scheduleSubscriptionUpdate() → 
+debounce timer → updateSubscriptions() → 
+applySubscriptionChanges(platform, toAdd, toRemove)
+```
+
+### 12.5 Safety Checks & Circuit Breaker
+
+The `LiveArbSafetyChecker` provides layered protection:
+
+| Check | Threshold | Severity |
+|-------|-----------|----------|
+| Price Age | `LIVE_ARB_MAX_PRICE_AGE_MS` (default 2000ms) | Critical |
+| Slippage | `LIVE_ARB_MAX_SLIPPAGE_BPS` (default 100 bps) | Critical |
+| Profit Margin | `LIVE_ARB_MIN_PROFIT_BPS` (default 25 bps) | Critical |
+| Liquidity | `LIVE_ARB_MIN_LIQUIDITY_USD` (default $10) | Critical |
+| Platform Skew | `LIVE_ARB_MAX_SKEW_PCT` (default 20%) | Critical |
+| Circuit Breaker | Open after N consecutive failures | Critical |
+
+**Circuit breaker behavior:**
+- Opens after `maxConsecutiveFailures` (default 5)
+- Stays open for `cooldownMs` (default 30s)
+- Automatically resets after cooldown
+- Can be manually tripped via `tripCircuit(reason)`
+
+**Integration with existing risk logic:**
+- Live safety checks run **first** (fail fast on stale data)
+- Then standard bot risk checks apply (expiry window, bet sizes)
+- Both must pass for execution
+
+### 12.6 SX.bet EIP-712 Order Signing
+
+Full order placement is now implemented for SX.bet using EIP-712 signatures:
+
+```typescript
+// EIP-712 Domain
+const SXBET_EIP712_DOMAIN = {
+  name: 'SX.bet',
+  version: '1.0',
+  chainId: 4162, // SX Network
+};
+
+// Fill Order Types
+const SXBET_FILL_ORDER_TYPES = {
+  FillOrder: [
+    { name: 'orderHash', type: 'bytes32' },
+    { name: 'takerAmount', type: 'uint256' },
+    { name: 'fillSalt', type: 'uint256' },
+    { name: 'taker', type: 'address' },
+    { name: 'baseToken', type: 'address' },
+    { name: 'expiry', type: 'uint256' },
+  ],
+};
+```
+
+Order placement flow:
+1. Fetch best orders for market via `getOrdersForMarket()`
+2. Build fill order params with random salt
+3. Sign using `wallet.signTypedData()` (ethers.js)
+4. Submit to `/orders/fill` endpoint
+
+Requires environment variables:
+- `SXBET_PRIVATE_KEY`: Wallet private key for signing
+- `SXBET_WALLET_ADDRESS`: Wallet address
+
+### 12.7 Dashboard Monitoring
+
+New API endpoints and UI for live arb monitoring:
+
+**API Endpoints:**
+- `GET /api/live-arb/status`: Overall status, WS connections, cache stats, circuit breaker
+- `GET /api/live-arb/markets?platform=&liveOnly=&limit=`: Markets with live prices
+
+**Dashboard page (`/live-arb`):**
+- System status (enabled/ready/degraded)
+- Per-platform connection indicators
+- Price cache statistics
+- Circuit breaker state
+- Live markets table with prices and age
+- Blocked opportunity counts by reason
+
+### 12.8 Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LIVE_ARB_ENABLED` | `false` | Enable live arb features |
+| `LIVE_ARB_WORKER` | `false` | Designate as dedicated live arb worker |
+| `LIVE_ARB_LIVE_EVENTS_ONLY` | `false` | Only monitor live events |
+| `LIVE_ARB_MIN_PROFIT_BPS` | `50` | Minimum profit (basis points) |
+| `LIVE_ARB_MAX_PRICE_AGE_MS` | `2000` | Max acceptable price age |
+| `LIVE_ARB_MAX_LATENCY_MS` | `2000` | Max execution latency |
+| `LIVE_ARB_MAX_SLIPPAGE_BPS` | `100` | Max slippage (basis points) |
+| `LIVE_ARB_LOG_LEVEL` | `info` | Log level (`info` or `debug`) |
+| `SXBET_WS_URL` | `wss://api.sx.bet/ws` | SX.bet WebSocket URL |
+| `POLYMARKET_WS_URL` | `wss://ws-subscriptions-clob.polymarket.com/ws/market` | Polymarket WS |
+
+### 12.9 Testing
+
+- `npm run test-live-ws`: Tests WebSocket connections to all platforms
+- `npm run test-live-arb`: Runs a simulated live arb scan
+
+---
+
+## 13. Dry-Fire (Paper Trading) Mode
+
+The dry-fire mode allows the system to run all arbitrage detection, pricing, and risk checks without placing real orders. This is essential for:
+
+1. **Validation**: Verify opportunity detection logic before risking capital
+2. **Tuning**: Collect data to adjust thresholds and parameters
+3. **Monitoring**: Track potential profits and rejection reasons
+
+### 13.1 Architecture Overview
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **DryFireTradeLog Types** | `types/dry-fire.ts` | Type definitions for paper trade logs |
+| **DryFireLogger** | `lib/dry-fire-logger.ts` | Persistence layer for paper trades |
+| **ExecutionWrapper** | `lib/execution-wrapper.ts` | Routes between real and dry-fire execution |
+| **Platform Guards** | `lib/markets/*.ts` | Belt-and-suspenders safety checks |
+
+### 13.2 Configuration
+
+Primary environment variable:
+
+```
+DRY_FIRE_MODE=true          # Master switch - when true, NO real orders placed
+```
+
+Optional fine-grained flags:
+
+```
+DRY_FIRE_LOG_OPPORTUNITIES=true    # Log all eligible opportunities
+DRY_FIRE_LOG_REJECTED_REASON=true  # Include rejection reasons in logs
+DRY_FIRE_MAX_LOGS=1000             # Maximum logs to keep
+```
+
+### 13.3 Execution Flow
+
+```
+Opportunity Detected
+        │
+        ▼
+validateOpportunityForExecution()
+        │
+        ├─── REJECTED? ──► Log as REJECTED_BY_VALIDATION
+        │
+        ▼
+calculateBetSizes()
+        │
+        ├─── Size too small? ──► Log as REJECTED_BY_RISK
+        │
+        ▼
+checkDryFireMode()
+        │
+        ├─── DRY_FIRE=true ──► executeOpportunityDryFire()
+        │                              │
+        │                              ▼
+        │                       logDryFireTrade(status: 'SIMULATED')
+        │                              │
+        │                              ▼
+        │                       Return (no API calls)
+        │
+        └─── DRY_FIRE=false ──► executeOpportunityReal()
+                                       │
+                                       ▼
+                                Platform placeBet() calls
+```
+
+### 13.4 Safety Guarantees
+
+**Triple-layer protection ensures no orders are placed in dry-fire mode:**
+
+1. **Wrapper Layer** (`lib/execution-wrapper.ts`):
+   - `executeOpportunityWithMode()` checks `DRY_FIRE_MODE` first
+   - Routes to `executeOpportunityDryFire()` which never calls platform APIs
+
+2. **Guard Layer** (`lib/execution-wrapper.ts`):
+   - `assertNotDryFire()` throws if called in dry-fire mode
+   - Used as additional check in real execution path
+
+3. **Platform Layer** (`lib/markets/*.ts`):
+   - Each `placeBet()` method has its own guard
+   - Returns error if `isDryFireMode()` is true
+   - Prevents accidental calls even if wrapper is bypassed
+
+### 13.5 DryFireTradeLog Schema
+
+```typescript
+interface DryFireTradeLog {
+  id: string;
+  createdAt: string;
+  mode: 'DRY_FIRE';
+  opportunityId: string;
+  opportunityHash: string;
+  legs: DryFireTradeLeg[];        // One per platform
+  expectedProfitUsd: number;
+  expectedProfitBps: number;
+  expectedProfitPct: number;
+  totalInvestment: number;
+  status: 'SIMULATED' | 'REJECTED_BY_SAFETY' | 'REJECTED_BY_RISK' | 'REJECTED_BY_VALIDATION';
+  rejectReasons?: string[];
+  isLiveEvent: boolean;
+  daysToExpiry: number;
+  safetySnapshot?: SafetySnapshot;
+}
+```
+
+### 13.6 Persistence
+
+Dry-fire logs are stored using the same infrastructure as other KV data:
+
+- **Primary**: Upstash Redis (`dry-fire:logs`, `dry-fire:stats`)
+- **Fallback**: In-memory storage for development
+
+Key functions in `lib/dry-fire-logger.ts`:
+- `logDryFireTrade(log)`: Store a new paper trade
+- `getDryFireLogs(options)`: Query logs with filters
+- `getDryFireStats(since?)`: Get aggregated statistics
+- `exportDryFireLogsToCSV(logs)`: Export to CSV format
+
+### 13.7 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/live-arb/dry-fire-stats` | GET | Aggregated statistics |
+| `/api/live-arb/dry-fire-export` | GET | CSV export with filters |
+
+**Stats endpoint query parameters:**
+- `since`: ISO timestamp filter
+- `platform`: Filter by platform (kalshi, polymarket, sxbet)
+
+**Export endpoint query parameters:**
+- `since`, `platform`: Same as stats
+- `status`: Filter by status (SIMULATED, REJECTED_BY_SAFETY, etc.)
+- `limit`: Maximum logs to export
+
+### 13.8 Dashboard Integration
+
+The `/live-arb` dashboard page includes:
+
+1. **Bot Control Panel**:
+   - Start/Stop buttons for the live betting bot
+   - Visual indicator when dry-fire mode is active
+   - Clear warning that no real orders will be placed
+
+2. **Dry-Fire Statistics Card**:
+   - Count of simulated vs rejected trades
+   - Breakdown by rejection reason
+   - Total potential profit if all simulated trades executed
+   - Profit distribution histogram
+
+3. **CSV Export Panel**:
+   - Download filtered trade logs
+   - Select between all/simulated/rejected
+
+### 13.9 Statistics Tracked
+
+```typescript
+interface DryFireStats {
+  dryFireModeEnabled: boolean;
+  totalSimulated: number;           // Would have executed
+  totalRejectedBySafety: number;    // Failed safety checks
+  totalRejectedByRisk: number;      // Failed risk checks
+  totalRejectedByValidation: number;
+  totalPotentialProfitUsd: number;
+  avgProfitPerTradeUsd: number;
+  profitBuckets: {                  // Profit distribution
+    '0-25bps': number;
+    '25-50bps': number;
+    '50-100bps': number;
+    '100-200bps': number;
+    '200+bps': number;
+  };
+  byPlatform: Record<MarketPlatform, { simulated: number; rejected: number }>;
+}
+```
+
+### 13.10 Usage Workflow
+
+1. **Enable dry-fire mode**: Set `DRY_FIRE_MODE=true` in environment
+2. **Start the bot**: Use dashboard or API
+3. **Monitor**: Watch `/live-arb` for simulated trades
+4. **Analyze**: Export CSV and review patterns
+5. **Tune**: Adjust thresholds based on data
+6. **Go live**: Set `DRY_FIRE_MODE=false` when confident
+
+---
+
+## 14. Rule-Based Live Sports Matcher
+
+The rule-based live sports matcher provides deterministic cross-platform event matching for live sporting events. Unlike the Gemini-powered match graph (which handles broader market matching), this system focuses specifically on live/near-live sports events using simple, reliable heuristics.
+
+### 14.1 Architecture Overview
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **LiveEventRegistry** | `lib/live-event-registry.ts` | In-memory store of vendor events |
+| **LiveEventMatcher** | `lib/live-event-matcher.ts` | Deterministic matching rules |
+| **LiveEventWatchers** | `lib/live-event-watchers.ts` | Per-event arb monitoring |
+| **LiveEventExtractors** | `lib/live-event-extractors.ts` | Vendor-specific event parsing |
+| **LiveSportsOrchestrator** | `lib/live-sports-orchestrator.ts` | Main coordination module |
+
+### 14.2 Matching Algorithm
+
+**No AI/ML** - Pure deterministic heuristics:
+
+1. **Sport Detection**: Pattern matching against known sports/league keywords
+2. **Team Name Normalization**: Alias map for common variations (e.g., "Lakers" → "Los Angeles Lakers")
+3. **Team Matching**: Jaccard similarity on normalized team names
+4. **Time Tolerance**: Events must start within configurable window (default 15 min)
+
+```
+Event 1: "Lakers vs Celtics" (SX.bet)
+Event 2: "LA Lakers @ Boston Celtics" (Polymarket)
+Event 3: "NBA-LAKERS-CELTICS-2024" (Kalshi)
+
+→ All normalize to: ["los angeles lakers", "boston celtics"]
+→ Sport: NBA, Time: within tolerance
+→ Match! Create MatchedEventGroup
+```
+
+### 14.3 Key Types
+
+```typescript
+interface VendorEvent {
+  platform: 'SXBET' | 'POLYMARKET' | 'KALSHI';
+  vendorMarketId: string;
+  sport: Sport;
+  homeTeam?: string;
+  awayTeam?: string;
+  teams: string[];
+  startTime?: number;
+  status: 'PRE' | 'LIVE' | 'ENDED';
+  rawTitle: string;
+}
+
+interface MatchedEventGroup {
+  eventKey: string;        // Canonical ID
+  sport: Sport;
+  homeTeam?: string;
+  awayTeam?: string;
+  vendors: {
+    SXBET?: VendorEvent[];
+    POLYMARKET?: VendorEvent[];
+    KALSHI?: VendorEvent[];
+  };
+  platformCount: number;
+  matchQuality: number;    // 0-1 confidence
+}
+```
+
+### 14.4 Event Watchers (Hardened)
+
+Watchers have been hardened with event-driven triggering and scoped arb checks:
+
+**Key improvements:**
+- **Event-driven**: Triggered by `LivePriceCache` price update callbacks, not blind 500ms polling
+- **Scoped scans**: Each watcher ONLY evaluates markets in its `MatchedEventGroup`, not the entire universe
+- **Debounced**: Rapid price updates are debounced (50ms) to prevent check storms
+- **Instrumented**: Tracks timing metrics (avg/max check time, checks/sec)
+- **Fallback polling**: 5-second safety net if WS is spotty
+
+For each matched group with ≥2 platforms:
+
+1. **Price Monitoring**: Subscribe to `LivePriceCache.onPriceUpdate()` for relevant markets
+2. **Arb Detection**: Run `scanArbitrageOpportunities()` on event markets
+3. **Execution**: Call `executeOpportunityWithMode()` (respects dry-fire mode)
+
+```
+MatchedEventGroup found
+        │
+        ▼
+Start LiveEventWatcher
+   - Register market IDs in marketIdToWatcher map
+   - Subscribe to LivePriceCache.onPriceUpdate()
+        │
+        ▼
+Price update received (event-driven)
+        │
+        ▼
+Debounce (50ms)
+        │
+        ├── Already checking? → Skip
+        ├── Rate limited? → Skip
+        │
+        ▼
+getMarketsForGroup(group)  ← ONLY this event's markets!
+        │
+        ├── < 2 markets? → Skip
+        │
+        ▼
+scanArbitrageOpportunities(groupMarkets)
+        │
+        ├── No opportunity? → Wait for next price update
+        │
+        ▼
+Found opportunity!
+        │
+        ▼
+executeOpportunityWithMode()
+        │
+        ├── DRY_FIRE_MODE=true → Log only
+        └── DRY_FIRE_MODE=false → Execute trades
+
+Fallback: 5s polling if WS is spotty
+```
+
+### 14.5 Rate Limiting
+
+REST API calls are rate-limited per platform using a token bucket algorithm:
+
+```typescript
+// lib/rate-limiter.ts
+const DEFAULT_RATE_LIMITS = {
+  SXBET: { maxRequestsPerSecond: 5, bucketSize: 10 },
+  POLYMARKET: { maxRequestsPerSecond: 5, bucketSize: 10 },
+  KALSHI: { maxRequestsPerSecond: 5, bucketSize: 10 },
+};
+
+// Override via environment
+SXBET_MAX_RPS=5
+POLYMARKET_MAX_RPS=5
+KALSHI_MAX_RPS=5
+```
+
+Usage in REST paths:
+```typescript
+import { acquireRateLimit } from './rate-limiter';
+
+if (!acquireRateLimit('SXBET')) {
+  console.log('[RateLimiter] SXBET rate limited, skipping request');
+  return;
+}
+// Make request...
+```
+
+### 14.6 Vendor API Alignment
+
+Field mappings in extractors follow official API docs:
+
+| Platform | ID Field | Teams | Start Time | Status |
+|----------|----------|-------|------------|--------|
+| SX.bet | `marketHash` | `outcomeOneName/outcomeTwoName` | `gameTime` (seconds) | `status` (1-4) |
+| Polymarket | `conditionId` | From title parsing | `gameStartTime` or `endDate` | `closed/resolved` |
+| Kalshi | `ticker` | From title parsing | `close_time` | `status` (open/closed/settled) |
+
+Each extractor includes `// NOTE:` comments linking to docs:
+```typescript
+// NOTE: Field mapping follows SX.bet docs: https://api.docs.sx.bet/
+export function extractSxBetEvent(marketHash, title, metadata) { ... }
+```
+
+### 14.7 Supported Sports
+
+| Sport | Key Patterns |
+|-------|-------------|
+| NBA | "nba", team nicknames |
+| NFL | "nfl", "super bowl", team names |
+| NHL | "nhl", "hockey", "stanley cup" |
+| MLB | "mlb", "baseball", "world series" |
+| EPL | "premier league", club names |
+| UFC | "ufc", "mma" |
+| NCAA_FB | "college football", "cfp" |
+| NCAA_BB | "march madness", "ncaa basketball" |
+
+### 14.8 Configuration
+
+```bash
+# Enable the rule-based matcher
+LIVE_RULE_BASED_MATCHER_ENABLED=true
+
+# Only match sports events (default true)
+LIVE_RULE_BASED_SPORTS_ONLY=true
+
+# Time tolerance for matching (ms)
+LIVE_MATCH_TIME_TOLERANCE_MS=900000
+
+# Max active watchers
+LIVE_MAX_EVENT_WATCHERS=50
+
+# Minimum platforms for a match
+LIVE_MIN_PLATFORMS=2
+
+# Refresh intervals
+LIVE_REGISTRY_REFRESH_MS=30000
+LIVE_MATCHER_INTERVAL_MS=10000
+```
+
+### 14.9 API Endpoint
+
+`GET /api/live-arb/live-events`
+
+Returns:
+- Configuration snapshot (time tolerance, max watchers, etc.)
+- Registry snapshot (all vendor events)
+- Matched event groups with quality scores
+- Active watchers with timing stats
+- Rate limiter status
+- Per-platform event breakdown
+
+Query parameters:
+- `liveOnly=true`: Only live events
+- `minPlatforms=3`: Require 3+ platforms
+- `sport=NBA`: Filter by sport
+- `limit=100`: Max groups to return
+
+### 14.10 Dashboard Integration
+
+The `/live-arb` page displays:
+
+- **Rule-Based Matcher Card**: 
+  - Running status and uptime
+  - Event counts by status (live/pre) and platform
+  - Match quality (3-way vs 2-way matches)
+  - Config summary (time tolerance, max watchers)
+  - Watcher performance (avg/max check time, checks/sec)
+- **Matched Events Table**: Cross-platform matches with sport, teams, platforms, quality
+
+### 14.11 Coexistence with HotMarketTracker
+
+This system runs **alongside** (not replacing) the existing architecture:
+
+| System | Scope | Method |
+|--------|-------|--------|
+| HotMarketTracker | All markets | NLP + Gemini |
+| Rule-Based Matcher | Live sports only | Deterministic |
+
+Both feed into the same:
+- `LivePriceCache` for prices
+- `executeOpportunityWithMode()` for execution
+- Dry-fire logging system
+
+---
+
+## 15. Future Work Hooks
 
 - New adapters can be added by dropping a `MarketAdapterConfig` entry + handler (`MarketFeedService` already supports adapter-type dispatch).
 - Snapshot schema versioning makes it safe to evolve fields without breaking the bot—old data fails validation and is ignored.
-- `marketFilters` is plumbed through config/UI, so exposing controls like “sports-only” or league-specific feeds now requires zero code changes in the adapters—just update the Upstash config entry.
+- `marketFilters` is plumbed through config/UI, so exposing controls like "sports-only" or league-specific feeds now requires zero code changes in the adapters—just update the Upstash config entry.
+- **Distributed price cache**: For multi-container deployments at scale, the in-memory `LivePriceCache` could be backed by Redis pub/sub for shared state.
+- **Additional WS platforms**: The WS client pattern is designed to be extensible for new platforms.
+- **Dry-fire analytics**: Add time-series analysis of paper trades to identify optimal trading windows.
+- **A/B threshold testing**: Run multiple parameter sets in parallel dry-fire mode to compare performance.
+- **Extended team alias map**: Add more team name variations as observed in production logs.
+- **Sport-specific matching rules**: Customize matching logic per sport (e.g., stricter for props).
 
 This architecture keeps trading logic centralized, decouples market ingestion from execution, and documents every platform-specific switch in a single, schema-validated location.

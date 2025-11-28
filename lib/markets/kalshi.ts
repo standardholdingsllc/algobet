@@ -1,6 +1,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import { Market } from '@/types';
+import { isDryFireMode } from '@/types/dry-fire';
 
 const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';
@@ -407,6 +408,13 @@ export class KalshiAPI {
     price: number,
     quantity: number
   ): Promise<{ success: boolean; orderId?: string; error?: string }> {
+    // DRY-FIRE GUARD: Never place real orders in dry-fire mode
+    if (isDryFireMode()) {
+      const error = '[Kalshi DRY-FIRE GUARD] Attempted to place real order in DRY_FIRE_MODE!';
+      console.error(error);
+      return { success: false, error };
+    }
+
     try {
       const path = '/orders';
       const body = {

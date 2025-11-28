@@ -23,6 +23,7 @@ import {
 import { KALSHI_API_BASE, MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { PolymarketAPI } from './markets/polymarket';
 import { SXBetAPI, SXBetMarketFetchStats } from './markets/sxbet';
+import { LivePriceCache } from './live-price-cache';
 
 type CanonicalFilterInput = MarketFilterInput & {
   __selfHealToken?: symbol;
@@ -872,6 +873,130 @@ export class MarketFeedService {
       return 5;
     }
     return Math.max(1, Math.ceil((end - start) / DAY_MS));
+  }
+
+  // --------------------------------------------------------------------------
+  // Live Price Integration
+  // --------------------------------------------------------------------------
+
+  /**
+   * Load cached markets with optional live price overlay.
+   * This is the primary method for getting market data with real-time prices.
+   *
+   * @param filters Market filter input
+   * @param options Load options
+   * @param liveOptions Live price overlay options
+   * @returns Markets with prices from live cache if available, otherwise snapshot
+   */
+  async loadCachedMarketsWithLivePrices(
+    filters: MarketFilterInput,
+    options: LoadOptions = {},
+    liveOptions: {
+      enabled?: boolean;
+      maxPriceAgeMs?: number;
+    } = {}
+  ): Promise<{
+    markets: Record<MarketPlatform, Market[]>;
+    liveStats: {
+      marketsWithLivePrices: number;
+      marketsWithSnapshotPrices: number;
+      liveByPlatform: Record<MarketPlatform, number>;
+    };
+  }> {
+    // Load cached markets as usual
+    const snapshotMarkets = await this.loadCachedMarkets(filters, options);
+
+    const liveEnabled = liveOptions.enabled ?? false;
+    const maxPriceAgeMs = liveOptions.maxPriceAgeMs ?? 2000;
+
+    const stats = {
+      marketsWithLivePrices: 0,
+      marketsWithSnapshotPrices: 0,
+      liveByPlatform: {
+        kalshi: 0,
+        polymarket: 0,
+        sxbet: 0,
+      } as Record<MarketPlatform, number>,
+    };
+
+    if (!liveEnabled) {
+      // Just return snapshot data
+      for (const platform of Object.keys(snapshotMarkets) as MarketPlatform[]) {
+        stats.marketsWithSnapshotPrices += snapshotMarkets[platform].length;
+      }
+      return { markets: snapshotMarkets, liveStats: stats };
+    }
+
+    // Overlay live prices onto snapshot markets
+    const result: Record<MarketPlatform, Market[]> = {
+      kalshi: [],
+      polymarket: [],
+      sxbet: [],
+    };
+
+    for (const platform of Object.keys(snapshotMarkets) as MarketPlatform[]) {
+      const markets = snapshotMarkets[platform];
+
+      for (const market of markets) {
+        const livePrices = LivePriceCache.getEffectiveMarketPrices(
+          market,
+          maxPriceAgeMs
+        );
+
+        const hasLiveYes = livePrices.yesSource === 'live';
+        const hasLiveNo = livePrices.noSource === 'live';
+
+        if (hasLiveYes || hasLiveNo) {
+          stats.marketsWithLivePrices++;
+          stats.liveByPlatform[platform]++;
+
+          result[platform].push({
+            ...market,
+            yesPrice: livePrices.yesPrice,
+            noPrice: livePrices.noPrice,
+          });
+        } else {
+          stats.marketsWithSnapshotPrices++;
+          result[platform].push(market);
+        }
+      }
+    }
+
+    console.log(
+      `[MarketFeed] Live price overlay: ${stats.marketsWithLivePrices} markets with live prices, ` +
+        `${stats.marketsWithSnapshotPrices} with snapshot prices ` +
+        `(kalshi=${stats.liveByPlatform.kalshi}, polymarket=${stats.liveByPlatform.polymarket}, sxbet=${stats.liveByPlatform.sxbet})`
+    );
+
+    return { markets: result, liveStats: stats };
+  }
+
+  /**
+   * Get effective price for a specific market outcome.
+   * Checks live cache first, falls back to provided market data.
+   *
+   * @param market The market from snapshot
+   * @param side 'yes' or 'no'
+   * @param maxPriceAgeMs Maximum age of live price to consider (default 2000ms)
+   * @returns Effective price and source
+   */
+  getEffectivePrice(
+    market: Market,
+    side: 'yes' | 'no',
+    maxPriceAgeMs: number = 2000
+  ): {
+    price: number;
+    source: 'live' | 'snapshot';
+    ageMs?: number;
+  } {
+    return LivePriceCache.getEffectivePrice(market, side, maxPriceAgeMs);
+  }
+
+  /**
+   * Get live price cache statistics for monitoring
+   */
+  getLivePriceCacheStats(): ReturnType<typeof LivePriceCache.getStats> {
+    return LivePriceCache.getStats();
   }
 }
 
