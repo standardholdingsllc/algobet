@@ -131,10 +131,18 @@ class LivePriceCacheImpl {
   private scoreHandlers: Set<LiveScoreHandler> = new Set();
 
   /** Statistics for monitoring */
-  private stats = {
+  private stats: {
+    totalPriceUpdates: number;
+    totalScoreUpdates: number;
+    priceUpdatesByPlatform: Record<MarketPlatform, number>;
+  } = {
     totalPriceUpdates: 0,
     totalScoreUpdates: 0,
-    priceUpdatesByPlatform: {} as Record<MarketPlatform, number>,
+    priceUpdatesByPlatform: {
+      kalshi: 0,
+      polymarket: 0,
+      sxbet: 0,
+    },
   };
 
   // --------------------------------------------------------------------------
@@ -494,10 +502,12 @@ class LivePriceCacheImpl {
    * Reset statistics (for testing)
    */
   resetStats(): void {
-    this.stats = {
-      totalPriceUpdates: 0,
-      totalScoreUpdates: 0,
-      priceUpdatesByPlatform: {},
+    this.stats.totalPriceUpdates = 0;
+    this.stats.totalScoreUpdates = 0;
+    this.stats.priceUpdatesByPlatform = {
+      kalshi: 0,
+      polymarket: 0,
+      sxbet: 0,
     };
   }
 
