@@ -749,8 +749,9 @@ export function getMatchedEvents(filter?: {
     groups = groups.filter(g => g.status === 'LIVE');
   }
   
-  if (filter?.minPlatforms) {
-    groups = groups.filter(g => g.platformCount >= filter.minPlatforms);
+  const minPlatforms = filter?.minPlatforms;
+  if (typeof minPlatforms === 'number') {
+    groups = groups.filter(g => g.platformCount >= minPlatforms);
   }
   
   if (filter?.sport) {
