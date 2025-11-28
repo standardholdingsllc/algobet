@@ -11,7 +11,8 @@ import {
   MarketPlatform,
   MatchGraph,
 } from '@/types';
-import { TrendingUp, Activity, Wallet, RefreshCw } from 'lucide-react';
+import { TrendingUp, Activity, Wallet, RefreshCw, Radio } from 'lucide-react';
+import Link from 'next/link';
 
 interface BotHealth {
   healthy: boolean;
@@ -313,6 +314,13 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="flex items-center space-x-4">
+            <Link
+              href="/live-arb"
+              className="px-4 py-3 rounded-lg font-semibold transition-colors bg-cyan-600 hover:bg-cyan-700 text-white flex items-center space-x-2"
+            >
+              <Radio className="w-4 h-4" />
+              <span>Live Betting</span>
+            </Link>
             <button
               onClick={handleRefreshBalances}
               disabled={refreshing}
