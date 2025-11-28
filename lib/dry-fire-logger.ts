@@ -12,6 +12,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { Redis } from '@upstash/redis';
 import {
   DryFireTradeLog,
   DryFireTradeLeg,
@@ -45,6 +46,21 @@ let inMemoryStats: DryFireStats | null = null;
 // ============================================================================
 
 let config: DryFireConfig | null = null;
+
+const redisClient =
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+    ? new Redis({
+        url: process.env.KV_REST_API_URL,
+        token: process.env.KV_REST_API_TOKEN,
+      })
+    : null;
+
+function getRedisClient(): Redis {
+  if (!redisClient) {
+    throw new Error('Upstash Redis client is not configured');
+  }
+  return redisClient;
+}
 
 /**
  * Get dry-fire configuration
@@ -209,22 +225,13 @@ export async function logDryFireTrade(log: DryFireTradeLog): Promise<void> {
   }
 
   try {
-    // Try to use KV storage
-    const { kv } = await import('@upstash/redis');
-    
-    // Get existing logs
-    const existing = await kv.get<DryFireTradeLog[]>(KV_DRY_FIRE_LOGS_KEY) || [];
-    
-    // Add new log
+    const kv = getRedisClient();
+
+    const existing = (await kv.get<DryFireTradeLog[]>(KV_DRY_FIRE_LOGS_KEY)) || [];
     existing.unshift(log);
-    
-    // Trim to max size
+
     const trimmed = existing.slice(0, cfg.maxLogsToKeep);
-    
-    // Save back
     await kv.set(KV_DRY_FIRE_LOGS_KEY, trimmed);
-    
-    // Update stats cache
     await updateStatsCache(trimmed);
     
     console.log(
@@ -257,8 +264,8 @@ export async function getDryFireLogs(options?: {
   let logs: DryFireTradeLog[] = [];
 
   try {
-    const { kv } = await import('@upstash/redis');
-    logs = await kv.get<DryFireTradeLog[]>(KV_DRY_FIRE_LOGS_KEY) || [];
+    const kv = getRedisClient();
+    logs = (await kv.get<DryFireTradeLog[]>(KV_DRY_FIRE_LOGS_KEY)) || [];
   } catch {
     logs = inMemoryLogs;
   }
@@ -383,10 +390,13 @@ function calculateStats(logs: DryFireTradeLog[], since?: string): DryFireStats {
  * Update cached stats
  */
 async function updateStatsCache(logs: DryFireTradeLog[]): Promise<void> {
+  if (!redisClient) {
+    return;
+  }
+
   try {
     const stats = calculateStats(logs);
-    const { kv } = await import('@upstash/redis');
-    await kv.set(KV_DRY_FIRE_STATS_KEY, stats);
+    await redisClient.set(KV_DRY_FIRE_STATS_KEY, stats);
     inMemoryStats = stats;
   } catch {
     // Ignore cache update failures
@@ -398,7 +408,7 @@ async function updateStatsCache(logs: DryFireTradeLog[]): Promise<void> {
  */
 export async function clearDryFireLogs(): Promise<void> {
   try {
-    const { kv } = await import('@upstash/redis');
+    const kv = getRedisClient();
     await kv.del(KV_DRY_FIRE_LOGS_KEY);
     await kv.del(KV_DRY_FIRE_STATS_KEY);
   } catch {
