@@ -11,11 +11,11 @@
  * - CSV export functionality
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { 
   RefreshCw, Wifi, WifiOff, AlertTriangle, CheckCircle, XCircle,
-  Play, Square, Download, FileText, TrendingUp, Activity
+  Play, Square, Download, FileText, TrendingUp, Activity, ShieldAlert, Zap
 } from 'lucide-react';
 
 // Types
@@ -95,6 +95,14 @@ interface BotStatus {
   lastScanAt?: string;
   opportunitiesFound?: number;
   mode: 'DRY_FIRE' | 'LIVE' | 'SIMULATION';
+}
+
+interface ExecutionModeData {
+  mode: 'DRY_FIRE' | 'LIVE';
+  forcedByEnv: boolean;
+  envDryFireMode: boolean;
+  configMode?: 'DRY_FIRE' | 'LIVE';
+  isDryFire: boolean;
 }
 
 // Rule-based matcher types
@@ -566,6 +574,108 @@ function MatchedEventsTable({ groups }: { groups: MatchedEventGroup[] }) {
   );
 }
 
+// Execution Mode Toggle
+function ExecutionModeCard({
+  executionMode,
+  onToggle,
+  isLoading,
+}: {
+  executionMode: ExecutionModeData | null;
+  onToggle: (newMode: 'DRY_FIRE' | 'LIVE') => void;
+  isLoading: boolean;
+}) {
+  if (!executionMode) {
+    return (
+      <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+          <ShieldAlert className="w-5 h-5 text-amber-400" />
+          Execution Mode
+        </h3>
+        <div className="text-gray-400 text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  const isDryFire = executionMode.mode === 'DRY_FIRE';
+  const isLocked = executionMode.forcedByEnv;
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5 text-amber-400" />
+          Execution Mode
+        </h3>
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+          isDryFire 
+            ? 'bg-amber-900/30 text-amber-300 border border-amber-700/50' 
+            : 'bg-green-900/30 text-green-300 border border-green-700/50'
+        }`}>
+          {executionMode.mode}
+        </span>
+      </div>
+
+      {/* Lock warning */}
+      {isLocked && (
+        <div className="mb-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
+          <div className="flex items-center gap-2 text-amber-300 text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>
+              Locked to Dry-Fire by <code className="bg-amber-900/50 px-1 rounded">DRY_FIRE_MODE</code> env.
+              Update your worker env to allow Live.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Toggle buttons */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onToggle('DRY_FIRE')}
+          disabled={isLoading || isDryFire}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+            isDryFire
+              ? 'bg-amber-600 text-white cursor-default'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Dry-Fire
+        </button>
+
+        <button
+          onClick={() => onToggle('LIVE')}
+          disabled={isLoading || !isDryFire || isLocked}
+          title={isLocked ? 'Locked by DRY_FIRE_MODE env' : undefined}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+            !isDryFire
+              ? 'bg-green-600 text-white cursor-default'
+              : isLocked
+                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                : 'bg-gray-700 text-gray-300 hover:bg-green-600 hover:text-white'
+          }`}
+        >
+          <Zap className="w-4 h-4" />
+          Live
+        </button>
+      </div>
+
+      {/* Status text */}
+      <div className="mt-4 text-sm">
+        {isDryFire ? (
+          <p className="text-amber-300/80">
+            📝 Simulating orders only. No real bets are placed.
+          </p>
+        ) : (
+          <p className="text-green-300/80">
+            ⚡ Live trading enabled. Orders may be placed on connected platforms.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // CSV Export Panel
 function ExportPanel() {
   const [isExporting, setIsExporting] = useState(false);
@@ -649,10 +759,12 @@ export default function LiveArbPage() {
   const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
   const [markets, setMarkets] = useState<LiveMarket[]>([]);
   const [liveEventsData, setLiveEventsData] = useState<LiveEventsData | null>(null);
+  const [executionMode, setExecutionMode] = useState<ExecutionModeData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [botActionLoading, setBotActionLoading] = useState(false);
+  const [executionModeLoading, setExecutionModeLoading] = useState(false);
 
   // Fetch status
   const fetchStatus = async () => {
@@ -728,6 +840,47 @@ export default function LiveArbPage() {
     }
   };
 
+  // Fetch execution mode
+  const fetchExecutionMode = async () => {
+    try {
+      const res = await fetch('/api/live-arb/execution-mode');
+      if (!res.ok) throw new Error('Failed to fetch execution mode');
+      const data = await res.json();
+      setExecutionMode(data);
+    } catch (err: any) {
+      console.error('Failed to fetch execution mode:', err);
+    }
+  };
+
+  // Toggle execution mode
+  const toggleExecutionMode = useCallback(async (newMode: 'DRY_FIRE' | 'LIVE') => {
+    if (executionMode?.forcedByEnv && newMode === 'LIVE') {
+      alert('Execution mode is locked to Dry-Fire by DRY_FIRE_MODE env. Update your worker env to allow Live.');
+      return;
+    }
+
+    setExecutionModeLoading(true);
+    try {
+      const res = await fetch('/api/live-arb/execution-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: newMode }),
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to change mode');
+      }
+      
+      await fetchExecutionMode();
+    } catch (err: any) {
+      console.error('Failed to change execution mode:', err);
+      alert('Failed to change execution mode: ' + err.message);
+    } finally {
+      setExecutionModeLoading(false);
+    }
+  }, [executionMode]);
+
   // Start bot
   const startBot = async () => {
     setBotActionLoading(true);
@@ -775,6 +928,7 @@ export default function LiveArbPage() {
       fetchDryFireStats(),
       fetchBotStatus(),
       fetchLiveEvents(),
+      fetchExecutionMode(),
     ]);
     setLastRefresh(new Date());
     setIsLoading(false);
@@ -828,7 +982,16 @@ export default function LiveArbPage() {
           </div>
         )}
 
-        {/* Bot Control + Dry Fire Stats Row */}
+        {/* Execution Mode Control */}
+        <div className="mb-6">
+          <ExecutionModeCard
+            executionMode={executionMode}
+            onToggle={toggleExecutionMode}
+            isLoading={executionModeLoading}
+          />
+        </div>
+
+        {/* Bot Control + Export Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <BotControlPanel
             botStatus={botStatus}

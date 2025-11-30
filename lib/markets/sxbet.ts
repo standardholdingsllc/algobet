@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { ethers } from 'ethers';
 import { Market } from '@/types';
-import { isDryFireMode } from '@/types/dry-fire';
+import { isDryFireMode } from '../execution-wrapper';
 
 const BASE_URL = process.env.SXBET_API_BASE || 'https://api.sx.bet';
 const SXBET_BEST_ODDS_CHUNK = 25;

@@ -37,6 +37,7 @@ const DEFAULT_CONFIG: BotConfig = {
     eventTypes: [],
     leagueTickers: [],
   },
+  liveExecutionMode: 'DRY_FIRE', // Default to paper trading for safety
 };
 
 const DEFAULT_DATA: StorageData = {
@@ -49,6 +50,22 @@ const DEFAULT_DATA: StorageData = {
 };
 
 const STORAGE_KEY = 'algobet:data';
+
+/**
+ * In-memory cache for config (for synchronous access)
+ * Updated whenever getConfig() is called
+ */
+let cachedConfig: BotConfig | null = null;
+let lastConfigFetchAt = 0;
+const CONFIG_CACHE_TTL_MS = 5000; // 5 seconds
+
+/**
+ * Get cached bot config synchronously
+ * Returns the last fetched config, or null if never fetched
+ */
+export function getCachedBotConfig(): BotConfig | null {
+  return cachedConfig;
+}
 
 /**
  * Upstash Redis Storage Adapter
@@ -140,19 +157,31 @@ export class KVStorage {
 
   /**
    * Get bot configuration
+   * Also updates the in-memory cache for synchronous access
    */
   static async getConfig(): Promise<BotConfig> {
     const data = await this.getAllData();
-    return data.config || DEFAULT_CONFIG;
+    const config = { ...DEFAULT_CONFIG, ...data.config };
+    
+    // Update cache
+    cachedConfig = config;
+    lastConfigFetchAt = Date.now();
+    
+    return config;
   }
 
   /**
    * Update bot configuration
+   * Also updates the in-memory cache
    */
   static async updateConfig(config: Partial<BotConfig>): Promise<void> {
     const data = await this.getAllData();
-    data.config = { ...data.config, ...config };
+    data.config = { ...DEFAULT_CONFIG, ...data.config, ...config };
     await this.updateAllData(data);
+    
+    // Update cache
+    cachedConfig = data.config;
+    lastConfigFetchAt = Date.now();
   }
 
   /**

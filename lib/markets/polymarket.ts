@@ -283,7 +283,7 @@ interface GammaMarket {
 /* -------------------------------------------------------------------------- */
 
 import { Market, MarketFilterInput } from '@/types';
-import { isDryFireMode } from '@/types/dry-fire';
+import { isDryFireMode } from '../execution-wrapper';
 import axios from 'axios';
 import { ethers, parseUnits } from 'ethers';
 

@@ -140,6 +140,13 @@ export interface AccountBalance {
   lastUpdated: Date;
 }
 
+/**
+ * Execution mode for live-arb system
+ * - 'DRY_FIRE': Paper trading - detect opportunities but only log them
+ * - 'LIVE': Execute real trades (only works if DRY_FIRE_MODE env is false)
+ */
+export type ExecutionMode = 'DRY_FIRE' | 'LIVE';
+
 export interface BotConfig {
   maxBetPercentage: number; // Max % of balance to bet (default 10%)
   maxDaysToExpiry: number;   // Max days until market expiry to EXECUTE bets (default 10) - scans all markets but only bets on near-term
@@ -155,6 +162,12 @@ export interface BotConfig {
   };
   simulationMode: boolean;   // When true, logs opportunities without placing bets (default: false)
   marketFilters?: MarketFilterPreferences;
+  /**
+   * Live arb execution mode (runtime toggle via dashboard)
+   * - 'DRY_FIRE': Paper trading only (default)
+   * - 'LIVE': Real execution (only if DRY_FIRE_MODE env is false)
+   */
+  liveExecutionMode?: ExecutionMode;
 }
 
 export interface DailyStats {

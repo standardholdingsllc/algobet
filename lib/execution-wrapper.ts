@@ -11,19 +11,19 @@
  * dry-fire mode is respected.
  */
 
-import { ArbitrageOpportunity, Bet, ArbitrageGroup, MarketPlatform } from '@/types';
+import { ArbitrageOpportunity, Bet, ArbitrageGroup, MarketPlatform, ExecutionMode } from '@/types';
 import {
   DryFireTradeLog,
   DryFireTradeStatus,
   SafetySnapshot,
-  isDryFireMode,
+  isDryFireForcedByEnv,
 } from '@/types/dry-fire';
 import {
   createDryFireLog,
   logDryFireTrade,
 } from './dry-fire-logger';
 import { calculateBetSizes, validateOpportunity } from './arbitrage';
-import { KVStorage } from './kv-storage';
+import { KVStorage, getCachedBotConfig } from './kv-storage';
 import { v4 as uuidv4 } from 'uuid';
 
 // ============================================================================
@@ -102,12 +102,38 @@ export interface PlatformAdapters {
 }
 
 // ============================================================================
-// Dry-Fire Guard
+// Execution Mode Logic
 // ============================================================================
+
+/**
+ * Get the effective execution mode.
+ * 
+ * Priority:
+ * 1. DRY_FIRE_MODE env = 'true' → always 'DRY_FIRE' (hard safety switch)
+ * 2. BotConfig.liveExecutionMode from KV → 'DRY_FIRE' or 'LIVE'
+ * 3. Default → 'DRY_FIRE'
+ */
+export function getExecutionMode(): ExecutionMode {
+  // Hard safety: env DRY_FIRE_MODE=true always forces DRY_FIRE
+  if (isDryFireForcedByEnv()) {
+    return 'DRY_FIRE';
+  }
+
+  // Check KV config
+  const cfg = getCachedBotConfig();
+  return cfg?.liveExecutionMode ?? 'DRY_FIRE';
+}
 
 /**
  * Check if dry-fire mode is active.
  * This is the authoritative check used by all execution paths.
+ */
+export function isDryFireMode(): boolean {
+  return getExecutionMode() === 'DRY_FIRE';
+}
+
+/**
+ * Alias for isDryFireMode for backward compatibility
  */
 export function checkDryFireMode(): boolean {
   return isDryFireMode();

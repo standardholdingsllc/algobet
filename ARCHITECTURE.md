@@ -468,8 +468,9 @@ The dry-fire mode allows the system to run all arbitrage detection, pricing, and
 |-----------|----------|---------|
 | **DryFireTradeLog Types** | `types/dry-fire.ts` | Type definitions for paper trade logs |
 | **DryFireLogger** | `lib/dry-fire-logger.ts` | Persistence layer for paper trades |
-| **ExecutionWrapper** | `lib/execution-wrapper.ts` | Routes between real and dry-fire execution |
+| **ExecutionWrapper** | `lib/execution-wrapper.ts` | Routes between real/dry-fire, runtime mode toggle |
 | **Platform Guards** | `lib/markets/*.ts` | Belt-and-suspenders safety checks |
+| **ExecutionMode API** | `pages/api/live-arb/execution-mode.ts` | Runtime toggle endpoint |
 
 ### 13.2 Configuration
 
@@ -636,6 +637,76 @@ interface DryFireStats {
 4. **Analyze**: Export CSV and review patterns
 5. **Tune**: Adjust thresholds based on data
 6. **Go live**: Set `DRY_FIRE_MODE=false` when confident
+
+### 13.11 Runtime Execution Mode Toggle
+
+The live arb system supports a **runtime execution mode toggle** that allows switching between dry-fire and live mode without restarting the worker:
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          EXECUTION MODE LOGIC                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   DRY_FIRE_MODE env = 'true'?  ──YES──►  Mode = DRY_FIRE (hard lock)    │
+│              │                                                           │
+│              NO                                                          │
+│              │                                                           │
+│              ▼                                                           │
+│   BotConfig.liveExecutionMode from KV                                   │
+│              │                                                           │
+│              ├──'LIVE'────►  Mode = LIVE (real execution)               │
+│              │                                                           │
+│              └──'DRY_FIRE' or missing──►  Mode = DRY_FIRE               │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Types:**
+```typescript
+type ExecutionMode = 'DRY_FIRE' | 'LIVE';
+
+interface BotConfig {
+  // ...existing fields
+  liveExecutionMode?: ExecutionMode; // Default: 'DRY_FIRE'
+}
+```
+
+**Key Functions (`lib/execution-wrapper.ts`):**
+- `getExecutionMode()`: Returns the effective mode (respects env + config)
+- `isDryFireMode()`: Returns `true` if mode is DRY_FIRE
+- `checkDryFireMode()`: Alias for `isDryFireMode()`
+- `assertNotDryFire(operation)`: Throws if attempting real execution in dry-fire mode
+
+**API Endpoint (`/api/live-arb/execution-mode`):**
+
+GET response:
+```json
+{
+  "mode": "DRY_FIRE",
+  "forcedByEnv": true,
+  "envDryFireMode": true,
+  "configMode": "DRY_FIRE",
+  "isDryFire": true
+}
+```
+
+POST body: `{ "mode": "DRY_FIRE" | "LIVE" }`
+- Returns 400 if attempting to switch to LIVE when `DRY_FIRE_MODE=true`
+- Updates `BotConfig.liveExecutionMode` in KV storage
+
+**Dashboard UI (`/live-arb`):**
+- Execution Mode Card at the top of the page
+- Toggle buttons for Dry-Fire / Live
+- Clear status text explaining current mode
+- Live button disabled when forced by env
+- Warning banner when locked by `DRY_FIRE_MODE`
+
+**Safety Guarantees:**
+1. **Environment Override**: `DRY_FIRE_MODE=true` always forces DRY_FIRE regardless of config
+2. **Default Safe**: New installs default to DRY_FIRE
+3. **Triple-Layer Protection**: Wrapper → Guard → Platform checks still apply
+4. **Instant Effect**: Mode changes take effect immediately via cached config
 
 ---
 

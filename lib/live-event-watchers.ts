@@ -27,8 +27,7 @@ import { LivePriceUpdate } from '@/types/live-arb';
 import { getMatchedEvents, getMatchedGroup } from './live-event-matcher';
 import { LivePriceCache } from './live-price-cache';
 import { scanArbitrageOpportunities } from './arbitrage';
-import { executeOpportunityWithMode, ExecutionOptions, PlatformAdapters } from './execution-wrapper';
-import { isDryFireMode } from '@/types/dry-fire';
+import { executeOpportunityWithMode, ExecutionOptions, PlatformAdapters, isDryFireMode } from './execution-wrapper';
 import { KVStorage } from './kv-storage';
 
 // ============================================================================

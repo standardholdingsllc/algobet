@@ -26,7 +26,8 @@
     "snapshot-worker": "node -r esbuild-register workers/snapshot-worker.ts",
     "test-live-arb": "node -r esbuild-register scripts/test-live-arb.ts",
     "test-live-ws": "node -r esbuild-register scripts/test-live-ws-connections.ts",
-    "test-live-events": "node -r esbuild-register scripts/test-live-events.ts"
+    "test-live-events": "node -r esbuild-register scripts/test-live-events.ts",
+    "test-execution-mode": "node -r esbuild-register scripts/test-execution-mode.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.5",

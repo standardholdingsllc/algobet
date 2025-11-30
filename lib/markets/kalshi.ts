@@ -1,7 +1,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import { Market } from '@/types';
-import { isDryFireMode } from '@/types/dry-fire';
+import { isDryFireMode } from '../execution-wrapper';
 
 const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';

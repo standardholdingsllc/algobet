@@ -21,10 +21,10 @@ import {
   DryFireConfig,
   SafetySnapshot,
   buildDryFireConfig,
-  isDryFireMode,
 } from '@/types/dry-fire';
 import { ArbitrageOpportunity, MarketPlatform } from '@/types';
 import { calculateTotalCost } from './fees';
+import { isDryFireMode } from './execution-wrapper';
 
 // ============================================================================
 // Storage Keys

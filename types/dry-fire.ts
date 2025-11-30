@@ -255,9 +255,21 @@ export function buildDryFireConfig(): DryFireConfig {
 }
 
 /**
- * Check if dry-fire mode is enabled
+ * Check if dry-fire mode is enabled (basic env check)
+ * NOTE: For the full execution mode logic that includes KV config,
+ * use getExecutionMode() / isDryFireModeActive() from lib/execution-wrapper.ts
  */
 export function isDryFireMode(): boolean {
+  // This is the basic env-only check
+  // The execution wrapper provides the full logic with KV config
+  return process.env.DRY_FIRE_MODE === 'true';
+}
+
+/**
+ * Check if execution is forced to dry-fire by environment
+ * When DRY_FIRE_MODE=true, no amount of config changes can enable live trading
+ */
+export function isDryFireForcedByEnv(): boolean {
   return process.env.DRY_FIRE_MODE === 'true';
 }
 
