@@ -182,11 +182,11 @@ MatchGraph {
 - `AdaptiveScanner` adjusts scan cadence between 5s and 60s based on live-event signals and recent opportunity counts.
 - `calculateBetSizes` enforces per-platform `maxBetPercentage` and available cash, while execution code double-checks expiry windows before sending orders.
 
-### Snapshot arb feature flags
+### Snapshot & live-arb feature flags
 - `SNAPSHOT_ARB_ENABLED` (env, default `true`) wraps the entire cron path. When set to `false`, `/api/bot/cron` returns immediately without touching `MarketFeedService`, Kalshi/Polymarket/SX.bet adapters, or HotMarketTracker so SX.bet pagination jobs are never triggered.
 - `BotConfig.snapshotArbEnabled` (default `false`) mirrors the env flag for KV-backed control; both must be `true` for the snapshot scanner to run, so new live-only environments stay quiet unless explicitly re-enabled.
 - `MATCH_GRAPH_ENABLED` (env, default `false`) + `BotConfig.matchGraphEnabled` gate Gemini/MatchGraph usage and every HotMarketTracker log. When disabled, the cron bot still loads single-platform snapshots if snapshot arb is enabled, but it skips cross-book tracking entirely.
-- The live-event arbitrage system (Section&nbsp;12) remains independent and continues to be controlled by `LIVE_ARB_ENABLED`, `LIVE_ARB_WORKER`, and the execution-mode toggle (`DRY_FIRE_MODE` + `BotConfig.liveExecutionMode`).
+- The live-event arbitrage system (Section&nbsp;12) is now governed by a KV-backed runtime config (`/api/live-arb/config`) surfaced on the dashboard: `liveArbEnabled`, `ruleBasedMatcherEnabled`, `sportsOnly`, and `liveEventsOnly`. The legacy `LIVE_ARB_*` env vars only seed the very first defaults; once saved, the KV + UI settings are the source of truth. `DRY_FIRE_MODE=true` remains an optional master safety override layered on top of the Execution Mode UI toggle, and `LIVE_ARB_WORKER` is still available for deployments that dedicate a worker process.
 
 ---
 
@@ -303,6 +303,17 @@ The live-event arbitrage subsystem provides real-time price streaming and low-la
 | **LiveArbIntegration** | `lib/live-arb-integration.ts` | Integration hooks between live system and existing bot |
 | **WebSocket Clients** | `services/sxbet-ws.ts`, `polymarket-ws.ts`, `kalshi-ws.ts` | Platform-specific WS connections |
 
+### 12.1 Runtime configuration (`/api/live-arb/config`)
+
+- Live arb enablement, matcher enablement, and filtering preferences are stored in `LiveArbRuntimeConfig` (Upstash KV) and surfaced directly on the `/live-arb` dashboard.
+- Fields:
+  - `liveArbEnabled`: Master switch for WebSocket ingestion + execution.
+  - `ruleBasedMatcherEnabled`: Controls the rule-based matcher + watcher orchestration.
+  - `sportsOnly`: Filters registry inputs to sports markets only.
+  - `liveEventsOnly`: Tells `LiveArbManager` to prefer live/in-play events for subscriptions.
+- Env vars such as `LIVE_ARB_ENABLED`/`LIVE_RULE_BASED_MATCHER_ENABLED` now **only seed the very first defaults**. After that, the KV value + UI toggle are the system of record.
+- `POST /api/live-arb/config` writes updates atomically; the API + UI reuse this endpoint.
+
 ### 12.2 LivePriceCache (`lib/live-price-cache.ts`)
 
 - **In-memory, per-process cache** for real-time price data
@@ -354,7 +365,7 @@ To avoid subscribing to everything (thousands of markets), `LiveArbManager` impl
 2. **Debouncing**: Subscription updates are debounced (default 1s) to prevent thrashing
 3. **Priority ordering**: Live events first, then by time-to-expiry
 4. **Per-platform limits**: Configurable max subscriptions per platform (default 100)
-5. **Live events only mode**: Optional filter via `LIVE_ARB_LIVE_EVENTS_ONLY=true`
+5. **Live events only mode**: Optional filter driven by the `liveEventsOnly` runtime toggle
 
 Subscription flow:
 ```
@@ -440,11 +451,11 @@ New API endpoints and UI for live arb monitoring:
 
 ### 12.8 Environment Variables
 
+Runtime toggles now live in KV/UI; the remaining env vars are optional tuning knobs or deployment hints:
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LIVE_ARB_ENABLED` | `false` | Enable live arb features |
-| `LIVE_ARB_WORKER` | `false` | Designate as dedicated live arb worker |
-| `LIVE_ARB_LIVE_EVENTS_ONLY` | `false` | Only monitor live events |
+| `LIVE_ARB_WORKER` | `false` | Designate this process as the dedicated live-arb worker |
 | `LIVE_ARB_MIN_PROFIT_BPS` | `50` | Minimum profit (basis points) |
 | `LIVE_ARB_MAX_PRICE_AGE_MS` | `2000` | Max acceptable price age |
 | `LIVE_ARB_MAX_LATENCY_MS` | `2000` | Max execution latency |
@@ -485,6 +496,8 @@ Primary environment variable:
 ```
 DRY_FIRE_MODE=true          # Master switch - when true, NO real orders placed
 ```
+
+When `DRY_FIRE_MODE` is unset (default), the `/live-arb` dashboard controls execution mode entirely via `/api/live-arb/execution-mode`. The UI writes `BotConfig.liveExecutionMode`, and the system will happily run in LIVE when the toggle is set accordingly. Setting `DRY_FIRE_MODE=true` still forces DRY_FIRE regardless of the UI and acts as the final safety override.
 
 Optional fine-grained flags:
 
@@ -923,11 +936,8 @@ export function extractSxBetEvent(marketHash, title, metadata) { ... }
 ### 14.8 Configuration
 
 ```bash
-# Enable the rule-based matcher
-LIVE_RULE_BASED_MATCHER_ENABLED=true
-
-# Only match sports events (default true)
-LIVE_RULE_BASED_SPORTS_ONLY=true
+# Matcher enablement + sports-only filtering now live in KV.
+# Use the /live-arb dashboard toggles instead of env vars.
 
 # Time tolerance for matching (ms)
 LIVE_MATCH_TIME_TOLERANCE_MS=900000

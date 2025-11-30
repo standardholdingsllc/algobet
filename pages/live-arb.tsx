@@ -168,6 +168,13 @@ interface LiveEventsData {
   matchedGroups: MatchedEventGroup[];
 }
 
+interface LiveArbRuntimeConfigData {
+  liveArbEnabled: boolean;
+  ruleBasedMatcherEnabled: boolean;
+  sportsOnly: boolean;
+  liveEventsOnly: boolean;
+}
+
 // Status indicator component
 function StatusIndicator({ connected }: { connected: boolean }) {
   return connected ? (
@@ -297,18 +304,20 @@ function DryFireStatsCard({ stats }: { stats: DryFireStats }) {
 }
 
 // Bot Control Panel
-function BotControlPanel({ 
-  botStatus, 
-  onStart, 
+function BotControlPanel({
+  botStatus,
+  executionMode,
+  onStart,
   onStop,
-  isLoading 
-}: { 
+  isLoading,
+}: {
   botStatus: BotStatus | null;
+  executionMode: ExecutionModeData | null;
   onStart: () => void;
   onStop: () => void;
   isLoading: boolean;
 }) {
-  const isDryFire = botStatus?.mode === 'DRY_FIRE';
+  const isDryFire = executionMode?.isDryFire ?? botStatus?.mode === 'DRY_FIRE';
   
   return (
     <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
@@ -386,7 +395,13 @@ function BotControlPanel({
 }
 
 // Rule-Based Matcher Card
-function RuleBasedMatcherCard({ data }: { data: LiveEventsData | null }) {
+function RuleBasedMatcherCard({
+  data,
+  runtimeConfig,
+}: {
+  data: LiveEventsData | null;
+  runtimeConfig: LiveArbRuntimeConfigData | null;
+}) {
   if (!data) {
     return (
       <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
@@ -399,6 +414,8 @@ function RuleBasedMatcherCard({ data }: { data: LiveEventsData | null }) {
     );
   }
 
+  const matcherEnabled =
+    runtimeConfig?.ruleBasedMatcherEnabled ?? data.enabled;
   const uptimeMinutes = Math.floor((data.uptimeMs || 0) / 60000);
 
   return (
@@ -409,17 +426,17 @@ function RuleBasedMatcherCard({ data }: { data: LiveEventsData | null }) {
           Rule-Based Sports Matcher
         </h3>
         <div className="flex items-center gap-2">
-          {data.running && (
+          {data.running && matcherEnabled && (
             <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
               RUNNING
             </span>
           )}
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            data.enabled 
+            matcherEnabled 
               ? 'bg-cyan-900/30 text-cyan-300 border border-cyan-700/50' 
               : 'bg-gray-700 text-gray-400'
           }`}>
-            {data.enabled ? 'ENABLED' : 'DISABLED'}
+            {matcherEnabled ? 'ENABLED' : 'DISABLED'}
           </span>
         </div>
       </div>
@@ -500,6 +517,94 @@ function RuleBasedMatcherCard({ data }: { data: LiveEventsData | null }) {
             <span>Max check: {data.watchers.stats.maxCheckTimeMs || 0}ms</span>
             <span>Markets: {data.watchers.stats.totalMarketsWatched || 0}</span>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LiveArbControlCard({
+  config,
+  onToggle,
+  isLoading,
+}: {
+  config: LiveArbRuntimeConfigData | null;
+  onToggle: (field: keyof LiveArbRuntimeConfigData, value: boolean) => void;
+  isLoading: boolean;
+}) {
+  const toggles: Array<{
+    key: keyof LiveArbRuntimeConfigData;
+    label: string;
+    description: string;
+  }> = [
+    {
+      key: 'liveArbEnabled',
+      label: 'Live Arb System',
+      description: 'Master switch for WebSocket streaming + execution',
+    },
+    {
+      key: 'ruleBasedMatcherEnabled',
+      label: 'Rule-Based Sports Matcher',
+      description: 'Controls vendor event matching + watchers',
+    },
+    {
+      key: 'sportsOnly',
+      label: 'Sports-Only Mode',
+      description: 'Keep matcher focused on sports contracts only',
+    },
+    {
+      key: 'liveEventsOnly',
+      label: 'Live Events Only',
+      description: 'Prioritize in-play events for subscriptions',
+    },
+  ];
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5 text-indigo-400" />
+          Live Arb Controls
+        </h3>
+        {isLoading && (
+          <span className="text-xs text-gray-400">Updating…</span>
+        )}
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {toggles.map((toggle) => {
+          const value = config ? config[toggle.key] : false;
+          return (
+            <div
+              key={toggle.key}
+              className="p-4 rounded-lg border border-gray-700 bg-gray-900/40"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="text-white font-medium">{toggle.label}</div>
+                  <div className="text-xs text-gray-400">
+                    {toggle.description}
+                  </div>
+                </div>
+                <button
+                  onClick={() => onToggle(toggle.key, !value)}
+                  disabled={isLoading || !config}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                    value
+                      ? 'bg-green-900/40 text-green-300 border border-green-600/40'
+                      : 'bg-gray-700 text-gray-300'
+                  } ${isLoading || !config ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-600'}`}
+                >
+                  {value ? 'ON' : 'OFF'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {!config && (
+        <div className="text-sm text-gray-400 mt-4">
+          Loading runtime config…
         </div>
       )}
     </div>
@@ -760,11 +865,13 @@ export default function LiveArbPage() {
   const [markets, setMarkets] = useState<LiveMarket[]>([]);
   const [liveEventsData, setLiveEventsData] = useState<LiveEventsData | null>(null);
   const [executionMode, setExecutionMode] = useState<ExecutionModeData | null>(null);
+  const [runtimeConfig, setRuntimeConfig] = useState<LiveArbRuntimeConfigData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [botActionLoading, setBotActionLoading] = useState(false);
   const [executionModeLoading, setExecutionModeLoading] = useState(false);
+  const [runtimeConfigLoading, setRuntimeConfigLoading] = useState(false);
 
   // Fetch status
   const fetchStatus = async () => {
@@ -800,16 +907,14 @@ export default function LiveArbPage() {
       setBotStatus({
         isRunning: Boolean(
           data.running ??
-          data.isScanning ??
-          (typeof data.status === 'string' ? data.status === 'running' : data.status?.running)
+            data.isScanning ??
+            (typeof data.status === 'string'
+              ? data.status === 'running'
+              : data.status?.running)
         ),
         lastScanAt: data.lastScan || data.lastSuccessfulScan || data.lastUpdated,
         opportunitiesFound: data.lastScanOpportunities ?? data.opportunitiesFound,
-        mode: process.env.NEXT_PUBLIC_DRY_FIRE_MODE === 'true'
-          ? 'DRY_FIRE'
-          : data.simulationMode
-            ? 'SIMULATION'
-            : 'LIVE',
+        mode: data.simulationMode ? 'SIMULATION' : 'LIVE',
       });
     } catch (err: any) {
       console.error('Failed to fetch bot status:', err);
@@ -849,6 +954,46 @@ export default function LiveArbPage() {
       setExecutionMode(data);
     } catch (err: any) {
       console.error('Failed to fetch execution mode:', err);
+    }
+  };
+
+  const fetchRuntimeConfig = async () => {
+    try {
+      const res = await fetch('/api/live-arb/config');
+      if (!res.ok) throw new Error('Failed to fetch live-arb runtime config');
+      const data = await res.json();
+      setRuntimeConfig(data);
+    } catch (err: any) {
+      console.error('Failed to fetch live-arb config:', err);
+    }
+  };
+
+  const handleRuntimeToggle = async (
+    field: keyof LiveArbRuntimeConfigData,
+    nextValue: boolean
+  ) => {
+    setRuntimeConfigLoading(true);
+    try {
+      const res = await fetch('/api/live-arb/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: nextValue }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update config');
+      }
+
+      const data = await res.json();
+      setRuntimeConfig(data);
+      // Refresh dependent panels
+      await Promise.all([fetchStatus(), fetchLiveEvents()]);
+    } catch (err: any) {
+      console.error('Failed to update live-arb config:', err);
+      alert('Failed to update live-arb config: ' + err.message);
+    } finally {
+      setRuntimeConfigLoading(false);
     }
   };
 
@@ -929,6 +1074,7 @@ export default function LiveArbPage() {
       fetchBotStatus(),
       fetchLiveEvents(),
       fetchExecutionMode(),
+      fetchRuntimeConfig(),
     ]);
     setLastRefresh(new Date());
     setIsLoading(false);
@@ -982,6 +1128,15 @@ export default function LiveArbPage() {
           </div>
         )}
 
+        {/* Live Arb Runtime Controls */}
+        <div className="mb-6">
+          <LiveArbControlCard
+            config={runtimeConfig}
+            onToggle={handleRuntimeToggle}
+            isLoading={runtimeConfigLoading}
+          />
+        </div>
+
         {/* Execution Mode Control */}
         <div className="mb-6">
           <ExecutionModeCard
@@ -995,6 +1150,7 @@ export default function LiveArbPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <BotControlPanel
             botStatus={botStatus}
+            executionMode={executionMode}
             onStart={startBot}
             onStop={stopBot}
             isLoading={botActionLoading}
@@ -1006,7 +1162,12 @@ export default function LiveArbPage() {
         {dryFireStats && <div className="mb-6"><DryFireStatsCard stats={dryFireStats} /></div>}
 
         {/* Rule-Based Sports Matcher */}
-        <div className="mb-6"><RuleBasedMatcherCard data={liveEventsData} /></div>
+        <div className="mb-6">
+          <RuleBasedMatcherCard
+            data={liveEventsData}
+            runtimeConfig={runtimeConfig}
+          />
+        </div>
 
         {/* Overall Status */}
         {status && (
@@ -1038,7 +1199,7 @@ export default function LiveArbPage() {
                     <XCircle className="w-8 h-8 text-gray-500" />
                     <div>
                       <div className="text-lg font-semibold text-gray-400">Disabled</div>
-                      <div className="text-sm text-gray-500">Set LIVE_ARB_ENABLED=true</div>
+                      <div className="text-sm text-gray-500">Enable via Live Arb Controls</div>
                     </div>
                   </>
                 )}

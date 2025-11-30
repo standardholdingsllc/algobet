@@ -57,31 +57,35 @@ import { HotMarketTracker } from './hot-market-tracker';
 import {
   LiveArbConfig,
   LiveArbOpportunity,
+  LiveArbRuntimeConfig,
   DEFAULT_LIVE_ARB_CONFIG,
 } from '@/types/live-arb';
 import { BotConfig, Market, MarketPlatform, TrackedMarket, ArbitrageOpportunity } from '@/types';
 import { scanArbitrageOpportunities, validateOpportunity } from './arbitrage';
+import { loadLiveArbRuntimeConfig } from './live-arb-runtime-config';
 
 // ============================================================================
 // Configuration Helpers
 // ============================================================================
 
 /**
- * Build LiveArbConfig from BotConfig and environment variables
+ * Build LiveArbConfig from BotConfig + KV runtime config.
+ * Environment variables remain optional tuning knobs.
  */
-export function buildLiveArbConfig(botConfig: BotConfig): LiveArbConfig {
-  const envEnabled = process.env.LIVE_ARB_ENABLED === 'true';
+export function buildLiveArbConfig(
+  botConfig: BotConfig,
+  runtimeConfig: LiveArbRuntimeConfig
+): LiveArbConfig {
   const envMinProfitBps = parseInt(process.env.LIVE_ARB_MIN_PROFIT_BPS || '50', 10);
   const envMaxLatencyMs = parseInt(process.env.LIVE_ARB_MAX_LATENCY_MS || '2000', 10);
   const envMaxPriceAgeMs = parseInt(process.env.LIVE_ARB_MAX_PRICE_AGE_MS || '2000', 10);
-  const envLiveOnly = process.env.LIVE_ARB_LIVE_EVENTS_ONLY === 'true';
 
   return {
-    enabled: envEnabled,
+    enabled: runtimeConfig.liveArbEnabled,
     minProfitBps: envMinProfitBps,
     maxExecutionLatencyMs: envMaxLatencyMs,
     maxPriceAgeMs: envMaxPriceAgeMs,
-    liveEventsOnly: envLiveOnly,
+    liveEventsOnly: runtimeConfig.liveEventsOnly,
     maxSlippageBps: 100,
     enabledPlatforms: ['kalshi', 'polymarket', 'sxbet'],
   };
@@ -103,10 +107,11 @@ export async function initializeLiveArb(
   botConfig: BotConfig,
   hotMarketTracker?: HotMarketTracker
 ): Promise<boolean> {
-  const config = buildLiveArbConfig(botConfig);
+  const runtimeConfig = await loadLiveArbRuntimeConfig();
+  const config = buildLiveArbConfig(botConfig, runtimeConfig);
 
-  if (!config.enabled) {
-    console.log('[LiveArbIntegration] Live arb disabled (LIVE_ARB_ENABLED != true)');
+  if (!runtimeConfig.liveArbEnabled) {
+    console.log('[LiveArbIntegration] Live arb disabled by runtime config; enable it from the dashboard.');
     return false;
   }
 

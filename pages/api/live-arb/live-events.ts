@@ -20,7 +20,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import {
   getOrchestratorStatus,
-  isLiveSportsMatcherEnabled,
   isOrchestratorRunning,
   getUptimeMs,
 } from '@/lib/live-sports-orchestrator';
@@ -28,7 +27,9 @@ import { getSnapshot, getRegistryStats } from '@/lib/live-event-registry';
 import { getMatchedEvents, getMatcherStats } from '@/lib/live-event-matcher';
 import { getActiveWatchers, getWatcherStats } from '@/lib/live-event-watchers';
 import { getRateLimiterStats } from '@/lib/rate-limiter';
-import { Sport, buildLiveEventMatcherConfig } from '@/types/live-events';
+import { Sport } from '@/types/live-events';
+import { buildLiveEventMatcherConfig } from '@/lib/live-event-config';
+import { loadLiveArbRuntimeConfig } from '@/lib/live-arb-runtime-config';
 
 export default async function handler(
   req: NextApiRequest,
@@ -40,6 +41,7 @@ export default async function handler(
   }
 
   try {
+    const runtimeConfig = await loadLiveArbRuntimeConfig();
     const { liveOnly, minPlatforms, sport, limit } = req.query;
 
     // Parse query params
@@ -52,7 +54,7 @@ export default async function handler(
     const maxGroups = limit ? parseInt(limit as string, 10) : 100;
 
     // Check if enabled
-    const enabled = isLiveSportsMatcherEnabled();
+    const enabled = runtimeConfig.ruleBasedMatcherEnabled;
     const running = isOrchestratorRunning();
     const uptimeMs = getUptimeMs();
     const config = buildLiveEventMatcherConfig();

@@ -13,6 +13,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getLiveArbStatus, isLiveArbActive } from '@/lib/live-arb-integration';
+import { loadLiveArbRuntimeConfig } from '@/lib/live-arb-runtime-config';
 import { LivePriceCache } from '@/lib/live-price-cache';
 import { LiveArbManager } from '@/lib/live-arb-manager';
 
@@ -64,6 +65,7 @@ export default async function handler(
   }
 
   try {
+    const runtimeConfig = await loadLiveArbRuntimeConfig();
     // Get overall status
     const status = getLiveArbStatus();
     const wsStatuses = LiveArbManager.getWsStatuses();
@@ -96,7 +98,7 @@ export default async function handler(
     }
 
     const response: LiveArbStatusResponse = {
-      liveArbEnabled: status.enabled,
+      liveArbEnabled: runtimeConfig.liveArbEnabled,
       liveArbReady: status.ready,
       timestamp: new Date().toISOString(),
       platforms,

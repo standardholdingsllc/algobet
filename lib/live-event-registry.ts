@@ -19,8 +19,8 @@ import {
   LiveEventRegistrySnapshot,
   MatchedEventGroup,
   Sport,
-  buildLiveEventMatcherConfig,
 } from '@/types/live-events';
+import { buildLiveEventMatcherConfig } from './live-event-config';
 import { setMatchedGroups as setMatcherGroups } from './live-event-matcher';
 
 // ============================================================================

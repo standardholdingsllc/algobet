@@ -173,7 +173,6 @@ async function runTests() {
     KALSHI_WS_URL:
       process.env.KALSHI_WS_URL ||
       'wss://trading-api.kalshi.com/trade-api/ws/v2 (default)',
-    LIVE_ARB_ENABLED: process.env.LIVE_ARB_ENABLED || 'false (default)',
     LIVE_ARB_MIN_PROFIT_BPS: process.env.LIVE_ARB_MIN_PROFIT_BPS || '50 (default)',
     LIVE_ARB_MAX_PRICE_AGE_MS: process.env.LIVE_ARB_MAX_PRICE_AGE_MS || '2000 (default)',
   };
@@ -189,8 +188,8 @@ async function runTests() {
   console.log('\n' + '='.repeat(60));
   console.log('✅ All tests completed!');
   console.log('='.repeat(60));
-  console.log('\nTo enable live arb, set LIVE_ARB_ENABLED=true in your .env file');
-  console.log('and ensure the platform API keys are configured.\n');
+  console.log('\nManage Live Arb enablement from the dashboard toggles.');
+  console.log('Ensure platform API keys are configured for WS connections.\n');
 }
 
 // Run tests

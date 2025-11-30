@@ -51,7 +51,8 @@ import {
   deleteMatchedGroupsFile,
   getMatchedGroupsFileInfo,
 } from '../lib/live-event-groups-store';
-import { VendorEvent, MatchedEventGroup, buildLiveEventMatcherConfig } from '../types/live-events';
+import { VendorEvent, MatchedEventGroup } from '../types/live-events';
+import { buildLiveEventMatcherConfig } from '../lib/live-event-config';
 import { Market } from '../types';
 
 // ============================================================================

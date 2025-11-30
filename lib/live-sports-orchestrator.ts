@@ -13,10 +13,11 @@
  */
 
 import {
-  buildLiveEventMatcherConfig,
   LiveEventMatcherConfig,
   LiveEventsApiResponse,
 } from '@/types/live-events';
+import { buildLiveEventMatcherConfig } from './live-event-config';
+import { loadLiveArbRuntimeConfig } from './live-arb-runtime-config';
 import { Market } from '@/types';
 import { getSnapshot, getRegistryStats, runCleanup, logRegistryState } from './live-event-registry';
 import { updateMatches, getMatchedEvents, getMatcherStats, logMatcherState } from './live-event-matcher';
@@ -104,10 +105,11 @@ export async function startOrchestrator(
   adapters: PlatformAdapters,
   executionOptions: Partial<ExecutionOptions>
 ): Promise<boolean> {
+  const runtimeConfig = await loadLiveArbRuntimeConfig();
   config = buildLiveEventMatcherConfig();
 
-  if (!config.enabled) {
-    console.log('[LiveSportsOrchestrator] Not enabled (set LIVE_RULE_BASED_MATCHER_ENABLED=true)');
+  if (!runtimeConfig.ruleBasedMatcherEnabled) {
+    console.log('[LiveSportsOrchestrator] Rule-based matcher disabled via runtime config. Enable it from the dashboard to start.');
     return false;
   }
 
@@ -348,4 +350,3 @@ export function logOrchestratorState(): void {
 // Export config for external use
 // ============================================================================
 
-export { buildLiveEventMatcherConfig } from '@/types/live-events';

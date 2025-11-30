@@ -224,6 +224,24 @@ export const DEFAULT_LIVE_ARB_CONFIG: LiveArbConfig = {
   enabledPlatforms: ['kalshi', 'polymarket', 'sxbet'],
 };
 
+/**
+ * KV-backed runtime configuration that the UI controls.
+ * Environment variables only seed the very first copy of this config.
+ */
+export interface LiveArbRuntimeConfig {
+  liveArbEnabled: boolean;
+  ruleBasedMatcherEnabled: boolean;
+  sportsOnly: boolean;
+  liveEventsOnly: boolean;
+}
+
+export const DEFAULT_LIVE_ARB_RUNTIME_CONFIG: LiveArbRuntimeConfig = {
+  liveArbEnabled: true,
+  ruleBasedMatcherEnabled: true,
+  sportsOnly: true,
+  liveEventsOnly: false,
+};
+
 // ============================================================================
 // Circuit Breaker Types
 // ============================================================================

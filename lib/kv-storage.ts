@@ -1,5 +1,15 @@
 import { Redis } from '@upstash/redis';
-import { Bet, ArbitrageGroup, BotConfig, DailyStats, AccountBalance, OpportunityLog } from '@/types';
+import {
+  Bet,
+  ArbitrageGroup,
+  BotConfig,
+  DailyStats,
+  AccountBalance,
+  OpportunityLog,
+  LiveArbRuntimeConfig,
+} from '@/types';
+import { DEFAULT_LIVE_ARB_RUNTIME_CONFIG } from '@/types/live-arb';
+import { buildLiveArbRuntimeSeed } from './live-arb-runtime-seed';
 
 // Initialize Upstash Redis client
 // Using Vercel's KV environment variables (set by Upstash integration)
@@ -15,6 +25,7 @@ interface StorageData {
   dailyStats: DailyStats[];
   balances: AccountBalance[];
   opportunityLogs: OpportunityLog[];
+  liveArbRuntimeConfig?: LiveArbRuntimeConfig;
 }
 
 const DEFAULT_CONFIG: BotConfig = {
@@ -49,6 +60,7 @@ const DEFAULT_DATA: StorageData = {
   dailyStats: [],
   balances: [],
   opportunityLogs: [],
+  liveArbRuntimeConfig: DEFAULT_LIVE_ARB_RUNTIME_CONFIG,
 };
 
 const STORAGE_KEY = 'algobet:data';
@@ -184,6 +196,35 @@ export class KVStorage {
     // Update cache
     cachedConfig = data.config;
     lastConfigFetchAt = Date.now();
+  }
+
+  /**
+   * Get the live-arb runtime config (KV + UI controlled).
+   * Seeds the store from env-derived defaults on first run.
+   */
+  static async getLiveArbRuntimeConfig(): Promise<LiveArbRuntimeConfig> {
+    const data = await this.getAllData();
+    if (!data.liveArbRuntimeConfig) {
+      const seeded = buildLiveArbRuntimeSeed();
+      data.liveArbRuntimeConfig = seeded;
+      await this.updateAllData(data);
+      return seeded;
+    }
+    return data.liveArbRuntimeConfig;
+  }
+
+  /**
+   * Update the live-arb runtime config.
+   */
+  static async updateLiveArbRuntimeConfig(
+    updates: Partial<LiveArbRuntimeConfig>
+  ): Promise<LiveArbRuntimeConfig> {
+    const data = await this.getAllData();
+    const current = data.liveArbRuntimeConfig ?? buildLiveArbRuntimeSeed();
+    const next = { ...current, ...updates };
+    data.liveArbRuntimeConfig = next;
+    await this.updateAllData(data);
+    return next;
   }
 
   /**

@@ -20,9 +20,9 @@ import {
   LiveEventRegistrySnapshot,
   Sport,
   VendorEventStatus,
-  buildLiveEventMatcherConfig,
   LiveEventMatcherConfig,
 } from '@/types/live-events';
+import { buildLiveEventMatcherConfig } from './live-event-config';
 import { getSnapshot } from './live-event-registry';
 import {
   saveMatchedGroupsToFile,

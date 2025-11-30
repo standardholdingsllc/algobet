@@ -312,26 +312,6 @@ export const DEFAULT_LIVE_EVENT_MATCHER_CONFIG: LiveEventMatcherConfig = {
   minCoverage: 0.6,                      // 60% coverage required
 };
 
-/**
- * Build config from environment variables
- */
-export function buildLiveEventMatcherConfig(): LiveEventMatcherConfig {
-  return {
-    enabled: process.env.LIVE_RULE_BASED_MATCHER_ENABLED === 'true',
-    sportsOnly: process.env.LIVE_RULE_BASED_SPORTS_ONLY !== 'false',
-    timeTolerance: parseInt(process.env.LIVE_MATCH_TIME_TOLERANCE_MS || '900000', 10),
-    minTeamSimilarity: parseFloat(process.env.LIVE_MIN_TEAM_SIMILARITY || '0.7'),
-    maxWatchers: parseInt(process.env.LIVE_MAX_EVENT_WATCHERS || '50', 10),
-    minPlatforms: parseInt(process.env.LIVE_MIN_PLATFORMS || '2', 10),
-    registryRefreshInterval: parseInt(process.env.LIVE_REGISTRY_REFRESH_MS || '30000', 10),
-    matcherInterval: parseInt(process.env.LIVE_MATCHER_INTERVAL_MS || '10000', 10),
-    preGameWindow: parseInt(process.env.LIVE_PRE_GAME_WINDOW_MS || '3600000', 10),
-    postGameWindow: parseInt(process.env.LIVE_POST_GAME_WINDOW_MS || '300000', 10),
-    minTokenOverlap: parseInt(process.env.LIVE_MIN_TOKEN_OVERLAP || '2', 10),
-    minCoverage: parseFloat(process.env.LIVE_MIN_COVERAGE || '0.6'),
-  };
-}
-
 // ============================================================================
 // API Response Types
 // ============================================================================

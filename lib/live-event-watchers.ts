@@ -19,9 +19,9 @@ import {
   WatcherState,
   LiveEventPlatform,
   VendorEvent,
-  buildLiveEventMatcherConfig,
   toMarketPlatform,
 } from '@/types/live-events';
+import { buildLiveEventMatcherConfig } from './live-event-config';
 import { ArbitrageOpportunity, Market, MarketPlatform } from '@/types';
 import { LivePriceUpdate } from '@/types/live-arb';
 import { getMatchedEvents, getMatchedGroup } from './live-event-matcher';
