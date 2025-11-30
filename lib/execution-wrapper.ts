@@ -25,6 +25,9 @@ import {
 import { calculateBetSizes, validateOpportunity } from './arbitrage';
 import { KVStorage, getCachedBotConfig } from './kv-storage';
 import { v4 as uuidv4 } from 'uuid';
+import { liveArbLog } from './live-arb-logger';
+
+const EXEC_LOG_TAG = 'LiveArb';
 
 // ============================================================================
 // Types
@@ -174,11 +177,20 @@ export async function executeOpportunityWithMode(
   // Check mode
   const dryFireActive = checkDryFireMode();
 
-  console.log(
-    `[Execution] Processing opportunity: ${opportunity.market1.title} ` +
-    `(${opportunity.market1.platform} vs ${opportunity.market2.platform}) ` +
-    `Mode: ${dryFireActive ? 'DRY_FIRE' : 'LIVE'}`
-  );
+  liveArbLog('info', EXEC_LOG_TAG, 'Processing opportunity', {
+    id: opportunity.id,
+    market1: {
+      id: opportunity.market1.id,
+      platform: opportunity.market1.platform,
+    },
+    market2: {
+      id: opportunity.market2.id,
+      platform: opportunity.market2.platform,
+    },
+    mode: dryFireActive ? 'DRY_FIRE' : 'LIVE',
+    profitMargin: opportunity.profitMargin,
+    expectedProfit: opportunity.expectedProfit,
+  });
 
   // Run all validations first (same for both modes)
   const validationResult = validateOpportunityForExecution(opportunity, options);
@@ -186,6 +198,10 @@ export async function executeOpportunityWithMode(
   if (!validationResult.valid) {
     // Log rejected opportunity in dry-fire mode
     if (dryFireActive) {
+      liveArbLog('warn', EXEC_LOG_TAG, 'REJECTED_BY_VALIDATION', {
+        opportunityId: opportunity.id,
+        reason: validationResult.reason,
+      });
       const dryFireLog = createDryFireLog(opportunity, validationResult.status, {
         rejectReasons: [validationResult.reason!],
         safetySnapshot: options.safetySnapshot,
@@ -219,6 +235,10 @@ export async function executeOpportunityWithMode(
   // Check minimum bet sizes
   if (quantity1 < 1 || quantity2 < 1) {
     const reason = 'Bet size too small';
+    liveArbLog('warn', EXEC_LOG_TAG, 'REJECTED_BY_RISK', {
+      opportunityId: opportunity.id,
+      reason,
+    });
 
     if (dryFireActive) {
       const dryFireLog = createDryFireLog(opportunity, 'REJECTED_BY_RISK', {
@@ -346,9 +366,13 @@ async function executeOpportunityDryFire(
   console.log(
     `📝 DRY-FIRE: Would execute ${opportunity.market1.title}`
   );
-  console.log(`   Platforms: ${opportunity.market1.platform} vs ${opportunity.market2.platform}`);
-  console.log(`   Profit: $${opportunity.expectedProfit.toFixed(2)} (${opportunity.profitMargin.toFixed(2)}%)`);
-  console.log(`   Investment: $${(betSizes.amount1 + betSizes.amount2).toFixed(2)}`);
+  liveArbLog('info', EXEC_LOG_TAG, 'DRY-FIRE simulation', {
+    opportunityId: opportunity.id,
+    platforms: [opportunity.market1.platform, opportunity.market2.platform],
+    expectedProfit: opportunity.expectedProfit,
+    profitMargin: opportunity.profitMargin,
+    investment: betSizes.amount1 + betSizes.amount2,
+  });
 
   // Create and log dry-fire trade
   const dryFireLog = createDryFireLog(opportunity, 'SIMULATED', {
@@ -380,11 +404,15 @@ async function executeOpportunityReal(
   // Final safety check
   assertNotDryFire('executeOpportunityReal');
 
-  console.log(
-    `🚀 LIVE: Executing arbitrage: ${opportunity.market1.title}`
-  );
-  console.log(`   Amounts: $${betSizes.amount1.toFixed(2)} and $${betSizes.amount2.toFixed(2)}`);
-  console.log(`   Expected profit: $${opportunity.expectedProfit.toFixed(2)} (${opportunity.profitMargin.toFixed(2)}%)`);
+  liveArbLog('info', EXEC_LOG_TAG, 'Executing LIVE opportunity', {
+    opportunityId: opportunity.id,
+    amounts: {
+      leg1: betSizes.amount1,
+      leg2: betSizes.amount2,
+    },
+    expectedProfit: opportunity.expectedProfit,
+    profitMargin: opportunity.profitMargin,
+  });
 
   const price1 = opportunity.side1 === 'yes' ? opportunity.market1.yesPrice : opportunity.market1.noPrice;
   const price2 = opportunity.side2 === 'yes' ? opportunity.market2.yesPrice : opportunity.market2.noPrice;
@@ -413,7 +441,9 @@ async function executeOpportunityReal(
 
   // Check results
   if (result1.success && result2.success) {
-    console.log('✅ Both bets placed successfully');
+    liveArbLog('info', EXEC_LOG_TAG, 'Both bets placed successfully', {
+      opportunityId: opportunity.id,
+    });
 
     // Create bet records
     const bet1: Bet = {
@@ -466,7 +496,11 @@ async function executeOpportunityReal(
       group,
     };
   } else {
-    console.error('❌ One or both bets failed');
+    liveArbLog('error', EXEC_LOG_TAG, 'One or both bets failed', {
+      opportunityId: opportunity.id,
+      result1,
+      result2,
+    });
 
     // Cancel any successful bet
     if (result1.success && result1.orderId) {

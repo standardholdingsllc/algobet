@@ -1075,6 +1075,22 @@ Both feed into the same:
 
 ---
 
+### 14.14 Live-Arb Worker & Observability
+
+- **Entrypoint**: `workers/live-arb-worker.ts` (run via `npm run live-arb-worker` with `LIVE_ARB_WORKER=true`).
+- **Boot sequence**: loads KV `BotConfig` + live-arb runtime config, logs the effective execution mode (`DRY_FIRE_MODE`, KV `liveExecutionMode`, `LIVE_ARB_MIN_PROFIT_BPS`, `LIVE_ARB_MAX_PRICE_AGE_MS`, `LIVE_ARB_LOG_LEVEL`), starts `LiveArbManager`, spins up the rule-based matcher (`startOrchestrator`) with real platform adapters, and continuously refreshes the registry by fetching live markets via `MarketFeedService`.
+- **WebSocket subscriptions**: whenever a `LiveEventWatcher` registers markets it now calls `LiveArbManager.subscribeToMarket`, so WS clients only stream the exact markets each watcher monitors.
+- **Logging tags**:
+  - `[LiveArbWorker]` – startup banner, per-refresh summaries (per-platform market counts, zero-market warnings), shutdown.
+  - `[LiveArbManager]` – initialization summary, subscription diffs with reasons, WS state transitions, circuit-breaker activity.
+  - `[SXBET-WS]`, `[POLYMARKET-WS]`, `[KALSHI-WS]` – connection lifecycle plus warnings if a client is stuck in `error`/`reconnecting`.
+  - `[LivePriceCache]` – 10‑second debug stats (market counts, update rates, average age) and rate-limited fallbacks when snapshot prices substitute stale/missing live quotes.
+  - `[LiveWatcher]` – watcher creation/teardown, arb-check triggers, explicit skip reasons (`insufficient_markets`, `no_fresh_prices`, `rate_limited`), opportunity discoveries, execution outcomes.
+  - `[LiveArb]` – execution-wrapper decisions (`REJECTED_BY_VALIDATION`, `REJECTED_BY_RISK`, dry-fire simulations, live executions).
+- **Status endpoints**:
+  - `/api/live-arb/status` now exposes whether the worker flag is enabled, WS/cache state, `LiveArbManager` subscription stats, and a live-events snapshot (registry counts, matched groups, watcher stats, rate limiter status).
+  - `/api/live-arb/live-events` continues to return the full matcher + watcher state; the new logging makes it easy to correlate API responses with runtime logs.
+
 ## 15. Future Work Hooks
 
 - New adapters can be added by dropping a `MarketAdapterConfig` entry + handler (`MarketFeedService` already supports adapter-type dispatch).

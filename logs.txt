@@ -1,30 +1,692 @@
-2025-11-30 04:09:48.724 [info] [ArbMatch] General scan summary: candidates=0, profitablePairs=0, opportunities=0 (minProfitMargin=0.5%)
-2025-11-30 04:09:48.724 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
-2025-11-30 04:09:48.742 [info] 🔴 LIVE EVENTS DETECTED (145) - Scanning every 5 seconds
-2025-11-30 04:09:48.742 [info] [2025-11-30T04:09:48.734Z] Cron scan completed successfully in 24487ms
-2025-11-30 04:09:24.247 [info] [2025-11-30T04:09:24.247Z] Cron scan starting...
-2025-11-30 04:09:24.248 [info] [2025-11-30T04:09:24.247Z] Scanning for arbitrage opportunities...
-2025-11-30 04:09:24.508 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-30 04:09:24.508 [info] [Kalshi] 💼 Portfolio value: $27.97
-2025-11-30 04:09:24.508 [info] [Kalshi] 💰 Positions value: $27.14
-2025-11-30 04:09:24.508 [info] [Kalshi] 💵 Total value: $27.97
-2025-11-30 04:09:24.579 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-30 04:09:24.630 [info] [Polymarket] 💵 Available cash: $10.01
-2025-11-30 04:09:24.630 [info] [Polymarket] 📊 Positions value: $24.02
-2025-11-30 04:09:24.630 [info] [Polymarket] ✅ Total account value: $34.03
-2025-11-30 04:09:24.726 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
-2025-11-30 04:09:24.726 [info] 💰 Polymarket: Total $34.03 (Cash: $10.01, Positions: $24.02)
-2025-11-30 04:09:24.726 [info] 💰 SX.bet: $0.00
-2025-11-30 04:09:24.732 [info] [BotConfig] maxDaysToExpiry=10d, minProfitMargin=0.5%, maxBetPercentage=10%, simulationMode=true. Snapshot window: 2025-11-30T04:09:24.732Z → 2025-12-10T04:09:24.732Z. Filters: sportsOnly=false, categories=0, eventTypes=0, leagues=0, maxMarkets=∞
-2025-11-30 04:09:24.748 [info] [MarketFeed] Using redis snapshot for kalshi: fetched 2.1m ago (max 5.0m) at 2025-11-30T04:07:18.876Z, schema v2, markets=1600/1600, adapter=rest-default, maxDaysToExpiry=10, filters=[start=2025-11-30T04:06:24.716Z, end=2025-12-10T04:06:24.716Z, sportsOnly=false], rawMarkets=n/a, withinWindow=n/a, hydratedWithOdds=n/a, reusedOdds=n/a, writer=bot-self-heal, stopReason=n/a
-2025-11-30 04:09:24.769 [info] [MarketFeed] Using redis snapshot for polymarket: fetched 2.1m ago (max 5.0m) at 2025-11-30T04:07:18.880Z, schema v2, markets=1896/1896, adapter=hybrid-clob, maxDaysToExpiry=10, filters=[start=2025-11-30T04:06:24.716Z, end=2025-12-10T04:06:24.716Z, sportsOnly=false], rawMarkets=n/a, withinWindow=n/a, hydratedWithOdds=n/a, reusedOdds=n/a, writer=bot-self-heal, stopReason=n/a
-2025-11-30 04:09:24.778 [info] [MarketFeed] Using redis snapshot for sxbet: fetched 2.1m ago (max 5.0m) at 2025-11-30T04:07:18.884Z, schema v2, markets=892/892, adapter=rest-active, maxDaysToExpiry=10, filters=[start=2025-11-30T04:06:24.716Z, end=2025-12-10T04:06:24.716Z, sportsOnly=false], rawMarkets=2000, withinWindow=1255, hydratedWithOdds=892, reusedOdds=0, writer=bot-self-heal, stopReason=maxPages cap (40)
-2025-11-30 04:09:24.780 [info] [MarketFilter] kalshi: total=1600, withinExecutionWindow=1600, expired=0, beyondWindow=0, invalidExpiry=0
-2025-11-30 04:09:24.780 [info] [MarketFilter] polymarket: total=1896, withinExecutionWindow=1896, expired=0, beyondWindow=0, invalidExpiry=0
-2025-11-30 04:09:24.780 [info] [MarketFilter] sxbet: total=892, withinExecutionWindow=892, expired=0, beyondWindow=0, invalidExpiry=0
-2025-11-30 04:09:24.780 [info] Found 1600 Kalshi, 1896 Polymarket, and 892 sx.bet markets
-2025-11-30 04:09:24.803 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-30 04:09:24.803 [info] [HotMarketTracker] tracked=0, new=0, dropped=0, sample=none
-2025-11-30 04:09:24.809 [info] [ArbMatch] Cross-platform candidate pairs=0 across 0 tracked market(s)
-2025-11-30 04:09:24.809 [warning] [Bot] No cross-platform candidates after filters; per-platform totals kalshi=1600, polymarket=1896, sxbet=892. If this persists, review filter config or snapshot freshness.
-2025-11-30 04:09:24.809 [info] [ArbMatch] Tracked combinations summary: candidates=0, profitablePairs=0, opportunities=0 (minProfitMargin=0.5%)
+2025-11-30 05:44:41.037 [info] [2025-11-30T05:44:41.036Z] Cron scan starting...
+2025-11-30 05:44:41.039 [info] [2025-11-30T05:44:41.039Z] Scanning for arbitrage opportunities...
+2025-11-30 05:44:41.259 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-30 05:44:41.259 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-30 05:44:41.259 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-30 05:44:41.259 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-30 05:44:41.297 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-30 05:44:41.390 [info] [Polymarket] 💵 Available cash: $10.01
+2025-11-30 05:44:41.390 [info] [Polymarket] 📊 Positions value: $24.02
+2025-11-30 05:44:41.390 [info] [Polymarket] ✅ Total account value: $34.03
+2025-11-30 05:44:41.610 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-30 05:44:41.610 [info] 💰 Polymarket: Total $34.03 (Cash: $10.01, Positions: $24.02)
+2025-11-30 05:44:41.610 [info] 💰 SX.bet: $0.00
+2025-11-30 05:44:41.623 [info] [BotConfig] maxDaysToExpiry=10d, minProfitMargin=0.5%, maxBetPercentage=10%, simulationMode=true. Snapshot window: 2025-11-30T05:44:41.623Z → 2025-12-10T05:44:41.623Z. Filters: sportsOnly=false, categories=0, eventTypes=0, leagues=0, maxMarkets=∞
+2025-11-30 05:44:41.633 [warning] [MarketFeed] Snapshot for kalshi unavailable (missing in redis); reason=No Redis snapshot stored for key market-snapshots:kalshi
+2025-11-30 05:44:41.644 [info] [Snapshots] Using directory /tmp/market-snapshots
+2025-11-30 05:44:41.644 [warning] [MarketFeed] Snapshot for kalshi unavailable (missing in disk); reason=No snapshot file at /tmp/market-snapshots/kalshi.json
+2025-11-30 05:44:41.645 [warning] [MarketFeed] Snapshot for kalshi unavailable (missing; diagnostics=redis:missing (No Redis snapshot stored for key market-snapshots:kalshi), disk:missing (No snapshot file at /tmp/market-snapshots/kalshi.json)); fetching live feed as fallback.
+2025-11-30 05:44:41.646 [info] [Kalshi Adapter] /markets page 1 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"<none>"}
+2025-11-30 05:44:41.705 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:41.706 [info] [Kalshi Adapter] /markets page 1 ← 200 raw (first_close=2025-12-10T04:00:00Z, last_close=2025-12-10T04:00:00Z), 200 tradable, cursor="CgYIwODjyQYSOUtYTVZFU1BPUlRTTVVMVElHQU1FRVhURU5ERUQtUzIwMjU3NTRBNzBEM0RGQy04OUI0MEExQTE3Qw"
+2025-11-30 05:44:41.706 [info] [Kalshi Adapter] /markets page 2 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"CgYIwODjyQYSOUtYTVZFU1BPUlRTTVVMVElHQU1FRVhURU5ERUQtUzIwMjU3NTRBNzBEM0RGQy04OUI0MEExQTE3Qw"}
+2025-11-30 05:44:41.764 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:41.764 [info] [Kalshi Adapter] /markets page 2 ← 200 raw (first_close=2025-12-10T04:00:00Z, last_close=2025-12-10T01:00:00Z), 200 tradable, cursor="CgYIkIzjyQYSOUtYTVZFU1BPUlRTTVVMVElHQU1FRVhURU5ERUQtUzIwMjU0Q0NGM0ZBN0NDMi1DOUMwRTRDQkE3Qw"
+2025-11-30 05:44:41.764 [info] [Kalshi Adapter] /markets page 3 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"CgYIkIzjyQYSOUtYTVZFU1BPUlRTTVVMVElHQU1FRVhURU5ERUQtUzIwMjU0Q0NGM0ZBN0NDMi1DOUMwRTRDQkE3Qw"}
+2025-11-30 05:44:41.814 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:41.814 [info] [Kalshi Adapter] /markets page 3 ← 200 raw (first_close=2025-12-10T01:00:00Z, last_close=2025-12-05T22:00:00Z), 200 tradable, cursor="CgYI4KvNyQYSGktYQlRDRC0yNURFQzA1MTctVDk0OTk5Ljk5"
+2025-11-30 05:44:41.814 [info] [Kalshi Adapter] /markets page 4 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"CgYI4KvNyQYSGktYQlRDRC0yNURFQzA1MTctVDk0OTk5Ljk5"}
+2025-11-30 05:44:41.860 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:41.860 [info] [Kalshi Adapter] /markets page 4 ← 200 raw (first_close=2025-12-05T22:00:00Z, last_close=2025-12-05T04:59:00Z), 200 tradable, cursor="CgYIlM3JyQYSG0tYU1BPVElGWUFMQlVNVy0yNURFQzA0LVNUSQ"
+2025-11-30 05:44:41.860 [info] [Kalshi Adapter] /markets page 5 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"CgYIlM3JyQYSG0tYU1BPVElGWUFMQlVNVy0yNURFQzA0LVNUSQ"}
+2025-11-30 05:44:41.905 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:41.905 [info] [Kalshi Adapter] /markets page 5 ← 200 raw (first_close=2025-12-05T04:59:00Z, last_close=2025-12-02T15:00:00Z), 200 tradable, cursor="CgYI8P27yQYSHEtYUE9XRUxMTUVOVElPTi0yNURFQzAyLUNBUkU"
+2025-11-30 05:44:41.905 [info] [Kalshi Adapter] /markets page 6 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"CgYI8P27yQYSHEtYUE9XRUxMTUVOVElPTi0yNURFQzAyLUNBUkU"}
+2025-11-30 05:44:41.953 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:41.953 [info] [Kalshi Adapter] /markets page 6 ← 200 raw (first_close=2025-12-02T15:00:00Z, last_close=2025-12-01T21:00:00Z), 200 tradable, cursor="CgYI0IO4yQYSI0tYTkFTREFRMTAwVS0yNURFQzAxSDE2MDAtVDIyNTk5Ljk5"
+2025-11-30 05:44:41.953 [info] [Kalshi Adapter] /markets page 7 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"CgYI0IO4yQYSI0tYTkFTREFRMTAwVS0yNURFQzAxSDE2MDAtVDIyNTk5Ljk5"}
+2025-11-30 05:44:41.993 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:41.993 [info] [Kalshi Adapter] /markets page 7 ← 200 raw (first_close=2025-12-01T21:00:00Z, last_close=2025-12-01T20:00:00Z), 200 tradable, cursor="CgYIwOe3yQYSI0tYTkFTREFRMTAwVS0yNURFQzAxSDE1MDAtVDI2NTg5Ljk5"
+2025-11-30 05:44:41.993 [info] [Kalshi Adapter] /markets page 8 → requesting with params {"limit":200,"min_close_ts":1764481481,"max_close_ts":1765345481,"cursor":"CgYIwOe3yQYSI0tYTkFTREFRMTAwVS0yNURFQzAxSDE1MDAtVDI2NTg5Ljk5"}
+2025-11-30 05:44:42.032 [info] [Kalshi Adapter] Normalized 200 raw markets into 200 tradable entries (skipped 0 by invalid close_time, 0 by missing prices)
+2025-11-30 05:44:42.032 [info] [Kalshi Adapter] /markets page 8 ← 200 raw (first_close=2025-12-01T20:00:00Z, last_close=2025-12-01T20:00:00Z), 200 tradable, cursor="CgYIwOe3yQYSI0tYTkFTREFRMTAwVS0yNURFQzAxSDE1MDAtVDI0NTg5Ljk5"
+2025-11-30 05:44:42.032 [info] [Kalshi Adapter] Collected 1600 tradable markets across 8 page(s) (stopped because reached maxPages cap (8))
+2025-11-30 05:44:42.036 [warning] [MarketFeed] Snapshot for polymarket unavailable (missing in redis); reason=No Redis snapshot stored for key market-snapshots:polymarket
+2025-11-30 05:44:42.036 [warning] [MarketFeed] Snapshot for polymarket unavailable (missing in disk); reason=No snapshot file at /tmp/market-snapshots/polymarket.json
+2025-11-30 05:44:42.036 [warning] [MarketFeed] Snapshot for polymarket unavailable (missing; diagnostics=redis:missing (No Redis snapshot stored for key market-snapshots:polymarket), disk:missing (No snapshot file at /tmp/market-snapshots/polymarket.json)); fetching live feed as fallback.
+2025-11-30 05:44:42.038 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 1,
+  limit: 500,
+  offset: 0,
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-30T05:44:41.623Z',
+    end_date_max: '2025-12-10T05:44:41.623Z'
+  }
+}
+2025-11-30 05:44:43.201 [info] [Polymarket Gamma] Page 1 summary: raw=500, tradable=500, cumulativeTradable=500.
+2025-11-30 05:44:43.201 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 2,
+  limit: 500,
+  offset: 500,
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-30T05:44:41.623Z',
+    end_date_max: '2025-12-10T05:44:41.623Z'
+  }
+}
+2025-11-30 05:44:44.238 [info] [Polymarket Gamma] Page 2 summary: raw=500, tradable=500, cumulativeTradable=1000.
+2025-11-30 05:44:44.239 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 3,
+  limit: 500,
+  offset: 1000,
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-30T05:44:41.623Z',
+    end_date_max: '2025-12-10T05:44:41.623Z'
+  }
+}
+2025-11-30 05:44:45.303 [info] [Polymarket Gamma] Page 3 summary: raw=500, tradable=500, cumulativeTradable=1500.
+2025-11-30 05:44:45.304 [info] [Polymarket Gamma] Fetching /markets page {
+  page: 4,
+  limit: 500,
+  offset: 1500,
+  filters: {
+    closed: 'false',
+    end_date_min: '2025-11-30T05:44:41.623Z',
+    end_date_max: '2025-12-10T05:44:41.623Z'
+  }
+}
+2025-11-30 05:44:46.225 [info] [Polymarket Gamma] Page 4 summary: raw=500, tradable=500, cumulativeTradable=2000.
+2025-11-30 05:44:46.225 [info] [Polymarket Gamma] Collected 2000 tradable markets out of 2000 raw across 4 page(s) (stopped because reached maxMarkets cap (2000)).
+2025-11-30 05:44:46.227 [info] [Polymarket Gamma] 2000 tradable markets out of 2000 raw entries for window 2025-11-30T05:44:41.623Z → 2025-12-10T05:44:41.623Z.
+2025-11-30 05:44:46.287 [info] [Polymarket] Filter breakdown (window 2025-11-30T05:44:41.623Z → 2025-12-10T05:44:41.623Z): raw=2000, kept=1896, skippedByExpiry=104, skippedByPrice=0.
+2025-11-30 05:44:46.292 [info] [Polymarket] Skipping by expiry (sample): [
+  {
+    conditionId: '0x3d7cbcff21f38814db9aa16a73e80a6a021d820093761f0cc86abde8db912e1d',
+    source: 'gamma',
+    question: 'Will Siaosi Sovaleni be the next Prime Minister of Tonga after the election?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x3ac5d865c1cc860aca1b60b1d2fcfed6e205c2e6853458fed2744f03957b0ea3',
+    source: 'gamma',
+    question: 'Will Dr ‘Aisake Valu Eke be the next Prime Minister of Tonga after the election?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x137cbb1e5bbb4eb571c18a6dfe2777dd3cd7e06a6fa25afbcb75206918e3776f',
+    source: 'gamma',
+    question: 'Will Dr Viliami Uasike Latu be the next Prime Minister of Tonga after the election?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x0f90742078c0807d6d17fd6808e187504989b6bd1aaa68aa9521d9499275025b',
+    source: 'gamma',
+    question: 'Will Etuate Lavulavu be the next Prime Minister of Tonga after the election?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0xf0982dec078df24338886583eeb3567b6a1d07b6092c20a7cf4a089a06d7ba56',
+    source: 'gamma',
+    question: 'Will Semisi Sika be the next Prime Minister of Tonga after the election?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x2aa7ad91285336b5ffc9c863ceab2b78f61019b4b07995064b9335d94b271eac',
+    source: 'gamma',
+    question: 'Will Siaosi Pōhiva be the next Prime Minister of Tonga after the election?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x6e38b18f06fde61891aab9f49bceae7f8dca4057bb7786ce6881748e61e58e07',
+    source: 'gamma',
+    question: 'Will a cat 5 hurricane make US landfall during Hurricane Season 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0xece1facd2790a2e10646582583ed571fe43cfeaac9b70786d5e272505df2f14d',
+    source: 'gamma',
+    question: 'Pengu above $0.05 on November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x6cd827626df41b698b234e79cce1757918e2bf21b47a746a21f24d74c7fe6ef3',
+    source: 'gamma',
+    question: 'Will Apple acquire Mistral by November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x168f5806bbf84f00e07ec3fee916bec5cb2f39f7803d765940d6e2b88aea190f',
+    source: 'gamma',
+    question: 'Israel strikes Iran by November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x59c26d8eefea4029f991dd8ec94bb742762da267bb074faacbdc86c63eca1df2',
+    source: 'gamma',
+    question: 'Will Russia capture Rodynske by November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0xe253dbce3e4c4b635ff1986ad354cf5a138f34471f09b009884b0ff332235423',
+    source: 'gamma',
+    question: 'Will Hamas agree to disarm by November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x62ed99103a040747554c2f9ef1e87e111155316964e604d326cd948f49580b51',
+    source: 'gamma',
+    question: 'TikTok sale announced by November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: '2025-09-25T16:55:00.000Z',
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0xa953bea944d7264285c0a2cc1f92809a7d9db78138b1c3de9cc23d8917f14d6a',
+    source: 'gamma',
+    question: 'Maduro out by November 30, 2025?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0xea283fdcf888aacc4e1d7ce1dbd189bdf8b9d3db62eb7a70fa50d5bfbe9137ec',
+    source: 'gamma',
+    question: 'Will the price of Bitcoin be less than $78,000 on November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x0eb6b132f397eed63e9c0cbd9c6097c5cd92fb84036ae7502ae559bdb0b2d74d',
+    source: 'gamma',
+    question: 'Will the price of Ethereum be above $2,300 on November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0xeca254c82cc7549d19a4f222b772f23d28fc83170f9c486483087a761e08ebc9',
+    source: 'gamma',
+    question: 'Will the price of Bitcoin be between $78,000 and $80,000 on November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x21337ca66aa374343122f6efde84925af38571655639f77522902dd38db47a0f',
+    source: 'gamma',
+    question: 'Will the price of Ethereum be above $2,400 on November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0x04f8593e2fed4e1bf8ac0d37c7f3ff0b89efc287287bef3f2a4465e5e9926481',
+    source: 'gamma',
+    question: 'Will the price of Bitcoin be between $80,000 and $82,000 on November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  },
+  {
+    conditionId: '0xf45d64ec5ae6cc4588d3821cb0e1a4665ced4d516b276007cb5b7806911a3460',
+    source: 'gamma',
+    question: 'Will the price of Ethereum be above $2,500 on November 30?',
+    sportsMarketType: null,
+    gameId: null,
+    eventStartTime: null,
+    gameStartTime: null,
+    endDate: '2025-11-30T00:00:00.000Z',
+    endDateIso: '2025-11-30T00:00:00.000Z',
+    umaEndDate: null,
+    umaEndDateIso: null,
+    derivedExpiry: '2025-11-30T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso',
+    windowStart: '2025-11-30T05:44:41.623Z',
+    windowEnd: '2025-12-10T05:44:41.623Z'
+  }
+]
+2025-11-30 05:44:46.292 [info] [Polymarket] gameStartTime: usedForSports=1167, ignoredAsNonSports=129.
+2025-11-30 05:44:46.293 [info] [Polymarket] Sample markets using gameStartTime for expiry: [
+  {
+    conditionId: '0x6bf8df2767742e890a5de6b769a7f9bc2873baa39c5c1f1dd3fcbced8645c8c2',
+    question: 'Will PSV win on 2025-11-30?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T11:15:00.000Z',
+    derivedExpiry: '2025-11-30T11:15:00.000Z'
+  },
+  {
+    conditionId: '0xeba5f5cd92912c712c38a8681fac77b1a1d81d6ee42937cd1bb72f73c1211596',
+    question: 'Will PSV vs. FC Volendam end in a draw?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T11:15:00.000Z',
+    derivedExpiry: '2025-11-30T11:15:00.000Z'
+  },
+  {
+    conditionId: '0xe74dd58b3dc3924c687015fa9bcf947d2c610791e730c03c7e9a159fafe612e1',
+    question: 'Will FC Volendam win on 2025-11-30?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T11:15:00.000Z',
+    derivedExpiry: '2025-11-30T11:15:00.000Z'
+  },
+  {
+    conditionId: '0x47893866915443f1a59e374e904fbb488aa033b7f48a5d5a3c1bf8bd05fdcc03',
+    question: 'Will Telstar 1963 win on 2025-11-30?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T13:30:00.000Z',
+    derivedExpiry: '2025-11-30T13:30:00.000Z'
+  },
+  {
+    conditionId: '0xc3560726da4907c0c93993b1bb4afa661898337c73ab54aab718541c0d66d1ac',
+    question: 'Will Telstar 1963 vs. Feyenoord Rotterdam end in a draw?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T13:30:00.000Z',
+    derivedExpiry: '2025-11-30T13:30:00.000Z'
+  },
+  {
+    conditionId: '0xda0ea7dab488698cad569df887bf3ee891b02625a430b3a679c5436c93e3b308',
+    question: 'Will Feyenoord Rotterdam win on 2025-11-30?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T13:30:00.000Z',
+    derivedExpiry: '2025-11-30T13:30:00.000Z'
+  },
+  {
+    conditionId: '0x34a32fc2ad1551f358db1de61aa4f4a23051ad3792e4f5531dd3d8ac565abbb9',
+    question: 'Will Go Ahead Eagles win on 2025-11-30?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T13:30:00.000Z',
+    derivedExpiry: '2025-11-30T13:30:00.000Z'
+  },
+  {
+    conditionId: '0x229b582316233a2d373a1517b4e4eb07b1df3cb1d73d6036026a72818689bda3',
+    question: 'Will Go Ahead Eagles vs. FC Utrecht end in a draw?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T13:30:00.000Z',
+    derivedExpiry: '2025-11-30T13:30:00.000Z'
+  },
+  {
+    conditionId: '0x55f58614d38120b119891f47fbca5a6526615eaba403e5534ab5e15da681f34d',
+    question: 'Will FC Utrecht win on 2025-11-30?',
+    source: 'gamma',
+    gameStartTime: '2025-11-30T13:30:00.000Z',
+    derivedExpiry: '2025-11-30T13:30:00.000Z'
+  },
+  {
+    conditionId: '0x78fb36a86db6759cc68b39ab375663f27359466b8b6200c71b0f9427a1564796',
+    question: "Will FC Twente '65 win on 2025-11-30?",
+    source: 'gamma',
+    gameStartTime: '2025-11-30T15:45:00.000Z',
+    derivedExpiry: '2025-11-30T15:45:00.000Z'
+  }
+]
+2025-11-30 05:44:46.293 [info] [Polymarket] gameStartTime ignored for non-sports markets (sample): [
+  {
+    conditionId: '0x7c27e0e039c587c0dd63104ddb3031fd635cfc1e1b011c748259a54cb942bf0e',
+    question: 'Will Jody Barrett win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0xcecf5bd4aebcda50818f73a755cd5d35080658e20bae41cb8339761963109e5f',
+    question: 'Will Aftyn Behn win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0xc40fa670744916b201f1e00e7f52f15448deaedb68d84ad25807e219e7d49402',
+    question: 'Will Gino Bulso win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0xa4dee20fb53121c0bf21cbb9c6ba975883e150a19b2af98029b0c8c7f17b8188',
+    question: 'Will Darden Copeland win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0x844780ede82f45209ff767a0827d5b61b2e617308145bdf2c24a54015b6afec3',
+    question: 'Will Vincent Dixie win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0xce92edd1bc80d108134adaee49bb889ab5cfa87a9d441836c159695b1154c9a5',
+    question: 'Will Jason Knight win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0xee24db5258a8c846244454bf67abec9a51d7d54fdd8b856541dba14bde21efa2',
+    question: 'Will Bo Mitchell win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0x5e67e5c2405d9eec82a7cc68a41fb6e9afe2221754397ddb5ff13c382f6ec58d',
+    question: 'Will Stewart Parks win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0x6abdb2f59bab899d206c66fd533edf19919d3d2bd2a176bb9a98c63f880edc3b',
+    question: 'Will Lee Reeves win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  },
+  {
+    conditionId: '0x92c863de3e818302bdfe388e1aca9b314742e463aae220844297b3ace904e04f',
+    question: 'Will Jon Thorp win TN-7 Special Election?',
+    source: 'gamma',
+    gameStartTime: '2025-09-10T18:15:00.000Z',
+    derivedExpiry: '2025-12-02T00:00:00.000Z',
+    derivedExpirySource: 'endDateIso'
+  }
+]
+2025-11-30 05:44:46.346 [warning] [MarketFeed] Snapshot for sxbet unavailable (missing in redis); reason=No Redis snapshot stored for key market-snapshots:sxbet
+2025-11-30 05:44:46.346 [warning] [MarketFeed] Snapshot for sxbet unavailable (missing in disk); reason=No snapshot file at /tmp/market-snapshots/sxbet.json
+2025-11-30 05:44:46.346 [warning] [MarketFeed] Snapshot for sxbet unavailable (missing; diagnostics=redis:missing (No Redis snapshot stored for key market-snapshots:sxbet), disk:missing (No snapshot file at /tmp/market-snapshots/sxbet.json)); fetching live feed as fallback.
+2025-11-30 05:44:46.351 [warning] [MarketFeed] Snapshot for sxbet unavailable (missing in redis); reason=No Redis snapshot stored for key market-snapshots:sxbet
+2025-11-30 05:44:46.351 [warning] [MarketFeed] Snapshot for sxbet unavailable (missing in disk); reason=No snapshot file at /tmp/market-snapshots/sxbet.json
+2025-11-30 05:44:46.352 [info] [sx.bet] /markets/active page 1 → requesting params={"pageSize":50,"paginationKey":"∅"}
+2025-11-30 05:44:46.557 [info] [sx.bet] /markets/active page 1 ← pageMarkets=50, nextKey=6924f18cc23bc45e6b02091b
+2025-11-30 05:44:46.557 [info] [sx.bet] /markets/active page 2 → requesting params={"pageSize":50,"paginationKey":"6924f18cc23bc45e6b02091b"}
+2025-11-30 05:44:46.705 [info] [sx.bet] /markets/active page 2 ← pageMarkets=50, nextKey=6924f18fcfe23ce4833182e7
+2025-11-30 05:44:46.706 [info] [sx.bet] /markets/active page 3 → requesting params={"pageSize":50,"paginationKey":"6924f18fcfe23ce4833182e7"}
+2025-11-30 05:44:46.881 [info] [sx.bet] /markets/active page 3 ← pageMarkets=50, nextKey=6924f191cd7e0b26a251508e
+2025-11-30 05:44:46.881 [info] [sx.bet] /markets/active page 4 → requesting params={"pageSize":50,"paginationKey":"6924f191cd7e0b26a251508e"}
+2025-11-30 05:44:47.050 [info] [sx.bet] /markets/active page 4 ← pageMarkets=50, nextKey=692505504a775876ff6d778d
+2025-11-30 05:44:47.050 [info] [sx.bet] /markets/active page 5 → requesting params={"pageSize":50,"paginationKey":"692505504a775876ff6d778d"}
+2025-11-30 05:44:47.259 [info] [sx.bet] /markets/active page 5 ← pageMarkets=50, nextKey=6926430529248c48229da5fd
+2025-11-30 05:44:47.259 [info] [sx.bet] /markets/active page 6 → requesting params={"pageSize":50,"paginationKey":"6926430529248c48229da5fd"}
+2025-11-30 05:44:47.444 [info] [sx.bet] /markets/active page 6 ← pageMarkets=50, nextKey=6926430ddde484f1f24cc6e6
+2025-11-30 05:44:47.444 [info] [sx.bet] /markets/active page 7 → requesting params={"pageSize":50,"paginationKey":"6926430ddde484f1f24cc6e6"}
+2025-11-30 05:44:47.613 [info] [sx.bet] /markets/active page 7 ← pageMarkets=50, nextKey=6926942cf80b4af3a0fd0039
+2025-11-30 05:44:47.613 [info] [sx.bet] /markets/active page 8 → requesting params={"pageSize":50,"paginationKey":"6926942cf80b4af3a0fd0039"}
+2025-11-30 05:44:47.789 [info] [sx.bet] /markets/active page 8 ← pageMarkets=50, nextKey=6927948400beb7bc521c3c81
+2025-11-30 05:44:47.789 [info] [sx.bet] /markets/active page 9 → requesting params={"pageSize":50,"paginationKey":"6927948400beb7bc521c3c81"}
+2025-11-30 05:44:47.968 [info] [sx.bet] /markets/active page 9 ← pageMarkets=50, nextKey=6927948600beb7bc521c3c9a
+2025-11-30 05:44:47.968 [info] [sx.bet] /markets/active page 10 → requesting params={"pageSize":50,"paginationKey":"6927948600beb7bc521c3c9a"}
+2025-11-30 05:44:48.111 [info] [sx.bet] /markets/active page 10 ← pageMarkets=50, nextKey=692794877aab98ce894ef8cb
+2025-11-30 05:44:48.111 [info] [sx.bet] /markets/active page 11 → requesting params={"pageSize":50,"paginationKey":"692794877aab98ce894ef8cb"}
+2025-11-30 05:44:48.262 [info] [sx.bet] /markets/active page 11 ← pageMarkets=50, nextKey=6927948acb70047a3e73b84b
+2025-11-30 05:44:48.262 [info] [sx.bet] /markets/active page 12 → requesting params={"pageSize":50,"paginationKey":"6927948acb70047a3e73b84b"}
+2025-11-30 05:44:48.406 [info] [sx.bet] /markets/active page 12 ← pageMarkets=50, nextKey=692794ad561ac72ae4ab0f5d
+2025-11-30 05:44:48.406 [info] [sx.bet] /markets/active page 13 → requesting params={"pageSize":50,"paginationKey":"692794ad561ac72ae4ab0f5d"}
+2025-11-30 05:44:48.489 [info] [sx.bet] /markets/active page 13 ← pageMarkets=50, nextKey=692794d2edc8415763e35b9e
+2025-11-30 05:44:48.489 [info] [sx.bet] /markets/active page 14 → requesting params={"pageSize":50,"paginationKey":"692794d2edc8415763e35b9e"}
+2025-11-30 05:44:48.716 [info] [sx.bet] /markets/active page 14 ← pageMarkets=50, nextKey=6927951b03409949122968ec
+2025-11-30 05:44:48.716 [info] [sx.bet] /markets/active page 15 → requesting params={"pageSize":50,"paginationKey":"6927951b03409949122968ec"}
+2025-11-30 05:44:48.930 [info] [sx.bet] /markets/active page 15 ← pageMarkets=50, nextKey=6927952fde05de0682d44d96
+2025-11-30 05:44:48.930 [info] [sx.bet] /markets/active page 16 → requesting params={"pageSize":50,"paginationKey":"6927952fde05de0682d44d96"}
+2025-11-30 05:44:49.082 [info] [sx.bet] /markets/active page 16 ← pageMarkets=50, nextKey=69279571de05de0682d44f3e
+2025-11-30 05:44:49.082 [info] [sx.bet] /markets/active page 17 → requesting params={"pageSize":50,"paginationKey":"69279571de05de0682d44f3e"}
+2025-11-30 05:44:49.281 [info] [sx.bet] /markets/active page 17 ← pageMarkets=50, nextKey=69281fde1884010f3ea8cbd4
+2025-11-30 05:44:49.281 [info] [sx.bet] /markets/active page 18 → requesting params={"pageSize":50,"paginationKey":"69281fde1884010f3ea8cbd4"}
+2025-11-30 05:44:49.451 [info] [sx.bet] /markets/active page 18 ← pageMarkets=50, nextKey=6928af8229741411b5b28a78
+2025-11-30 05:44:49.451 [info] [sx.bet] /markets/active page 19 → requesting params={"pageSize":50,"paginationKey":"6928af8229741411b5b28a78"}
+2025-11-30 05:44:49.615 [info] [sx.bet] /markets/active page 19 ← pageMarkets=50, nextKey=6928b35129741411b5b2c386
+2025-11-30 05:44:49.615 [info] [sx.bet] /markets/active page 20 → requesting params={"pageSize":50,"paginationKey":"6928b35129741411b5b2c386"}
+2025-11-30 05:44:49.772 [info] [sx.bet] /markets/active page 20 ← pageMarkets=50, nextKey=6928b93646765f066278b62d
+2025-11-30 05:44:49.772 [info] [sx.bet] /markets/active page 21 → requesting params={"pageSize":50,"paginationKey":"6928b93646765f066278b62d"}
+2025-11-30 05:44:49.940 [info] [sx.bet] /markets/active page 21 ← pageMarkets=50, nextKey=6928e6da6d1e490d97e1cd2e
+2025-11-30 05:44:49.940 [info] [sx.bet] /markets/active page 22 → requesting params={"pageSize":50,"paginationKey":"6928e6da6d1e490d97e1cd2e"}
+2025-11-30 05:44:50.119 [info] [sx.bet] /markets/active page 22 ← pageMarkets=50, nextKey=6929da5621d4b30298145e75
+2025-11-30 05:44:50.119 [info] [sx.bet] /markets/active page 23 → requesting params={"pageSize":50,"paginationKey":"6929da5621d4b30298145e75"}
+2025-11-30 05:44:50.362 [info] [sx.bet] /markets/active page 23 ← pageMarkets=50, nextKey=692a3884e52dcbc1b1891e53
+2025-11-30 05:44:50.362 [info] [sx.bet] /markets/active page 24 → requesting params={"pageSize":50,"paginationKey":"692a3884e52dcbc1b1891e53"}
+2025-11-30 05:44:50.528 [info] [sx.bet] /markets/active page 24 ← pageMarkets=50, nextKey=692a6364a72f097a5b597529
+2025-11-30 05:44:50.528 [info] [sx.bet] /markets/active page 25 → requesting params={"pageSize":50,"paginationKey":"692a6364a72f097a5b597529"}
+2025-11-30 05:44:50.687 [info] [sx.bet] /markets/active page 25 ← pageMarkets=50, nextKey=692afa7524477f74511db282
+2025-11-30 05:44:50.687 [info] [sx.bet] /markets/active page 26 → requesting params={"pageSize":50,"paginationKey":"692afa7524477f74511db282"}
+2025-11-30 05:44:50.851 [info] [sx.bet] /markets/active page 26 ← pageMarkets=50, nextKey=692b09bd6e12c695e186cb57
+2025-11-30 05:44:50.851 [info] [sx.bet] /markets/active page 27 → requesting params={"pageSize":50,"paginationKey":"692b09bd6e12c695e186cb57"}
+2025-11-30 05:44:51.244 [info] [sx.bet] /markets/active page 27 ← pageMarkets=50, nextKey=692b190ba49379bbdf021473
+2025-11-30 05:44:51.244 [info] [sx.bet] /markets/active page 28 → requesting params={"pageSize":50,"paginationKey":"692b190ba49379bbdf021473"}
+2025-11-30 05:44:51.407 [info] [sx.bet] /markets/active page 28 ← pageMarkets=50, nextKey=692b2a9aead07858c86422d0
+2025-11-30 05:44:51.407 [info] [sx.bet] /markets/active page 29 → requesting params={"pageSize":50,"paginationKey":"692b2a9aead07858c86422d0"}
+2025-11-30 05:44:51.568 [info] [sx.bet] /markets/active page 29 ← pageMarkets=50, nextKey=692b3d56b388eb4c88a99ebc
+2025-11-30 05:44:51.568 [info] [sx.bet] /markets/active page 30 → requesting params={"pageSize":50,"paginationKey":"692b3d56b388eb4c88a99ebc"}
+2025-11-30 05:44:51.737 [info] [sx.bet] /markets/active page 30 ← pageMarkets=50, nextKey=692b4e6eb21eff7bf326b48a
+2025-11-30 05:44:51.737 [info] [sx.bet] /markets/active page 31 → requesting params={"pageSize":50,"paginationKey":"692b4e6eb21eff7bf326b48a"}
+2025-11-30 05:44:51.912 [info] [sx.bet] /markets/active page 31 ← pageMarkets=50, nextKey=692b5ce3ead304cb6d32a76d
+2025-11-30 05:44:51.912 [info] [sx.bet] /markets/active page 32 → requesting params={"pageSize":50,"paginationKey":"692b5ce3ead304cb6d32a76d"}
+2025-11-30 05:44:52.073 [info] [sx.bet] /markets/active page 32 ← pageMarkets=50, nextKey=692b6d8ed089e16445e20603
+2025-11-30 05:44:52.073 [info] [sx.bet] /markets/active page 33 → requesting params={"pageSize":50,"paginationKey":"692b6d8ed089e16445e20603"}
+2025-11-30 05:44:52.241 [info] [sx.bet] /markets/active page 33 ← pageMarkets=50, nextKey=692b7c3362f1cccfb6632575
+2025-11-30 05:44:52.241 [info] [sx.bet] /markets/active page 34 → requesting params={"pageSize":50,"paginationKey":"692b7c3362f1cccfb6632575"}
+2025-11-30 05:44:52.411 [info] [sx.bet] /markets/active page 34 ← pageMarkets=50, nextKey=692b8906c5b1c9831c548e47
+2025-11-30 05:44:52.411 [info] [sx.bet] /markets/active page 35 → requesting params={"pageSize":50,"paginationKey":"692b8906c5b1c9831c548e47"}
+2025-11-30 05:44:52.658 [info] [sx.bet] /markets/active page 35 ← pageMarkets=50, nextKey=692b89edc5b1c9831c54911a
+2025-11-30 05:44:52.658 [info] [sx.bet] /markets/active page 36 → requesting params={"pageSize":50,"paginationKey":"692b89edc5b1c9831c54911a"}
+2025-11-30 05:44:52.821 [info] [sx.bet] /markets/active page 36 ← pageMarkets=50, nextKey=692b90a5cef74e356155fd57
+2025-11-30 05:44:52.821 [info] [sx.bet] /markets/active page 37 → requesting params={"pageSize":50,"paginationKey":"692b90a5cef74e356155fd57"}
+2025-11-30 05:44:53.009 [info] [sx.bet] /markets/active page 37 ← pageMarkets=50, nextKey=692b965ec5b1c9831c54b4ec
+2025-11-30 05:44:53.009 [info] [sx.bet] /markets/active page 38 → requesting params={"pageSize":50,"paginationKey":"692b965ec5b1c9831c54b4ec"}
+2025-11-30 05:44:53.188 [info] [sx.bet] /markets/active page 38 ← pageMarkets=50, nextKey=692ba047b2a0872c2fe52783
+2025-11-30 05:44:53.188 [info] [sx.bet] /markets/active page 39 → requesting params={"pageSize":50,"paginationKey":"692ba047b2a0872c2fe52783"}
+2025-11-30 05:44:53.283 [info] [sx.bet] /markets/active page 39 ← pageMarkets=50, nextKey=692ba576bfe009d764b756a9
+2025-11-30 05:44:53.283 [info] [sx.bet] /markets/active page 40 → requesting params={"pageSize":50,"paginationKey":"692ba576bfe009d764b756a9"}
+2025-11-30 05:44:53.422 [info] [sx.bet] /markets/active page 40 ← pageMarkets=50, nextKey=692bb1dc2dba3e7ef1cbc554
+2025-11-30 05:44:53.422 [info] [sx.bet] Collected 2000 active markets across 40 page(s) (stop=maxPages cap (40)).
+2025-11-30 05:44:53.425 [info] [sx.bet] Odds hydration starting: totalInWindow=1382, reusedFromSnapshot=0, toFetch=1382
+2025-11-30 05:44:55.993 [warning] [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
+2025-11-30 05:45:07.819 [warning] [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
+2025-11-30 05:45:20.498 [warning] [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
+2025-11-30 05:45:31.045 [info] [sx.bet] Retrieved 1000 active orders (fallback)
+2025-11-30 05:45:31.067 [info] [sx.bet] Markets within window=1382, with USDC odds=956 (reused=0)
+2025-11-30 05:45:31.132 [info] [Snapshots] Wrote 956 sxbet markets to ../../tmp/market-snapshots/sxbet.json (≤ 10d) (schema v2)
+2025-11-30 05:45:31.133 [info] [Snapshots] Wrote 1600 kalshi markets to ../../tmp/market-snapshots/kalshi.json (≤ 10d) (schema v2)
+2025-11-30 05:45:31.133 [info] [Snapshots] Wrote 1896 polymarket markets to ../../tmp/market-snapshots/polymarket.json (≤ 10d) (schema v2)
+2025-11-30 05:45:31.181 [info] [MarketFeed] Persisted fallback snapshots for kalshi, polymarket, sxbet (3 total).
+2025-11-30 05:45:31.201 [info] [MarketFilter] kalshi: total=1600, withinExecutionWindow=1600, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-30 05:45:31.201 [info] [MarketFilter] polymarket: total=1896, withinExecutionWindow=1896, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-30 05:45:31.201 [info] [MarketFilter] sxbet: total=956, withinExecutionWindow=956, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-30 05:45:31.201 [info] Found 1600 Kalshi, 1896 Polymarket, and 956 sx.bet markets
+2025-11-30 05:45:31.201 [info] [CronBot] MatchGraph / HotMarketTracker disabled by config; skipping cross-platform tracking.
+2025-11-30 05:45:40.397 [error] Vercel Runtime Timeout Error: Task timed out after 60 seconds

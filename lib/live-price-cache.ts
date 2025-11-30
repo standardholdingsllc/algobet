@@ -65,6 +65,12 @@ import {
   parseLiveMarketKey,
 } from '@/types/live-arb';
 import { MarketPlatform, Market } from '@/types';
+import { liveArbLog, shouldLog } from './live-arb-logger';
+
+const LOG_TAG = 'LivePriceCache';
+const STATS_INTERVAL_MS = 10_000;
+const PRICE_LOG_SUPPRESSION_MS = 60_000;
+import { liveArbLog, shouldLog } from './live-arb-logger';
 
 // ============================================================================
 // Price Conversion Utilities
@@ -144,6 +150,20 @@ class LivePriceCacheImpl {
       sxbet: 0,
     },
   };
+  private statsTimer: NodeJS.Timeout | null = null;
+  private priceUpdatesWindow: Record<MarketPlatform, number> = {
+    kalshi: 0,
+    polymarket: 0,
+    sxbet: 0,
+  };
+  private stalePriceLogs: Map<string, number> = new Map();
+  private missingPriceLogs: Map<string, number> = new Map();
+
+  constructor() {
+    if (shouldLog('debug')) {
+      this.startStatsReporter();
+    }
+  }
 
   // --------------------------------------------------------------------------
   // Price Cache Operations
@@ -180,6 +200,11 @@ class LivePriceCacheImpl {
     this.stats.totalPriceUpdates++;
     this.stats.priceUpdatesByPlatform[update.key.platform] =
       (this.stats.priceUpdatesByPlatform[update.key.platform] ?? 0) + 1;
+    if (shouldLog('debug')) {
+      this.priceUpdatesWindow[update.key.platform] =
+        (this.priceUpdatesWindow[update.key.platform] ?? 0) + 1;
+      this.startStatsReporter();
+    }
 
     // Notify subscribers
     for (const handler of this.priceHandlers) {
@@ -394,6 +419,7 @@ class LivePriceCacheImpl {
       marketId: market.id,
       outcomeId: side,
     };
+    const keyStr = serializeLiveMarketKey(key);
 
     const liveEntry = this.getLivePrice(key);
 
@@ -406,8 +432,25 @@ class LivePriceCacheImpl {
       };
     }
 
+    if (liveEntry && (liveEntry.ageMs ?? 0) > maxLivePriceAgeMs) {
+      this.logPriceWarning('stale', keyStr, {
+        platform: market.platform,
+        marketId: market.id,
+        outcome: side,
+        ageMs: liveEntry.ageMs ?? 0,
+        maxAgeMs: maxLivePriceAgeMs,
+      });
+    }
+
     // Fall back to snapshot price
     const snapshotPrice = side === 'yes' ? market.yesPrice : market.noPrice;
+    if (snapshotPrice === undefined || snapshotPrice === null) {
+      this.logPriceWarning('missing', keyStr, {
+        platform: market.platform,
+        marketId: market.id,
+        outcome: side,
+      });
+    }
     return {
       price: snapshotPrice,
       source: 'snapshot',
@@ -518,6 +561,73 @@ class LivePriceCacheImpl {
     this.priceCache.clear();
     this.scoreCache.clear();
     this.resetStats();
+  }
+
+  private startStatsReporter(): void {
+    if (this.statsTimer || !shouldLog('debug')) {
+      return;
+    }
+    this.statsTimer = setInterval(() => this.emitStats(), STATS_INTERVAL_MS);
+  }
+
+  private emitStats(): void {
+    if (!shouldLog('debug')) {
+      return;
+    }
+    const counts = this.getPriceCountByPlatform();
+    const avgAgeByPlatform = this.computeAvgAgeMsByPlatform();
+    liveArbLog('debug', LOG_TAG, 'Stats snapshot', {
+      markets: counts,
+      updatesLastWindow: { ...this.priceUpdatesWindow },
+      avgAgeMs: avgAgeByPlatform,
+    });
+    this.priceUpdatesWindow = { kalshi: 0, polymarket: 0, sxbet: 0 };
+  }
+
+  private computeAvgAgeMsByPlatform(): Record<MarketPlatform, number> {
+    const sums: Record<MarketPlatform, number> = {
+      kalshi: 0,
+      polymarket: 0,
+      sxbet: 0,
+    };
+    const counts: Record<MarketPlatform, number> = {
+      kalshi: 0,
+      polymarket: 0,
+      sxbet: 0,
+    };
+    const now = Date.now();
+    for (const entry of this.priceCache.values()) {
+      const ageMs = now - new Date(entry.lastUpdatedAt).getTime();
+      sums[entry.key.platform] += ageMs;
+      counts[entry.key.platform] += 1;
+    }
+    return {
+      kalshi: counts.kalshi ? Math.round(sums.kalshi / counts.kalshi) : 0,
+      polymarket: counts.polymarket ? Math.round(sums.polymarket / counts.polymarket) : 0,
+      sxbet: counts.sxbet ? Math.round(sums.sxbet / counts.sxbet) : 0,
+    };
+  }
+
+  private logPriceWarning(
+    type: 'stale' | 'missing',
+    serializedKey: string,
+    meta: Record<string, unknown>
+  ): void {
+    const store = type === 'stale' ? this.stalePriceLogs : this.missingPriceLogs;
+    const now = Date.now();
+    const last = store.get(serializedKey);
+    if (last && now - last < PRICE_LOG_SUPPRESSION_MS) {
+      return;
+    }
+    store.set(serializedKey, now);
+    if (!shouldLog('debug')) {
+      return;
+    }
+    const message =
+      type === 'stale'
+        ? 'Using snapshot price because live price is stale'
+        : 'Live and snapshot prices are missing';
+    liveArbLog('debug', LOG_TAG, message, meta);
   }
 }
 

@@ -41,6 +41,9 @@ import {
   parseTeamsFromTitleTokens,
   TokenMatchScore,
 } from './text-normalizer';
+import { liveArbLog } from './live-arb-logger';
+
+const MATCHER_LOG_TAG = 'LiveEvents';
 
 // ============================================================================
 // Types
@@ -430,6 +433,23 @@ export function updateMatches(snapshot?: LiveEventRegistrySnapshot): void {
 
   // Persist to file (rate-limited to avoid excessive I/O)
   persistGroupsToFile();
+
+  const stats = getMatcherStats();
+  liveArbLog('info', MATCHER_LOG_TAG, 'Matcher results', {
+    totalGroups: stats.totalGroups,
+    liveGroups: stats.liveGroups,
+    preGroups: stats.preGroups,
+    threeWayMatches: stats.by3Platforms,
+    twoWayMatches: stats.by2Platforms,
+    bySport: stats.bySport,
+  });
+  if (stats.totalGroups === 0) {
+    liveArbLog(
+      'warn',
+      MATCHER_LOG_TAG,
+      'Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds'
+    );
+  }
 }
 
 /**
@@ -451,7 +471,7 @@ export function setMatchedGroups(groups: MatchedEventGroup[]): void {
   saveMatchedGroupsToFile(allGroups, config);
   lastFileSaveAt = Date.now();
   
-  console.log(`[LiveEventMatcher] Set ${groups.length} matched groups`);
+  liveArbLog('info', MATCHER_LOG_TAG, `Set ${groups.length} matched groups`);
 }
 
 /**
@@ -471,7 +491,7 @@ function persistGroupsToFile(): void {
   const saved = saveMatchedGroupsToFile(groups, config);
   if (saved) {
     lastFileSaveAt = now;
-    console.log(`[LiveEventMatcher] Persisted ${groups.length} matched groups to file`);
+    liveArbLog('debug', MATCHER_LOG_TAG, `Persisted ${groups.length} matched groups to file`);
   }
 }
 
@@ -485,7 +505,7 @@ export function forcePersistGroupsToFile(): boolean {
   const saved = saveMatchedGroupsToFile(groups, config);
   if (saved) {
     lastFileSaveAt = Date.now();
-    console.log(`[LiveEventMatcher] Force-persisted ${groups.length} matched groups to file`);
+    liveArbLog('debug', MATCHER_LOG_TAG, `Force-persisted ${groups.length} matched groups to file`);
   }
   return saved;
 }
@@ -588,11 +608,7 @@ export function clearMatchedGroups(): void {
  */
 export function logMatcherState(): void {
   const stats = getMatcherStats();
-  console.log('[LiveEventMatcher] Current state:');
-  console.log(`  Total matched groups: ${stats.totalGroups}`);
-  console.log(`  Live: ${stats.liveGroups}, Pre: ${stats.preGroups}`);
-  console.log(`  3+ platforms: ${stats.by3Platforms}, 2 platforms: ${stats.by2Platforms}`);
-  console.log(`  By sport: ${JSON.stringify(stats.bySport)}`);
+  liveArbLog('info', MATCHER_LOG_TAG, 'Matcher state snapshot', stats);
 }
 
 // ============================================================================

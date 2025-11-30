@@ -43,6 +43,7 @@ import {
   WsStateHandler,
 } from '@/types/live-arb';
 import { LivePriceCache } from '@/lib/live-price-cache';
+import { liveArbLog } from '@/lib/live-arb-logger';
 
 // ============================================================================
 // Configuration
@@ -50,6 +51,16 @@ import { LivePriceCache } from '@/lib/live-price-cache';
 
 /** Default SX.bet WebSocket URL - may need to be Ably endpoint in production */
 const DEFAULT_SXBET_WS_URL = 'wss://api.sx.bet/ws';
+const WS_LOG_TAG = 'SXBET-WS';
+const RECONNECT_WARNING_MS = 15000;
+const wsInfo = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('info', WS_LOG_TAG, message, meta);
+const wsWarn = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('warn', WS_LOG_TAG, message, meta);
+const wsError = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('error', WS_LOG_TAG, message, meta);
+const wsDebug = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('debug', WS_LOG_TAG, message, meta);
 
 /** Alternative Ably-based URL pattern (if SX.bet uses Ably) */
 const ABLY_WS_URL_PATTERN = 'wss://realtime.ably.io';
@@ -122,6 +133,7 @@ export class SxBetWsClient {
   private reconnectAttempts = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
+  private reconnectWarningTimer: NodeJS.Timeout | null = null;
   private connectedAt?: Date;
   private lastMessageAt?: Date;
   private subscribedMarkets: Set<string> = new Set();
@@ -158,13 +170,13 @@ export class SxBetWsClient {
    */
   async connect(): Promise<void> {
     if (this.state === 'connected' || this.state === 'connecting') {
-      console.log('[SxBetWs] Already connected or connecting');
+      wsInfo('Already connected or connecting');
       return;
     }
 
     if (!this.apiKey) {
       const error = 'SXBET_API_KEY not configured - WebSocket will not connect';
-      console.warn(`[SxBetWs] ${error}`);
+      wsWarn(error);
       this.errorMessage = error;
       this.setState('error');
       // Don't throw - allow graceful degradation
@@ -172,7 +184,7 @@ export class SxBetWsClient {
     }
 
     this.setState('connecting');
-    console.log(`[SxBetWs] Connecting to ${this.wsUrl}...`);
+    wsInfo(`Connecting to ${this.wsUrl}...`);
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -181,7 +193,7 @@ export class SxBetWsClient {
           this.errorMessage = error;
           this.ws?.close();
           this.setState('error');
-          console.warn('[SxBetWs] Connection timeout - will retry');
+          wsWarn('Connection timeout - will retry');
           resolve(); // Don't reject, allow graceful degradation
         }
       }, this.config.connectionTimeoutMs);
@@ -199,7 +211,7 @@ export class SxBetWsClient {
           this.connectedAt = new Date();
           this.reconnectAttempts = 0;
           this.setState('connected');
-          console.log('[SxBetWs] ✅ Connected successfully');
+          wsInfo('Connected successfully');
 
           // Send initialization/auth message
           this.sendAuthMessage();
@@ -219,7 +231,7 @@ export class SxBetWsClient {
 
         this.ws.on('error', (error: Error) => {
           clearTimeout(timeout);
-          console.error('[SxBetWs] WebSocket error:', error.message);
+          wsError('WebSocket error', { message: error.message });
           this.errorMessage = error.message;
           this.stats.errors++;
           this.stats.lastErrorMessage = error.message;
@@ -232,7 +244,7 @@ export class SxBetWsClient {
         this.ws.on('close', (code: number, reason: Buffer) => {
           clearTimeout(timeout);
           const reasonStr = reason.toString() || 'unknown';
-          console.log(`[SxBetWs] Connection closed: code=${code}, reason=${reasonStr}`);
+          wsInfo('Connection closed', { code, reason: reasonStr });
           this.stopHeartbeat();
           this.handleDisconnect();
         });
@@ -240,7 +252,7 @@ export class SxBetWsClient {
         clearTimeout(timeout);
         this.errorMessage = error.message;
         this.setState('error');
-        console.error('[SxBetWs] Failed to create WebSocket:', error.message);
+        wsError('Failed to create WebSocket', { error: error.message });
         resolve(); // Don't reject, allow graceful degradation
       }
     });
@@ -267,7 +279,7 @@ export class SxBetWsClient {
    * Disconnect from WebSocket
    */
   disconnect(): void {
-    console.log('[SxBetWs] Disconnecting...');
+    wsInfo('Disconnecting websocket');
     this.stopReconnectTimer();
     this.stopHeartbeat();
     
@@ -299,9 +311,9 @@ export class SxBetWsClient {
     }
 
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-      console.error(
-        `[SxBetWs] Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`
-      );
+      wsError('Max reconnection attempts reached', {
+        maxAttempts: this.config.maxReconnectAttempts,
+      });
       this.setState('error');
       return;
     }
@@ -319,9 +331,9 @@ export class SxBetWsClient {
       this.config.reconnectMaxDelayMs
     );
 
-    console.log(
-      `[SxBetWs] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`
-    );
+    wsInfo(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`, {
+      delayMs: delay,
+    });
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectAttempts++;
@@ -330,7 +342,7 @@ export class SxBetWsClient {
         // Resubscribe to markets after reconnection
         await this.resubscribe();
       } catch (error) {
-        console.error('[SxBetWs] Reconnection failed:', error);
+        wsError('Reconnection failed', { error });
       }
     }, delay);
   }
@@ -377,7 +389,7 @@ export class SxBetWsClient {
       try {
         this.ws.send(JSON.stringify(message));
       } catch (error: any) {
-        console.error('[SxBetWs] Failed to send message:', error.message);
+        wsError('Failed to send message', { error: error.message });
       }
     }
   }
@@ -422,16 +434,16 @@ export class SxBetWsClient {
 
         case 'subscribed':
         case 'attached': // Ably attached confirmation
-          console.log(`[SxBetWs] Subscribed to ${message.channel}`);
+          wsInfo(`Subscribed to ${message.channel}`);
           break;
 
         case 'auth':
         case 'connected':
-          console.log('[SxBetWs] Authentication confirmed');
+          wsInfo('Authentication confirmed');
           break;
 
         case 'error':
-          console.error('[SxBetWs] Server error:', message.data);
+          wsError('Server error', message.data);
           this.stats.errors++;
           this.stats.lastErrorMessage = JSON.stringify(message.data);
           break;
@@ -445,12 +457,12 @@ export class SxBetWsClient {
           } else {
             // Log unknown message types for debugging (at debug level)
             if (process.env.LIVE_ARB_LOG_LEVEL === 'debug') {
-              console.debug('[SxBetWs] Unknown message:', msgType, message);
+              wsDebug(`Unknown message: ${String(msgType)}`, { message });
             }
           }
       }
     } catch (error) {
-      console.error('[SxBetWs] Failed to parse message:', error);
+      wsError('Failed to parse websocket message', error as Error);
       this.stats.errors++;
     }
   }
@@ -650,7 +662,7 @@ export class SxBetWsClient {
    */
   private processPendingSubscriptions(): void {
     if (this.pendingSubscriptions.size > 0) {
-      console.log(`[SxBetWs] Processing ${this.pendingSubscriptions.size} pending subscriptions`);
+      wsInfo(`Processing ${this.pendingSubscriptions.size} pending subscriptions`);
       for (const marketHash of this.pendingSubscriptions) {
         this.doSubscribe(marketHash);
       }
@@ -711,7 +723,7 @@ export class SxBetWsClient {
       type: 'subscribe',
       channel: 'best-odds',
     });
-    console.log('[SxBetWs] Subscribed to best-odds stream');
+    wsInfo('Subscribed to best-odds stream');
   }
 
   /**
@@ -722,7 +734,7 @@ export class SxBetWsClient {
       type: 'subscribe',
       channel: 'live-scores',
     });
-    console.log('[SxBetWs] Subscribed to live-scores stream');
+    wsInfo('Subscribed to live-scores stream');
   }
 
   /**
@@ -733,7 +745,7 @@ export class SxBetWsClient {
       type: 'subscribe',
       channel: 'line-changes',
     });
-    console.log('[SxBetWs] Subscribed to line-changes stream');
+    wsInfo('Subscribed to line-changes stream');
   }
 
   /**
@@ -766,7 +778,7 @@ export class SxBetWsClient {
    */
   private async resubscribe(): Promise<void> {
     const markets = Array.from(this.subscribedMarkets);
-    console.log(`[SxBetWs] Resubscribing to ${markets.length} markets`);
+    wsInfo(`Resubscribing to ${markets.length} markets`);
 
     // Resubscribe to global feeds
     this.subscribeToBestOdds();
@@ -795,8 +807,34 @@ export class SxBetWsClient {
     this.state = newState;
 
     if (oldState !== newState) {
-      console.log(`[SxBetWs] State: ${oldState} → ${newState}`);
+      liveArbLog('info', WS_LOG_TAG, `State change: ${oldState} → ${newState}`);
+      if (newState === 'reconnecting' || newState === 'error') {
+        this.scheduleReconnectWarning(newState);
+      } else {
+        this.clearReconnectWarning();
+      }
       this.notifyStateChange();
+    }
+  }
+
+  private scheduleReconnectWarning(state: WsConnectionState): void {
+    this.clearReconnectWarning();
+    this.reconnectWarningTimer = setTimeout(() => {
+      if (this.state === state) {
+        liveArbLog(
+          'warn',
+          WS_LOG_TAG,
+          `WARNING: stuck in ${state} state`,
+          { attempts: this.reconnectAttempts, lastError: this.errorMessage }
+        );
+      }
+    }, RECONNECT_WARNING_MS);
+  }
+
+  private clearReconnectWarning(): void {
+    if (this.reconnectWarningTimer) {
+      clearTimeout(this.reconnectWarningTimer);
+      this.reconnectWarningTimer = null;
     }
   }
 
@@ -806,7 +844,7 @@ export class SxBetWsClient {
       try {
         handler(status);
       } catch (error) {
-        console.error('[SxBetWs] Error in state handler:', error);
+        wsError('Error in state handler', error as Error);
       }
     }
   }

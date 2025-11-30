@@ -24,6 +24,7 @@
     "generate-password": "node scripts/generate-password-hash.js",
     "migrate-kv": "node -r esbuild-register scripts/migrate-to-kv.ts",
     "snapshot-worker": "node -r esbuild-register workers/snapshot-worker.ts",
+    "live-arb-worker": "node -r esbuild-register workers/live-arb-worker.ts",
     "test-live-arb": "node -r esbuild-register scripts/test-live-arb.ts",
     "test-live-arb-runtime": "node -r esbuild-register scripts/test-live-arb-runtime-config.ts",
     "test-live-ws": "node -r esbuild-register scripts/test-live-ws-connections.ts",

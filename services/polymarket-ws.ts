@@ -21,6 +21,7 @@ import {
   WsStateHandler,
 } from '@/types/live-arb';
 import { LivePriceCache } from '@/lib/live-price-cache';
+import { liveArbLog } from '@/lib/live-arb-logger';
 
 // ============================================================================
 // Polymarket WebSocket Message Types
@@ -74,6 +75,7 @@ export class PolymarketWsClient {
   private reconnectAttempts = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
+  private reconnectWarningTimer: NodeJS.Timeout | null = null;
   private connectedAt?: Date;
   private lastMessageAt?: Date;
   private subscribedAssets: Set<string> = new Set();
@@ -81,6 +83,15 @@ export class PolymarketWsClient {
   private errorMessage?: string;
 
   private readonly wsUrl: string;
+
+const WS_LOG_TAG = 'POLYMARKET-WS';
+const RECONNECT_WARNING_MS = 15000;
+const wsInfo = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('info', WS_LOG_TAG, message, meta);
+const wsWarn = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('warn', WS_LOG_TAG, message, meta);
+const wsError = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('error', WS_LOG_TAG, message, meta);
 
   constructor(config?: Partial<WsClientConfig>) {
     this.config = { ...DEFAULT_WS_CONFIG, ...config };
@@ -97,12 +108,12 @@ export class PolymarketWsClient {
    */
   async connect(): Promise<void> {
     if (this.state === 'connected' || this.state === 'connecting') {
-      console.log('[PolymarketWs] Already connected or connecting');
+      wsInfo('Already connected or connecting');
       return;
     }
 
     this.setState('connecting');
-    console.log(`[PolymarketWs] Connecting to ${this.wsUrl}...`);
+    wsInfo(`Connecting to ${this.wsUrl}...`);
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -122,7 +133,7 @@ export class PolymarketWsClient {
           this.connectedAt = new Date();
           this.reconnectAttempts = 0;
           this.setState('connected');
-          console.log('[PolymarketWs] ✅ Connected successfully');
+          wsInfo('Connected successfully');
 
           // Start heartbeat
           this.startHeartbeat();
@@ -136,7 +147,7 @@ export class PolymarketWsClient {
 
         this.ws.on('error', (error: Error) => {
           clearTimeout(timeout);
-          console.error('[PolymarketWs] WebSocket error:', error.message);
+          wsError('WebSocket error', { message: error.message });
           this.errorMessage = error.message;
           if (this.state === 'connecting') {
             reject(error);
@@ -145,7 +156,7 @@ export class PolymarketWsClient {
 
         this.ws.on('close', (code: number, reason: Buffer) => {
           clearTimeout(timeout);
-          console.log(`[PolymarketWs] Connection closed: ${code} - ${reason.toString()}`);
+          wsInfo('Connection closed', { code, reason: reason.toString() });
           this.stopHeartbeat();
           this.handleDisconnect();
         });
@@ -162,7 +173,7 @@ export class PolymarketWsClient {
    * Disconnect from WebSocket
    */
   disconnect(): void {
-    console.log('[PolymarketWs] Disconnecting...');
+    wsInfo('Disconnecting websocket');
     this.stopReconnectTimer();
     this.stopHeartbeat();
     this.subscribedAssets.clear();
@@ -186,9 +197,9 @@ export class PolymarketWsClient {
     }
 
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-      console.error(
-        `[PolymarketWs] Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`
-      );
+      wsError('Max reconnection attempts reached', {
+        maxAttempts: this.config.maxReconnectAttempts,
+      });
       this.setState('error');
       return;
     }
@@ -206,9 +217,9 @@ export class PolymarketWsClient {
       this.config.reconnectMaxDelayMs
     );
 
-    console.log(
-      `[PolymarketWs] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`
-    );
+    wsInfo(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`, {
+      delayMs: delay,
+    });
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectAttempts++;
@@ -216,7 +227,7 @@ export class PolymarketWsClient {
         await this.connect();
         await this.resubscribe();
       } catch (error) {
-        console.error('[PolymarketWs] Reconnection failed:', error);
+        wsError('Reconnection failed', { error });
       }
     }, delay);
   }
@@ -284,13 +295,11 @@ export class PolymarketWsClient {
           break;
 
         case 'subscribed':
-          console.log(
-            `[PolymarketWs] Subscribed to ${message.market || message.asset_id}`
-          );
+          wsInfo(`Subscribed to ${message.market || message.asset_id}`);
           break;
 
         case 'error':
-          console.error('[PolymarketWs] Server error:', message.data);
+          wsError('Server error', message.data);
           break;
 
         case 'pong':
@@ -306,7 +315,7 @@ export class PolymarketWsClient {
           }
       }
     } catch (error) {
-      console.error('[PolymarketWs] Failed to parse message:', error);
+      wsError('Failed to parse websocket message', error as Error);
     }
   }
 
@@ -481,7 +490,7 @@ export class PolymarketWsClient {
    */
   private async resubscribe(): Promise<void> {
     const assets = Array.from(this.subscribedAssets);
-    console.log(`[PolymarketWs] Resubscribing to ${assets.length} markets`);
+    wsInfo(`Resubscribing to ${assets.length} markets`);
 
     for (const asset of assets) {
       this.subscribeToMarket(asset);
@@ -497,8 +506,32 @@ export class PolymarketWsClient {
     this.state = newState;
 
     if (oldState !== newState) {
-      console.log(`[PolymarketWs] State: ${oldState} → ${newState}`);
+      wsInfo(`State change: ${oldState} → ${newState}`);
+      if (newState === 'reconnecting' || newState === 'error') {
+        this.scheduleReconnectWarning(newState);
+      } else {
+        this.clearReconnectWarning();
+      }
       this.notifyStateChange();
+    }
+  }
+
+  private scheduleReconnectWarning(state: WsConnectionState): void {
+    this.clearReconnectWarning();
+    this.reconnectWarningTimer = setTimeout(() => {
+      if (this.state === state) {
+        wsWarn(`WARNING: stuck in ${state} state`, {
+          attempts: this.reconnectAttempts,
+          lastError: this.errorMessage,
+        });
+      }
+    }, RECONNECT_WARNING_MS);
+  }
+
+  private clearReconnectWarning(): void {
+    if (this.reconnectWarningTimer) {
+      clearTimeout(this.reconnectWarningTimer);
+      this.reconnectWarningTimer = null;
     }
   }
 
@@ -508,7 +541,7 @@ export class PolymarketWsClient {
       try {
         handler(status);
       } catch (error) {
-        console.error('[PolymarketWs] Error in state handler:', error);
+        wsError('Error in state handler', error as Error);
       }
     }
   }

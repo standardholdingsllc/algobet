@@ -22,6 +22,9 @@ import {
 } from '@/types/live-events';
 import { buildLiveEventMatcherConfig } from './live-event-config';
 import { setMatchedGroups as setMatcherGroups } from './live-event-matcher';
+import { liveArbLog } from './live-arb-logger';
+
+const LOG_TAG = 'LiveEvents';
 
 // ============================================================================
 // Internal State
@@ -390,7 +393,7 @@ export function runCleanup(): number {
   }
 
   if (removed > 0) {
-    console.log(`[LiveEventRegistry] Cleaned up ${removed} stale events`);
+    liveArbLog('info', LOG_TAG, `Cleaned up ${removed} stale events`);
   }
 
   return removed;
@@ -405,11 +408,16 @@ export function runCleanup(): number {
  */
 export function logRegistryState(): void {
   const stats = getRegistryStats();
-  console.log('[LiveEventRegistry] Current state:');
-  console.log(`  Total events: ${stats.totalEvents}`);
-  console.log(`  By platform: SX.bet=${stats.byPlatform.SXBET}, Polymarket=${stats.byPlatform.POLYMARKET}, Kalshi=${stats.byPlatform.KALSHI}`);
-  console.log(`  By status: PRE=${stats.byStatus.PRE}, LIVE=${stats.byStatus.LIVE}, ENDED=${stats.byStatus.ENDED}`);
-  console.log(`  Lifetime: added=${stats.totalAdded}, updated=${stats.totalUpdated}, removed=${stats.totalRemoved}`);
+  liveArbLog('info', LOG_TAG, 'Registry state snapshot', {
+    totalEvents: stats.totalEvents,
+    byPlatform: stats.byPlatform,
+    byStatus: stats.byStatus,
+    lifecycle: {
+      added: stats.totalAdded,
+      updated: stats.totalUpdated,
+      removed: stats.totalRemoved,
+    },
+  });
 }
 
 // ============================================================================
@@ -460,10 +468,12 @@ export function markPlatformSnapshot(platform: LiveEventPlatform, events: Vendor
     totalAdded++;
   }
   
-  console.log(
-    `[LiveEventRegistry] Snapshot for ${platform}: ` +
-    `removed ${keysToRemove.length}, added ${events.length}`
-  );
+  liveArbLog('info', LOG_TAG, 'Registry snapshot updated', {
+    platform,
+    removed: keysToRemove.length,
+    added: events.length,
+    totals: getRegistryStats().byPlatform,
+  });
 }
 
 /**
@@ -504,7 +514,7 @@ export function pruneEndedEvents(now: number): number {
   }
   
   if (pruned > 0) {
-    console.log(`[LiveEventRegistry] Pruned ${pruned} ended/stale events`);
+    liveArbLog('info', LOG_TAG, `Pruned ${pruned} ended/stale events`);
   }
   
   return pruned;

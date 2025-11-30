@@ -37,6 +37,7 @@ import { getPolymarketWsClient, PolymarketWsClient } from '@/services/polymarket
 import { getKalshiWsClient, KalshiWsClient } from '@/services/kalshi-ws';
 import { HotMarketTracker } from './hot-market-tracker';
 import { scanArbitrageOpportunities } from './arbitrage';
+import { liveArbLog } from './live-arb-logger';
 
 // ============================================================================
 // Subscription Management Configuration
@@ -59,6 +60,9 @@ const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
   liveEventsOnly: false,
   imminentHours: 3, // 3 hours
 };
+
+const LOG_TAG = 'LiveArbManager';
+const SUBSCRIPTION_REASON_MAX = 5;
 
 // ============================================================================
 // Subscription Stats for Monitoring
@@ -101,6 +105,7 @@ class LiveArbManagerImpl {
   // Subscription management
   private subscriptionDebounceTimer: NodeJS.Timeout | null = null;
   private pendingSubscriptionUpdate = false;
+  private pendingSubscriptionReasons: Set<string> = new Set();
   private currentSubscribedMarkets: Map<MarketPlatform, Set<string>> = new Map([
     ['sxbet', new Set()],
     ['polymarket', new Set()],
@@ -138,7 +143,7 @@ class LiveArbManagerImpl {
     tracker?: HotMarketTracker
   ): Promise<void> {
     if (this.isInitialized) {
-      console.log('[LiveArbManager] Already initialized');
+      liveArbLog('debug', LOG_TAG, 'initialize() called but manager is already initialized');
       return;
     }
 
@@ -149,14 +154,33 @@ class LiveArbManagerImpl {
     // Update subscription config from live arb config
     this.subscriptionConfig.liveEventsOnly = this.config.liveEventsOnly ?? false;
 
+    const platformSummary = this.config.enabledPlatforms.join(',');
+    const maxSubscriptions = {
+      sxbet: this.subscriptionConfig.maxMarketsPerPlatform,
+      polymarket: this.subscriptionConfig.maxMarketsPerPlatform,
+      kalshi: this.subscriptionConfig.maxMarketsPerPlatform,
+    };
+    liveArbLog('info', LOG_TAG, 'Starting LiveArbManager', {
+      enabled: this.config.enabled,
+      liveEventsOnly: this.subscriptionConfig.liveEventsOnly,
+      maxSubscriptions,
+      platforms: platformSummary,
+    });
+
     if (!this.config.enabled) {
-      console.log('[LiveArbManager] Live arb is disabled in config');
+      liveArbLog(
+        'info',
+        LOG_TAG,
+        'liveArbEnabled=false – skipping WebSocket startup and arb scanning (check /api/live-arb/config)'
+      );
       return;
     }
 
-    console.log('[LiveArbManager] Initializing...');
-    console.log(`[LiveArbManager] Config: liveEventsOnly=${this.subscriptionConfig.liveEventsOnly}, ` +
-      `maxMarketsPerPlatform=${this.subscriptionConfig.maxMarketsPerPlatform}`);
+    liveArbLog(
+      'debug',
+      LOG_TAG,
+      `Config snapshot: liveEventsOnly=${this.subscriptionConfig.liveEventsOnly}, maxMarketsPerPlatform=${this.subscriptionConfig.maxMarketsPerPlatform}`
+    );
 
     this.hotMarketTracker = tracker ?? null;
 
@@ -184,8 +208,10 @@ class LiveArbManagerImpl {
     const succeeded = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    console.log(
-      `[LiveArbManager] Initialized: ${succeeded}/${results.length} platforms connected (${failed} failed)`
+    liveArbLog(
+      failed ? 'warn' : 'info',
+      LOG_TAG,
+      `Initialization complete: ${succeeded}/${results.length} websocket clients connected (${failed} failed)`
     );
 
     this.isInitialized = true;
@@ -195,7 +221,7 @@ class LiveArbManagerImpl {
    * Shut down the live arb manager
    */
   async shutdown(): Promise<void> {
-    console.log('[LiveArbManager] Shutting down...');
+    liveArbLog('info', LOG_TAG, 'Shutting down LiveArbManager');
 
     // Clear debounce timer
     if (this.subscriptionDebounceTimer) {
@@ -214,7 +240,7 @@ class LiveArbManagerImpl {
     this.kalshiWs = null;
     this.isInitialized = false;
 
-    console.log('[LiveArbManager] Shutdown complete');
+    liveArbLog('info', LOG_TAG, 'Shutdown complete');
   }
 
   private async initSxBetWs(): Promise<void> {
@@ -222,10 +248,10 @@ class LiveArbManagerImpl {
       this.sxBetWs = getSxBetWsClient();
 
       this.sxBetWs.onStateChange((status) => {
-        console.log(`[LiveArbManager] SX.bet WS state: ${status.state}`);
+        liveArbLog('info', 'SXBET-WS', `State changed to ${status.state}`);
         // Re-trigger subscription update on reconnect
         if (status.state === 'connected') {
-          this.scheduleSubscriptionUpdate();
+          this.scheduleSubscriptionUpdate('sxbet_ws_connected');
         }
       });
 
@@ -237,9 +263,9 @@ class LiveArbManagerImpl {
       this.sxBetWs.subscribeToLiveScores();
       this.sxBetWs.subscribeToLineChanges();
 
-      console.log('[LiveArbManager] SX.bet WebSocket initialized');
+      liveArbLog('info', 'SXBET-WS', 'Initialized websocket client');
     } catch (error) {
-      console.error('[LiveArbManager] Failed to init SX.bet WS:', error);
+      liveArbLog('error', 'SXBET-WS', 'Failed to initialize websocket client', error as Error);
       // Don't throw - allow graceful degradation
     }
   }
@@ -249,16 +275,16 @@ class LiveArbManagerImpl {
       this.polymarketWs = getPolymarketWsClient();
 
       this.polymarketWs.onStateChange((status) => {
-        console.log(`[LiveArbManager] Polymarket WS state: ${status.state}`);
+        liveArbLog('info', 'POLYMARKET-WS', `State changed to ${status.state}`);
         if (status.state === 'connected') {
-          this.scheduleSubscriptionUpdate();
+          this.scheduleSubscriptionUpdate('polymarket_ws_connected');
         }
       });
 
       await this.polymarketWs.connect();
-      console.log('[LiveArbManager] Polymarket WebSocket initialized');
+      liveArbLog('info', 'POLYMARKET-WS', 'Initialized websocket client');
     } catch (error) {
-      console.error('[LiveArbManager] Failed to init Polymarket WS:', error);
+      liveArbLog('error', 'POLYMARKET-WS', 'Failed to initialize websocket client', error as Error);
       // Don't throw - allow graceful degradation
     }
   }
@@ -268,16 +294,16 @@ class LiveArbManagerImpl {
       this.kalshiWs = getKalshiWsClient();
 
       this.kalshiWs.onStateChange((status) => {
-        console.log(`[LiveArbManager] Kalshi WS state: ${status.state}`);
+        liveArbLog('info', 'KALSHI-WS', `State changed to ${status.state}`);
         if (status.state === 'connected') {
-          this.scheduleSubscriptionUpdate();
+          this.scheduleSubscriptionUpdate('kalshi_ws_connected');
         }
       });
 
       await this.kalshiWs.connect();
-      console.log('[LiveArbManager] Kalshi WebSocket initialized');
+      liveArbLog('info', 'KALSHI-WS', 'Initialized websocket client');
     } catch (error) {
-      console.error('[LiveArbManager] Failed to init Kalshi WS:', error);
+      liveArbLog('error', 'KALSHI-WS', 'Failed to initialize websocket client', error as Error);
       // Don't throw - allow graceful degradation
     }
   }
@@ -304,7 +330,7 @@ class LiveArbManagerImpl {
       try {
         handler(update);
       } catch (error) {
-        console.error('[LiveArbManager] Error in price handler:', error);
+        liveArbLog('error', LOG_TAG, 'Error in price handler', error as Error);
       }
     }
 
@@ -318,7 +344,7 @@ class LiveArbManagerImpl {
       try {
         handler(update);
       } catch (error) {
-        console.error('[LiveArbManager] Error in score handler:', error);
+        liveArbLog('error', LOG_TAG, 'Error in score handler', error as Error);
       }
     }
   }
@@ -331,7 +357,10 @@ class LiveArbManagerImpl {
    * Schedule a debounced subscription update.
    * This prevents thrashing when markets are added/removed frequently.
    */
-  private scheduleSubscriptionUpdate(): void {
+  private scheduleSubscriptionUpdate(reason: string = 'timer'): void {
+    if (this.pendingSubscriptionReasons.size < SUBSCRIPTION_REASON_MAX) {
+      this.pendingSubscriptionReasons.add(reason);
+    }
     if (this.subscriptionDebounceTimer) {
       // Already scheduled, just mark as pending
       this.pendingSubscriptionUpdate = true;
@@ -343,7 +372,9 @@ class LiveArbManagerImpl {
       this.subscriptionDebounceTimer = null;
       if (this.pendingSubscriptionUpdate) {
         this.pendingSubscriptionUpdate = false;
-        this.updateSubscriptions();
+        const reasons = Array.from(this.pendingSubscriptionReasons);
+        this.pendingSubscriptionReasons.clear();
+        this.updateSubscriptions(reasons);
       }
     }, this.subscriptionConfig.debounceMs);
   }
@@ -352,12 +383,26 @@ class LiveArbManagerImpl {
    * Update subscriptions based on current hot markets.
    * Called after debounce timer expires.
    */
-  private updateSubscriptions(): void {
+  private updateSubscriptions(reasons: string[] = []): void {
     if (!this.isInitialized || !this.hotMarketTracker) {
+      liveArbLog(
+        'debug',
+        LOG_TAG,
+        'Skipping subscription update because HotMarketTracker is unavailable or manager not initialized'
+      );
       return;
     }
 
     const trackedMarkets = this.getMarketsToSubscribe();
+    const totalTargets = trackedMarkets.length;
+    if (totalTargets === 0) {
+      liveArbLog(
+        'debug',
+        LOG_TAG,
+        'No tracked markets available for subscription',
+        { reasons }
+      );
+    }
     
     // Group by platform
     const byPlatform: Record<MarketPlatform, string[]> = {
@@ -384,6 +429,13 @@ class LiveArbManagerImpl {
       // Find markets to remove
       const toRemove = [...currentMarkets].filter(m => !newMarkets.has(m));
 
+      const platformTag = `${platform.toUpperCase()}-WS`;
+      liveArbLog('debug', platformTag, 'applySubscriptionChanges', {
+        add: toAdd.length,
+        remove: toRemove.length,
+        totalActive: newMarkets.size,
+      });
+
       // Apply changes
       this.applySubscriptionChanges(platform, toAdd, toRemove);
 
@@ -394,13 +446,12 @@ class LiveArbManagerImpl {
 
     this.stats.lastUpdateAt = new Date().toISOString();
     this.stats.updateCount++;
-
-    console.log(
-      `[LiveArbManager] Subscription update #${this.stats.updateCount}: ` +
-      `SX.bet=${this.stats.currentSubscriptions.sxbet}, ` +
-      `Polymarket=${this.stats.currentSubscriptions.polymarket}, ` +
-      `Kalshi=${this.stats.currentSubscriptions.kalshi}`
-    );
+    const reasonLabel = reasons.length ? reasons.join(',') : 'unknown';
+    liveArbLog('debug', LOG_TAG, `Subscription update #${this.stats.updateCount} (reason=${reasonLabel})`, {
+      sxbet: this.stats.currentSubscriptions.sxbet,
+      polymarket: this.stats.currentSubscriptions.polymarket,
+      kalshi: this.stats.currentSubscriptions.kalshi,
+    });
   }
 
   /**
@@ -449,6 +500,11 @@ class LiveArbManagerImpl {
   ): void {
     const client = this.getWsClient(platform);
     if (!client?.isConnected()) {
+      liveArbLog(
+        'debug',
+        `${platform.toUpperCase()}-WS`,
+        'Cannot apply subscription changes because websocket client is not connected'
+      );
       return;
     }
 
@@ -502,14 +558,12 @@ class LiveArbManagerImpl {
    */
   subscribeToTrackedMarkets(trackedMarkets: TrackedMarket[]): void {
     if (!this.isInitialized) {
-      console.warn(
-        '[LiveArbManager] Cannot subscribe - not initialized'
-      );
+      liveArbLog('warn', LOG_TAG, 'Cannot subscribe to tracked markets because manager is not initialized');
       return;
     }
 
     // Just trigger a subscription update - the smart management will handle it
-    this.scheduleSubscriptionUpdate();
+    this.scheduleSubscriptionUpdate('hot_markets_updated');
   }
 
   /**
@@ -678,17 +732,19 @@ class LiveArbManagerImpl {
   }
 
   private notifyArbOpportunity(opp: LiveArbOpportunity): void {
-    console.log(
-      `[LiveArbManager] 🔥 LIVE ARB DETECTED: ${opp.market1.title} ` +
-        `(${opp.market1.platform}) vs ${opp.market2.platform} - ` +
-        `${opp.profitMargin.toFixed(2)}% profit`
+    liveArbLog(
+      'info',
+      LOG_TAG,
+      `LIVE ARB DETECTED ${opp.market1.title} (${opp.market1.platform} vs ${opp.market2.platform}) profit=${opp.profitMargin.toFixed(
+        2
+      )}%`
     );
 
     for (const handler of this.arbOpportunityHandlers) {
       try {
         handler(opp);
       } catch (error) {
-        console.error('[LiveArbManager] Error in arb handler:', error);
+        liveArbLog('error', LOG_TAG, 'Error in arb opportunity handler', error as Error);
         this.recordFailure();
       }
     }
@@ -715,7 +771,7 @@ class LiveArbManagerImpl {
     this.circuitBreakerState.openReason = reason;
     this.circuitBreakerState.openedAt = new Date().toISOString();
 
-    console.warn(`[LiveArbManager] ⚠️ Circuit opened: ${reason}`);
+    liveArbLog('warn', LOG_TAG, `Circuit opened: ${reason}`);
 
     // Schedule circuit reset
     setTimeout(() => {
@@ -724,7 +780,7 @@ class LiveArbManagerImpl {
   }
 
   private resetCircuit(): void {
-    console.log('[LiveArbManager] Circuit reset');
+    liveArbLog('info', LOG_TAG, 'Circuit reset');
     this.circuitBreakerState = {
       isOpen: false,
       consecutiveFailures: 0,
@@ -794,10 +850,10 @@ class LiveArbManagerImpl {
     // Update subscription config if relevant settings changed
     if (config.liveEventsOnly !== undefined) {
       this.subscriptionConfig.liveEventsOnly = config.liveEventsOnly;
-      this.scheduleSubscriptionUpdate();
+      this.scheduleSubscriptionUpdate('config_updated');
     }
     
-    console.log('[LiveArbManager] Config updated:', this.config);
+    liveArbLog('info', LOG_TAG, 'Config updated', this.config);
   }
 
   /**

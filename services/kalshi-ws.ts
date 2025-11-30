@@ -21,6 +21,7 @@ import {
   WsStateHandler,
 } from '@/types/live-arb';
 import { LivePriceCache } from '@/lib/live-price-cache';
+import { liveArbLog } from '@/lib/live-arb-logger';
 
 // ============================================================================
 // Kalshi WebSocket Message Types
@@ -81,6 +82,7 @@ export class KalshiWsClient {
   private reconnectAttempts = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
+  private reconnectWarningTimer: NodeJS.Timeout | null = null;
   private connectedAt?: Date;
   private lastMessageAt?: Date;
   private subscribedTickers: Set<string> = new Set();
@@ -101,6 +103,15 @@ export class KalshiWsClient {
 
   private readonly wsUrl: string;
 
+const WS_LOG_TAG = 'KALSHI-WS';
+const RECONNECT_WARNING_MS = 15000;
+const wsInfo = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('info', WS_LOG_TAG, message, meta);
+const wsWarn = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('warn', WS_LOG_TAG, message, meta);
+const wsError = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('error', WS_LOG_TAG, message, meta);
+
   constructor(config?: Partial<WsClientConfig>) {
     this.config = { ...DEFAULT_WS_CONFIG, ...config };
     // Kalshi WebSocket URL
@@ -118,12 +129,12 @@ export class KalshiWsClient {
    */
   async connect(): Promise<void> {
     if (this.state === 'connected' || this.state === 'connecting') {
-      console.log('[KalshiWs] Already connected or connecting');
+      wsInfo('Already connected or connecting');
       return;
     }
 
     this.setState('connecting');
-    console.log(`[KalshiWs] Connecting to ${this.wsUrl}...`);
+    wsInfo(`Connecting to ${this.wsUrl}...`);
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -143,7 +154,7 @@ export class KalshiWsClient {
           this.connectedAt = new Date();
           this.reconnectAttempts = 0;
           this.setState('connected');
-          console.log('[KalshiWs] ✅ Connected successfully');
+          wsInfo('Connected successfully');
 
           // Start heartbeat
           this.startHeartbeat();
@@ -157,7 +168,7 @@ export class KalshiWsClient {
 
         this.ws.on('error', (error: Error) => {
           clearTimeout(timeout);
-          console.error('[KalshiWs] WebSocket error:', error.message);
+          wsError('WebSocket error', { message: error.message });
           this.errorMessage = error.message;
           if (this.state === 'connecting') {
             reject(error);
@@ -166,7 +177,7 @@ export class KalshiWsClient {
 
         this.ws.on('close', (code: number, reason: Buffer) => {
           clearTimeout(timeout);
-          console.log(`[KalshiWs] Connection closed: ${code} - ${reason.toString()}`);
+          wsInfo('Connection closed', { code, reason: reason.toString() });
           this.stopHeartbeat();
           this.handleDisconnect();
         });
@@ -187,7 +198,7 @@ export class KalshiWsClient {
    * Disconnect from WebSocket
    */
   disconnect(): void {
-    console.log('[KalshiWs] Disconnecting...');
+    wsInfo('Disconnecting websocket');
     this.stopReconnectTimer();
     this.stopHeartbeat();
     this.subscribedTickers.clear();
@@ -212,9 +223,9 @@ export class KalshiWsClient {
     }
 
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-      console.error(
-        `[KalshiWs] Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`
-      );
+      wsError('Max reconnection attempts reached', {
+        maxAttempts: this.config.maxReconnectAttempts,
+      });
       this.setState('error');
       return;
     }
@@ -232,9 +243,9 @@ export class KalshiWsClient {
       this.config.reconnectMaxDelayMs
     );
 
-    console.log(
-      `[KalshiWs] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`
-    );
+    wsInfo(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`, {
+      delayMs: delay,
+    });
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectAttempts++;
@@ -242,7 +253,7 @@ export class KalshiWsClient {
         await this.connect();
         await this.resubscribe();
       } catch (error) {
-        console.error('[KalshiWs] Reconnection failed:', error);
+        wsError('Reconnection failed', { error });
       }
     }, delay);
   }
@@ -295,7 +306,7 @@ export class KalshiWsClient {
       const message: KalshiWsMessage = JSON.parse(data.toString());
 
       if (message.error) {
-        console.error('[KalshiWs] Server error:', message.error);
+        wsError('Server error', { error: message.error });
         return;
       }
 
@@ -317,11 +328,11 @@ export class KalshiWsClient {
           break;
 
         case 'subscribed':
-          console.log('[KalshiWs] Subscription confirmed:', message.msg);
+          wsInfo('Subscription confirmed', { message: message.msg });
           break;
 
         case 'unsubscribed':
-          console.log('[KalshiWs] Unsubscription confirmed:', message.msg);
+          wsInfo('Unsubscription confirmed', { message: message.msg });
           break;
 
         default:
@@ -334,7 +345,7 @@ export class KalshiWsClient {
           }
       }
     } catch (error) {
-      console.error('[KalshiWs] Failed to parse message:', error);
+      wsError('Failed to parse websocket message', error as Error);
     }
   }
 
@@ -666,7 +677,7 @@ export class KalshiWsClient {
    */
   private async resubscribe(): Promise<void> {
     const tickers = Array.from(this.subscribedTickers);
-    console.log(`[KalshiWs] Resubscribing to ${tickers.length} markets`);
+    wsInfo(`Resubscribing to ${tickers.length} markets`);
 
     // Clear old orderbook state
     this.orderbookState.clear();
@@ -694,8 +705,32 @@ export class KalshiWsClient {
     this.state = newState;
 
     if (oldState !== newState) {
-      console.log(`[KalshiWs] State: ${oldState} → ${newState}`);
+      wsInfo(`State change: ${oldState} → ${newState}`);
+      if (newState === 'reconnecting' || newState === 'error') {
+        this.scheduleReconnectWarning(newState);
+      } else {
+        this.clearReconnectWarning();
+      }
       this.notifyStateChange();
+    }
+  }
+
+  private scheduleReconnectWarning(state: WsConnectionState): void {
+    this.clearReconnectWarning();
+    this.reconnectWarningTimer = setTimeout(() => {
+      if (this.state === state) {
+        wsWarn(`WARNING: stuck in ${state} state`, {
+          attempts: this.reconnectAttempts,
+          lastError: this.errorMessage,
+        });
+      }
+    }, RECONNECT_WARNING_MS);
+  }
+
+  private clearReconnectWarning(): void {
+    if (this.reconnectWarningTimer) {
+      clearTimeout(this.reconnectWarningTimer);
+      this.reconnectWarningTimer = null;
     }
   }
 
@@ -705,7 +740,7 @@ export class KalshiWsClient {
       try {
         handler(status);
       } catch (error) {
-        console.error('[KalshiWs] Error in state handler:', error);
+        wsError('Error in state handler', error as Error);
       }
     }
   }

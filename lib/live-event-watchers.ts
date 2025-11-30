@@ -29,6 +29,10 @@ import { LivePriceCache } from './live-price-cache';
 import { scanArbitrageOpportunities } from './arbitrage';
 import { executeOpportunityWithMode, ExecutionOptions, PlatformAdapters, isDryFireMode } from './execution-wrapper';
 import { KVStorage } from './kv-storage';
+import { LiveArbManager } from './live-arb-manager';
+import { liveArbLog } from './live-arb-logger';
+
+const WATCHER_LOG_TAG = 'LiveWatcher';
 
 // ============================================================================
 // Debug Configuration
@@ -52,6 +56,7 @@ interface ActiveWatcher {
   startedAt: number;
   lastPriceUpdateAt?: number;
   lastArbCheckAt?: number;
+  lastTrigger?: { platform: MarketPlatform; marketId: string };
   arbCheckCount: number;
   opportunitiesFound: number;
   lastOpportunity?: {
@@ -85,6 +90,12 @@ const marketIdToWatcher = new Map<string, string>();
 const FALLBACK_POLL_INTERVAL_MS = 5000;  // Safety net polling every 5s
 const DEBOUNCE_MS = 50;                   // Debounce rapid price updates
 const MIN_CHECK_INTERVAL_MS = 100;        // Minimum time between checks
+const watcherInfo = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('info', WATCHER_LOG_TAG, message, meta);
+const watcherDebug = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('debug', WATCHER_LOG_TAG, message, meta);
+const watcherWarn = (message: string, meta?: Record<string, unknown>) =>
+  liveArbLog('warn', WATCHER_LOG_TAG, message, meta);
 
 /** Platform adapters (set during initialization) */
 let platformAdapters: PlatformAdapters | null = null;
@@ -112,7 +123,7 @@ export function initializeWatchers(
   // Register for price updates from LivePriceCache
   priceUpdateUnsubscribe = LivePriceCache.onPriceUpdate(handlePriceUpdate);
   
-  console.log('[LiveEventWatchers] Initialized with platform adapters and price update listener');
+  watcherInfo('Initialized watchers with platform adapters');
 }
 
 /**
@@ -127,7 +138,7 @@ export function cleanupWatchers(): void {
   }
   
   marketIdToWatcher.clear();
-  console.log('[LiveEventWatchers] Cleaned up');
+  watcherInfo('Cleaned up watchers');
 }
 
 // ============================================================================
@@ -153,6 +164,10 @@ function handlePriceUpdate(update: LivePriceUpdate): void {
   }
   
   watcher.lastPriceUpdateAt = Date.now();
+  watcher.lastTrigger = {
+    platform: update.key.platform,
+    marketId,
+  };
   
   debugLog(
     `Price update for ${eventKey}: ${update.key.platform}:${marketId} = ${update.price}`
@@ -229,12 +244,19 @@ function getMarketsForGroup(group: MatchedEventGroup): Market[] {
   return markets;
 }
 
+interface RecentPriceStats {
+  hasRecent: boolean;
+  platformsWithRecent: number;
+  stalePlatforms: number;
+}
+
 /**
  * Check if we have recent prices for at least 2 platforms in the group
  */
-function hasRecentPricesForArb(group: MatchedEventGroup, maxAgeMs: number = 10000): boolean {
+function getRecentPriceStats(group: MatchedEventGroup, maxAgeMs: number = 10000): RecentPriceStats {
   const now = Date.now();
   let platformsWithRecentPrices = 0;
+  let stalePlatforms = 0;
   
   for (const platform of ['SXBET', 'POLYMARKET', 'KALSHI'] as LiveEventPlatform[]) {
     const vendorEvents = group.vendors[platform];
@@ -261,10 +283,16 @@ function hasRecentPricesForArb(group: MatchedEventGroup, maxAgeMs: number = 1000
     
     if (hasRecent) {
       platformsWithRecentPrices++;
+    } else {
+      stalePlatforms++;
     }
   }
   
-  return platformsWithRecentPrices >= 2;
+  return {
+    hasRecent: platformsWithRecentPrices >= 2,
+    platformsWithRecent: platformsWithRecentPrices,
+    stalePlatforms,
+  };
 }
 
 /**
@@ -277,9 +305,12 @@ function registerWatcherMarkets(watcher: ActiveWatcher): void {
     const vendorEvents = watcher.group.vendors[platform];
     if (!vendorEvents) continue;
     
+    const marketPlatform = toMarketPlatform(platform);
+    
     for (const ve of vendorEvents) {
       watcher.marketIdToEventKey.set(ve.vendorMarketId, watcher.group.eventKey);
       marketIdToWatcher.set(ve.vendorMarketId, watcher.group.eventKey);
+      LiveArbManager.subscribeToMarket(marketPlatform, ve.vendorMarketId);
     }
   }
   
@@ -316,7 +347,7 @@ export function startWatcher(group: MatchedEventGroup): boolean {
   
   // Check max watchers
   if (activeWatchers.size >= config.maxWatchers) {
-    console.log(`[Watcher] Max watchers (${config.maxWatchers}) reached, cannot start new watcher`);
+    watcherWarn('Max watcher limit reached', { maxWatchers: config.maxWatchers });
     return false;
   }
   
@@ -358,11 +389,14 @@ export function startWatcher(group: MatchedEventGroup): boolean {
     }
   }, FALLBACK_POLL_INTERVAL_MS);
   
-  console.log(
-    `[Watcher] Started watching ${group.eventKey}: ` +
-    `${group.sport} ${group.homeTeam} vs ${group.awayTeam} ` +
-    `(${group.platformCount} platforms, ${watcher.marketIdToEventKey.size} markets)`
-  );
+  watcherInfo('Started watcher', {
+    eventKey: group.eventKey,
+    sport: group.sport,
+    homeTeam: group.homeTeam,
+    awayTeam: group.awayTeam,
+    platforms: group.platformCount,
+    markets: watcher.marketIdToEventKey.size,
+  });
   
   return true;
 }
@@ -370,7 +404,7 @@ export function startWatcher(group: MatchedEventGroup): boolean {
 /**
  * Stop a watcher
  */
-export function stopWatcher(eventKey: string): boolean {
+export function stopWatcher(eventKey: string, reason: string = 'manual'): boolean {
   const watcher = activeWatchers.get(eventKey);
   if (!watcher) return false;
   
@@ -392,10 +426,12 @@ export function stopWatcher(eventKey: string): boolean {
   watcher.state = 'STOPPED';
   activeWatchers.delete(eventKey);
   
-  console.log(
-    `[Watcher] Stopped watching ${eventKey} ` +
-    `(${watcher.arbCheckCount} checks, ${watcher.opportunitiesFound} opportunities)`
-  );
+  watcherInfo('Stopped watcher', {
+    eventKey,
+    reason,
+    arbChecks: watcher.arbCheckCount,
+    opportunitiesFound: watcher.opportunitiesFound,
+  });
   return true;
 }
 
@@ -404,9 +440,9 @@ export function stopWatcher(eventKey: string): boolean {
  */
 export function stopAllWatchers(): void {
   for (const eventKey of [...activeWatchers.keys()]) {
-    stopWatcher(eventKey);
+    stopWatcher(eventKey, 'stop_all');
   }
-  console.log('[Watcher] All watchers stopped');
+  watcherInfo('All watchers stopped');
 }
 
 /**
@@ -419,6 +455,7 @@ async function runArbCheck(eventKey: string): Promise<void> {
   
   // Prevent concurrent checks
   if (watcher.isChecking) {
+    watcherDebug('Skipping arb check (already running)', { eventKey });
     debugLog(`Skipping concurrent check for ${eventKey}`);
     return;
   }
@@ -426,6 +463,7 @@ async function runArbCheck(eventKey: string): Promise<void> {
   // Rate limit checks
   const now = Date.now();
   if (watcher.lastArbCheckAt && now - watcher.lastArbCheckAt < MIN_CHECK_INTERVAL_MS) {
+    watcherDebug('Skipping arb check (rate limited)', { eventKey });
     return;
   }
   
@@ -435,10 +473,18 @@ async function runArbCheck(eventKey: string): Promise<void> {
   try {
     // Get latest group data (might have updated)
     const group = getMatchedGroup(eventKey) || watcher.group;
+    watcherDebug('Running arb check', {
+      eventKey,
+      triggeredBy: watcher.lastTrigger,
+    });
     
     // Skip if no recent prices from at least 2 platforms
-    if (!hasRecentPricesForArb(group, 10000)) {
-      debugLog(`Skipping ${eventKey}: no recent prices from 2+ platforms`);
+    const recentStats = getRecentPriceStats(group, 10000);
+    if (!recentStats.hasRecent) {
+      watcherDebug('Skip arb check (no fresh prices)', {
+        eventKey,
+        stalePlatforms: recentStats.stalePlatforms,
+      });
       return;
     }
     
@@ -454,6 +500,10 @@ async function runArbCheck(eventKey: string): Promise<void> {
     );
     
     if (markets.length < 2) {
+      watcherDebug('Skip arb check (insufficient markets)', {
+        eventKey,
+        marketsAvailable: markets.length,
+      });
       return; // Need at least 2 markets to arb
     }
     
@@ -481,7 +531,13 @@ async function runArbCheck(eventKey: string): Promise<void> {
         const markets1 = marketsByPlatform[platforms[i]];
         const markets2 = marketsByPlatform[platforms[j]];
         
-        if (markets1.length === 0 || markets2.length === 0) continue;
+        if (markets1.length === 0 || markets2.length === 0) {
+          watcherDebug('Skip platform pair due to missing markets', {
+            eventKey,
+            platformPair: [platforms[i], platforms[j]],
+          });
+          continue;
+        }
         
         const result = scanArbitrageOpportunities(
           markets1,
@@ -508,20 +564,22 @@ async function runArbCheck(eventKey: string): Promise<void> {
         foundAt: now,
       };
       
-      console.log(
-        `[Watcher] Found opportunity for ${eventKey}: ` +
-        `${bestOpp.profitMargin.toFixed(2)}% profit ` +
-        `(${bestOpp.market1.platform} vs ${bestOpp.market2.platform})`
-      );
+      watcherInfo('Opportunity found', {
+        eventKey,
+        profitBps: bestOpp.profitMargin,
+        platforms: [bestOpp.market1.platform, bestOpp.market2.platform],
+      });
       
       // Execute if we have adapters
       if (platformAdapters && executionOptionsTemplate) {
         await executeOpportunity(bestOpp, group);
       }
+    } else {
+      watcherDebug('No opportunities detected', { eventKey, marketsEvaluated: markets.length });
     }
     
   } catch (error) {
-    console.error(`[Watcher] Error in arb check for ${eventKey}:`, error);
+    liveArbLog('error', WATCHER_LOG_TAG, `Error in arb check for ${eventKey}`, error as Error);
   } finally {
     watcher.isChecking = false;
     
@@ -545,7 +603,9 @@ async function executeOpportunity(
   group: MatchedEventGroup
 ): Promise<void> {
   if (!platformAdapters || !executionOptionsTemplate) {
-    console.error('[Watcher] Cannot execute: adapters not initialized');
+    watcherWarn('Cannot execute opportunity because adapters are not initialized', {
+      eventKey: group.eventKey,
+    });
     return;
   }
   
@@ -572,18 +632,20 @@ async function executeOpportunity(
     );
     
     if (result.success) {
-      console.log(
-        `[Watcher] ${isDryFireMode() ? 'DRY-FIRE' : 'LIVE'} execution succeeded for ${group.eventKey}: ` +
-        `${opportunity.profitMargin.toFixed(2)}% profit`
-      );
+      watcherInfo('Execution succeeded', {
+        eventKey: group.eventKey,
+        mode: isDryFireMode() ? 'DRY_FIRE' : 'LIVE',
+        profitMargin: opportunity.profitMargin,
+      });
     } else {
-      console.log(
-        `[Watcher] Execution not attempted for ${group.eventKey}: ${result.reason}`
-      );
+      watcherWarn('Execution skipped or failed', {
+        eventKey: group.eventKey,
+        reason: result.reason,
+      });
     }
     
   } catch (error) {
-    console.error(`[Watcher] Execution error for ${group.eventKey}:`, error);
+    liveArbLog('error', WATCHER_LOG_TAG, `Execution error for ${group.eventKey}`, error as Error);
   }
 }
 
@@ -619,7 +681,7 @@ export function updateWatchers(): void {
       const watcher = activeWatchers.get(eventKey);
       // Keep watching for a bit after group disappears
       if (watcher && Date.now() - watcher.startedAt > 5 * 60 * 1000) {
-        stopWatcher(eventKey);
+        stopWatcher(eventKey, 'group_removed');
       }
     }
   }
@@ -712,7 +774,7 @@ export function pauseAllWatchers(): void {
     }
     watcher.state = 'PAUSED';
   }
-  console.log('[Watcher] All watchers paused');
+  watcherInfo('All watchers paused');
 }
 
 /**
@@ -730,7 +792,7 @@ export function resumeAllWatchers(): void {
       }, FALLBACK_POLL_INTERVAL_MS);
     }
   }
-  console.log('[Watcher] All watchers resumed');
+  watcherInfo('All watchers resumed');
 }
 
 /**
@@ -738,12 +800,5 @@ export function resumeAllWatchers(): void {
  */
 export function logWatcherState(): void {
   const stats = getWatcherStats();
-  console.log('[LiveEventWatchers] Current state:');
-  console.log(`  Active watchers: ${stats.activeWatchers}`);
-  console.log(`  Total markets watched: ${stats.totalMarketsWatched}`);
-  console.log(`  Total arb checks: ${stats.totalArbChecks}`);
-  console.log(`  Total opportunities: ${stats.totalOpportunities}`);
-  console.log(`  Avg checks/sec: ${stats.avgChecksPerSecond.toFixed(2)}`);
-  console.log(`  Avg check time: ${stats.avgCheckTimeMs.toFixed(1)}ms`);
-  console.log(`  Max check time: ${stats.maxCheckTimeMs}ms`);
+  watcherInfo('Watcher state snapshot', stats);
 }

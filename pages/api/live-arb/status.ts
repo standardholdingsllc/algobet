@@ -16,15 +16,44 @@ import { getLiveArbStatus, isLiveArbActive } from '@/lib/live-arb-integration';
 import { loadLiveArbRuntimeConfig } from '@/lib/live-arb-runtime-config';
 import { LivePriceCache } from '@/lib/live-price-cache';
 import { LiveArbManager } from '@/lib/live-arb-manager';
+import { getOrchestratorStatus } from '@/lib/live-sports-orchestrator';
 
 interface LiveArbStatusResponse {
   liveArbEnabled: boolean;
   liveArbReady: boolean;
+  liveArbWorkerConfigured: boolean;
   timestamp: string;
   platforms: {
     sxbet: PlatformStatus;
     polymarket: PlatformStatus;
     kalshi: PlatformStatus;
+  };
+  liveEvents: {
+    enabled: boolean;
+    running: boolean;
+    uptimeMs: number;
+    registry: {
+      countByPlatform: Record<string, number>;
+      countByStatus: Record<string, number>;
+      updatedAt: number;
+    };
+    stats: {
+      totalVendorEvents: number;
+      liveEvents: number;
+      preEvents: number;
+      matchedGroups: number;
+      activeWatchers: number;
+      arbChecksTotal: number;
+      opportunitiesTotal: number;
+    };
+    watcherStats: {
+      totalArbChecks: number;
+      totalOpportunities: number;
+      avgChecksPerSecond: number;
+      avgCheckTimeMs: number;
+      maxCheckTimeMs: number;
+      totalMarketsWatched: number;
+    };
   };
   priceCacheStats: {
     totalEntries: number;
@@ -70,6 +99,7 @@ export default async function handler(
     const status = getLiveArbStatus();
     const wsStatuses = LiveArbManager.getWsStatuses();
     const subscriptionStats = LiveArbManager.getSubscriptionStats();
+    const orchestratorStatus = getOrchestratorStatus();
 
     // Build platform status
     const platforms: LiveArbStatusResponse['platforms'] = {
@@ -100,8 +130,21 @@ export default async function handler(
     const response: LiveArbStatusResponse = {
       liveArbEnabled: runtimeConfig.liveArbEnabled,
       liveArbReady: status.ready,
+      liveArbWorkerConfigured: process.env.LIVE_ARB_WORKER === 'true',
       timestamp: new Date().toISOString(),
       platforms,
+      liveEvents: {
+        enabled: orchestratorStatus.enabled,
+        running: orchestratorStatus.running,
+        uptimeMs: orchestratorStatus.uptimeMs,
+        registry: {
+          countByPlatform: orchestratorStatus.registry.countByPlatform,
+          countByStatus: orchestratorStatus.registry.countByStatus,
+          updatedAt: orchestratorStatus.registry.updatedAt,
+        },
+        stats: orchestratorStatus.stats,
+        watcherStats: orchestratorStatus.watchers.stats,
+      },
       priceCacheStats: {
         totalEntries: cacheStats.priceCacheSize,
         entriesByPlatform: pricesByPlatform,
