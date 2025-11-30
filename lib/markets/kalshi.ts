@@ -20,6 +20,12 @@ interface KalshiMarket {
   event_ticker: string;
   close_time: string;
   series_ticker?: string;
+  category?: string;
+  expected_expiration_time?: string;
+  expiration_time?: string;
+  status?: string;
+  market_type?: string;
+  mve_collection_ticker?: string;
 }
 
 interface KalshiOrderbookEntry {
@@ -39,6 +45,46 @@ interface KalshiMarketsResponse {
   };
   next_cursor?: string;
   cursor?: string;
+}
+
+const KALSHI_EVENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const KALSHI_EVENT_PREFETCH_BATCH = 8;
+
+const KALSHI_SPORT_PREFIX_MAP: Record<string, string> = {
+  KXNFL: 'NFL',
+  KXCFB: 'NCAA_FB',
+  KXNCAAF: 'NCAA_FB',
+  KXNCAAFOOTBALL: 'NCAA_FB',
+  KXNBA: 'NBA',
+  KXNCAAB: 'NCAA_BB',
+  KXNBAG: 'NBA',
+  KXNHL: 'NHL',
+  KXMLB: 'MLB',
+  KXMLS: 'MLS',
+  KXSOCCER: 'MLS',
+  KXEPL: 'EPL',
+  KXUCL: 'UCL',
+  KXUFC: 'UFC',
+  KXBOX: 'BOXING',
+  KXTENNIS: 'TENNIS',
+  KXGOLF: 'GOLF',
+};
+
+interface KalshiEventSummary {
+  event_ticker: string;
+  title: string;
+  sub_title?: string;
+  category?: string;
+  series_ticker?: string;
+}
+
+interface KalshiEventApiResponse {
+  event: KalshiEventSummary;
+}
+
+interface KalshiEventCacheEntry {
+  event: KalshiEventSummary;
+  fetchedAt: number;
 }
 
 let cachedKalshiPrivateKey: string | null = null;
@@ -155,11 +201,118 @@ export class KalshiAPI {
   private apiKey: string;
   private privateKey: string;
   private email: string;
+  private eventCache: Map<string, KalshiEventCacheEntry> = new Map();
 
   constructor() {
     this.apiKey = process.env.KALSHI_API_KEY || '';
     this.privateKey = getFormattedKalshiPrivateKey();
     this.email = process.env.KALSHI_EMAIL || '';
+  }
+
+  private isMultivariateTicker(eventTicker?: string): boolean {
+    return !!eventTicker && eventTicker.startsWith('KXMVE');
+  }
+
+  private isLikelySportsTicker(eventTicker?: string): boolean {
+    if (!eventTicker || this.isMultivariateTicker(eventTicker)) {
+      return false;
+    }
+    return Object.keys(KALSHI_SPORT_PREFIX_MAP).some((prefix) =>
+      eventTicker.startsWith(prefix)
+    );
+  }
+
+  private getSportHintFromTicker(
+    eventTicker?: string,
+    seriesTicker?: string
+  ): string | undefined {
+    if (eventTicker) {
+      const prefixEntry = Object.entries(KALSHI_SPORT_PREFIX_MAP).find(([prefix]) =>
+        eventTicker.startsWith(prefix)
+      );
+      if (prefixEntry) return prefixEntry[1];
+    }
+
+    if (seriesTicker) {
+      const seriesEntry = Object.entries(KALSHI_SPORT_PREFIX_MAP).find(([prefix]) =>
+        seriesTicker.startsWith(prefix)
+      );
+      if (seriesEntry) return seriesEntry[1];
+    }
+
+    return undefined;
+  }
+
+  private isEventCacheFresh(ticker: string): boolean {
+    const cached = this.eventCache.get(ticker);
+    if (!cached) return false;
+    return Date.now() - cached.fetchedAt < KALSHI_EVENT_CACHE_TTL_MS;
+  }
+
+  private async fetchEventDetails(ticker: string): Promise<void> {
+    try {
+      const response = await axios.get<KalshiEventApiResponse>(`${BASE_URL}/events/${ticker}`);
+      if (response.data?.event) {
+        this.eventCache.set(ticker, {
+          event: response.data.event,
+          fetchedAt: Date.now(),
+        });
+      }
+    } catch (error: any) {
+      console.error(
+        `[Kalshi] Failed to fetch event metadata for ${ticker}:`,
+        error.response?.status || error.message
+      );
+    }
+  }
+
+  private async prefetchEventDetails(tickers: string[]): Promise<void> {
+    const unique = Array.from(new Set(tickers.filter(Boolean)));
+    const toFetch = unique.filter((ticker) => !this.isEventCacheFresh(ticker));
+
+    for (let i = 0; i < toFetch.length; i += KALSHI_EVENT_PREFETCH_BATCH) {
+      const batch = toFetch.slice(i, i + KALSHI_EVENT_PREFETCH_BATCH);
+      await Promise.all(batch.map((ticker) => this.fetchEventDetails(ticker)));
+    }
+  }
+
+  private mapKalshiMarket(market: KalshiMarket): Market {
+    const expiryDate = new Date(market.close_time);
+    const eventMeta = market.event_ticker
+      ? this.eventCache.get(market.event_ticker)?.event
+      : undefined;
+    const sportHint = this.getSportHintFromTicker(
+      market.event_ticker,
+      eventMeta?.series_ticker || market.series_ticker
+    );
+
+    const vendorMetadata =
+      eventMeta || sportHint || market.status || market.series_ticker
+        ? {
+            kalshiEvent: eventMeta,
+            kalshiSportHint: sportHint,
+            kalshiMarketStatus: market.status,
+            kalshiSeriesTicker: market.series_ticker,
+          }
+        : undefined;
+
+    return {
+      id: market.ticker,
+      platform: 'kalshi',
+      ticker: market.ticker,
+      marketType: 'prediction',
+      title: eventMeta?.title || market.title,
+      yesPrice: market.yes_price,
+      noPrice: market.no_price,
+      expiryDate: expiryDate.toISOString(),
+      volume: market.volume,
+      vendorMetadata,
+      eventTicker: market.event_ticker,
+      eventStartTime:
+        market.expected_expiration_time ||
+        market.expiration_time ||
+        market.close_time,
+    };
   }
 
   /**
@@ -234,7 +387,8 @@ export class KalshiAPI {
     };
 
     try {
-      const markets: Market[] = [];
+      const rawMarkets: KalshiMarket[] = [];
+      const sportsEventTickers = new Set<string>();
       let cursor: string | undefined;
       let page = 0;
 
@@ -257,33 +411,24 @@ export class KalshiAPI {
             continue;
           }
 
-          const yesPrice = market.yes_price;
-          const noPrice = market.no_price;
+          rawMarkets.push(market);
 
-          markets.push({
-            id: market.ticker,
-            platform: 'kalshi',
-            ticker: market.ticker,
-            marketType: 'prediction',
-            title: market.title,
-            yesPrice,
-            noPrice,
-            expiryDate: expiryDate.toISOString(),
-            volume: market.volume,
-          });
+          if (this.isLikelySportsTicker(market.event_ticker)) {
+            sportsEventTickers.add(market.event_ticker);
+          }
         }
 
         console.info(
-          `[Kalshi] Processed Kalshi page ${page} (${entries.length} raw within <=${maxDaysToExpiry}d, ${markets.length} total tradable so far).`
+          `[Kalshi] Processed Kalshi page ${page} (${entries.length} raw within <=${maxDaysToExpiry}d, ${rawMarkets.length} total tradable so far).`
         );
 
         if (!nextCursor) {
           break;
         }
 
-        if (markets.length >= KALSHI_TARGET_MARKETS) {
+        if (rawMarkets.length >= KALSHI_TARGET_MARKETS) {
           console.info(
-            `[Kalshi] Reached target tradable market count (${markets.length}); stopping pagination early.`
+            `[Kalshi] Reached target tradable market count (${rawMarkets.length}); stopping pagination early.`
           );
           break;
         }
@@ -291,12 +436,17 @@ export class KalshiAPI {
         cursor = nextCursor;
       }
 
-      if (markets.length === 0) {
+      if (rawMarkets.length === 0) {
         console.warn(
           `[Kalshi] No markets matched the expiry filter (<= ${maxDaysToExpiry}d) across ${page} page(s).`
         );
       }
 
+      if (sportsEventTickers.size > 0) {
+        await this.prefetchEventDetails(Array.from(sportsEventTickers));
+      }
+
+      const markets: Market[] = rawMarkets.map((market) => this.mapKalshiMarket(market));
       return markets;
     } catch (error: any) {
       console.error('Error fetching Kalshi markets:', error.response?.status || error.message);

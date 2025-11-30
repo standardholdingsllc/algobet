@@ -12,6 +12,12 @@ export interface Market {
   volume?: number;
   liquidity?: number;
   oddsAsOf?: string;
+  /** Optional per-platform metadata (event info, raw payloads, etc.) */
+  vendorMetadata?: Record<string, unknown>;
+  /** Optional event ticker provided by the platform (e.g., Kalshi) */
+  eventTicker?: string;
+  /** Optional event start time if provided by the platform */
+  eventStartTime?: string;
 }
 
 export type MarketPlatform = Market['platform'];

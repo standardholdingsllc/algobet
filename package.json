@@ -30,7 +30,8 @@
     "test-live-ws": "node -r esbuild-register scripts/test-live-ws-connections.ts",
     "test-live-events": "node -r esbuild-register scripts/test-live-events.ts",
     "test-execution-mode": "node -r esbuild-register scripts/test-execution-mode.ts",
-    "test-kalshi-ws-auth": "node -r esbuild-register scripts/test-kalshi-ws-auth.ts"
+    "test-kalshi-ws-auth": "node -r esbuild-register scripts/test-kalshi-ws-auth.ts",
+    "debug-kalshi-sports": "node -r esbuild-register scripts/debug-kalshi-sports.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.5",

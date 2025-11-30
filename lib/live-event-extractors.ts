@@ -469,16 +469,16 @@ export function processPolymarketMarkets(markets: Market[]): number {
 
 /** Kalshi sports-related ticker patterns */
 const KALSHI_SPORTS_PATTERNS = [
-  /^NBA/i,
-  /^NFL/i,
-  /^NHL/i,
-  /^MLB/i,
-  /^MLS/i,
-  /^EPL/i,
-  /^UCL/i,
-  /^NCAA/i,
-  /^CFP/i,
-  /^SPORT/i,
+  /^(KX)?NBA/i,
+  /^(KX)?NFL/i,
+  /^(KX)?NHL/i,
+  /^(KX)?MLB/i,
+  /^(KX)?MLS/i,
+  /^(KX)?EPL/i,
+  /^(KX)?UCL/i,
+  /^(KX)?NCAA/i,
+  /^(KX)?CFP/i,
+  /^(KX)?SPORT/i,
 ];
 
 /**
@@ -507,9 +507,13 @@ export function extractKalshiEvent(
   // Also check event_ticker if available
   const eventTicker = metadata?.event_ticker as string | undefined;
   const isSportsEvent = eventTicker && KALSHI_SPORTS_PATTERNS.some(p => p.test(eventTicker));
+  const sportHint = metadata?.sport_hint as string | undefined;
+  const hasSportsHint = Boolean(sportHint);
   
   // Detect sport from ticker first, then title
-  let sportResult = detectSport(ticker, metadata);
+  let sportResult = sportHint
+    ? { sport: sportHint as Sport, confidence: 0.95 }
+    : detectSport(ticker, metadata);
   if (sportResult.sport === 'OTHER') {
     sportResult = detectSport(title, metadata);
   }
@@ -518,7 +522,7 @@ export function extractKalshiEvent(
   const { home, away, teams } = parseTeamsFromTitle(title, sportResult.sport);
   
   // Need sports ticker or good detection with teams
-  if (!isSportsTicker && !isSportsEvent && sportResult.sport === 'OTHER') {
+  if (!isSportsTicker && !isSportsEvent && !hasSportsHint && sportResult.sport === 'OTHER') {
     return null;
   }
   
@@ -526,14 +530,21 @@ export function extractKalshiEvent(
   // NOTE: Kalshi uses close_time as the primary time reference
   // For sports, the game typically happens around close_time
   let startTime: number | undefined;
-  if (metadata?.close_time) {
+  if (metadata?.expected_expiration_time) {
+    startTime = new Date(metadata.expected_expiration_time as string).getTime();
+  } else if (metadata?.event_start_time) {
+    startTime = new Date(metadata.event_start_time as string).getTime();
+  } else if (metadata?.close_time) {
     startTime = new Date(metadata.close_time as string).getTime();
   } else if (metadata?.expiration_time) {
     startTime = new Date(metadata.expiration_time as string).getTime();
   }
   
   // Extract league from event_ticker or series_ticker
-  const league = eventTicker || (metadata?.series_ticker as string | undefined);
+  const league =
+    (metadata?.league as string | undefined) ||
+    eventTicker ||
+    (metadata?.series_ticker as string | undefined);
   
   // Detect status
   // NOTE: Kalshi status is "open", "closed", or "settled"
@@ -582,26 +593,107 @@ export function extractKalshiEvent(
   };
 }
 
+function isKalshiMultiEventTicker(eventTicker?: string): boolean {
+  return !!(eventTicker && eventTicker.startsWith('KXMVE'));
+}
+
+function looksLikeKalshiSportsMarket(market: Market): boolean {
+  if (market.platform !== 'kalshi') return false;
+  const target = market.eventTicker || market.ticker;
+  return Boolean(target && KALSHI_SPORTS_PATTERNS.some((pattern) => pattern.test(target)));
+}
+
+/**
+ * Build a Kalshi VendorEvent from a normalized Market object.
+ */
+export function createKalshiVendorEvent(market: Market): VendorEvent | null {
+  if (market.platform !== 'kalshi') return null;
+
+  const vendorMeta = (market.vendorMetadata ?? {}) as Record<string, unknown>;
+  const kalshiEvent = vendorMeta.kalshiEvent as {
+    event_ticker?: string;
+    title?: string;
+    sub_title?: string;
+    category?: string;
+    series_ticker?: string;
+  } | undefined;
+  const sportHint = vendorMeta.kalshiSportHint as string | undefined;
+  const marketStatus = vendorMeta.kalshiMarketStatus as string | undefined;
+  const seriesTicker =
+    kalshiEvent?.series_ticker ||
+    (vendorMeta.kalshiSeriesTicker as string | undefined) ||
+    market.eventTicker;
+
+  const eventTicker = kalshiEvent?.event_ticker || market.eventTicker || market.ticker;
+  if (isKalshiMultiEventTicker(eventTicker)) {
+    return null;
+  }
+
+  const titleSource = (kalshiEvent?.title || kalshiEvent?.sub_title || market.title).trim();
+
+  const metadata: Record<string, unknown> = {
+    close_time: market.expiryDate,
+    expiration_time: market.expiryDate,
+    expected_expiration_time: market.eventStartTime,
+    event_ticker: eventTicker,
+    series_ticker: seriesTicker,
+    league: seriesTicker,
+    category: kalshiEvent?.category,
+    sport_hint: sportHint,
+    status: marketStatus,
+  };
+
+  return extractKalshiEvent(market.ticker, titleSource, metadata);
+}
+
 /**
  * Process Kalshi markets into the registry
  */
 export function processKalshiMarkets(markets: Market[]): number {
   let added = 0;
+  let combosSkipped = 0;
+  let metadataMisses = 0;
+  const sampleEvents: VendorEvent[] = [];
   
   for (const market of markets) {
     if (market.platform !== 'kalshi') continue;
-    
-    const metadata: Record<string, unknown> = {
-      close_time: market.expiryDate,
-    };
-    
-    const event = extractKalshiEvent(market.ticker, market.title, metadata);
-    
+    const looksSports = looksLikeKalshiSportsMarket(market);
+
+    if (isKalshiMultiEventTicker(market.eventTicker)) {
+      combosSkipped++;
+      continue;
+    }
+
+    const event = createKalshiVendorEvent(market);
+
     if (event && event.teams.length >= 2) {
       addOrUpdateEvent(event);
       added++;
+      if (sampleEvents.length < 5) {
+        sampleEvents.push(event);
+      }
+    } else {
+      if (looksSports) {
+        metadataMisses++;
+      }
     }
   }
+
+  console.info(
+    '[Kalshi-Sports] Markets processed',
+    {
+      totalRaw: markets.length,
+      sportsDetected: added,
+      combosSkipped,
+      metadataMisses,
+      sample: sampleEvents.map((event) => ({
+        sport: event.sport,
+        matchup: `${event.awayTeam ?? '?'} @ ${event.homeTeam ?? '?'}`.trim(),
+        startTime: event.startTime ? new Date(event.startTime).toISOString() : 'unknown',
+        ticker: event.vendorMarketId,
+      })),
+    }
+  );
   
   return added;
 }
