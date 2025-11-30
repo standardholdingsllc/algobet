@@ -8,60 +8,19 @@ import {
   Bet,
   DailyStats,
   AccountBalance,
-  MarketPlatform,
-  MatchGraph,
 } from '@/types';
 import { TrendingUp, Activity, Wallet, RefreshCw, Radio } from 'lucide-react';
 import Link from 'next/link';
-
-interface BotHealth {
-  healthy: boolean;
-  running: boolean;
-  lastScan?: string;
-  lastSuccessfulScan?: string;
-  minutesSinceLastScan?: number;
-  consecutiveErrors: number;
-  totalScans: number;
-  totalErrors: number;
-  watchdogLastRun?: string;
-  minutesSinceWatchdog?: number;
-  restartAttempts: number;
-  restartThrottled: boolean;
-  lastRestartReason?: string;
-  lastScanDurationMs?: number;
-  averageScanDurationMs?: number;
-  healthReasons: string[];
-}
 
 export default function DashboardPage() {
   const [bets, setBets] = useState<Bet[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [balances, setBalances] = useState<AccountBalance[]>([]);
-  const [botRunning, setBotRunning] = useState(false);
-  const [botHealth, setBotHealth] = useState<BotHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportPeriod, setExportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
-  const [isRunningMatch, setIsRunningMatch] = useState(false);
-  const [arbableSummary, setArbableSummary] = useState<MatchGraph | null>(null);
-  const [matchError, setMatchError] = useState<string | null>(null);
-  const [manualJson, setManualJson] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-  // Snapshot download buttons fetch cached MarketSnapshot JSON via the raw API route.
-  const snapshotDownloadLinks: { platform: MarketPlatform; label: string }[] = [
-    { platform: 'kalshi', label: 'Download Kalshi JSON' },
-    { platform: 'polymarket', label: 'Download Polymarket JSON' },
-    { platform: 'sxbet', label: 'Download SX.bet JSON' },
-  ];
-  const llmSnapshotDownloadLinks: { platform: MarketPlatform; label: string }[] = [
-    { platform: 'kalshi', label: 'Download Kalshi LLM JSON' },
-    { platform: 'polymarket', label: 'Download Polymarket LLM JSON' },
-    { platform: 'sxbet', label: 'Download SX.bet LLM JSON' },
-  ];
 
   useEffect(() => {
     // Load data on mount
@@ -74,44 +33,23 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const [betsRes, statsRes, balancesRes, statusRes] = await Promise.all([
+      const [betsRes, statsRes, balancesRes] = await Promise.all([
         fetch('/api/bets'),
         fetch('/api/stats'),
         fetch('/api/balances'),
-        fetch('/api/bot/status'),
       ]);
 
       const betsData = await betsRes.json();
       const statsData = await statsRes.json();
       const balancesData = await balancesRes.json();
-      const statusData = await statusRes.json();
 
       setBets(betsData.bets || []);
       setDailyStats(statsData.stats || []);
       setBalances(balancesData.balances || []);
-      setBotRunning(statusData.running || false);
-      setBotHealth(statusData);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
       setLoading(false);
-    }
-  };
-
-  const handleBotToggle = async () => {
-    try {
-      const action = botRunning ? 'stop' : 'start';
-      const response = await fetch('/api/bot/control', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-
-      if (response.ok) {
-        setBotRunning(!botRunning);
-      }
-    } catch (error) {
-      console.error('Error toggling bot:', error);
     }
   };
 
@@ -164,63 +102,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleRunMatch = async () => {
-    setIsRunningMatch(true);
-    setMatchError(null);
-    try {
-      const response = await fetch('/api/match-graph/preview');
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        const message = data?.error || data?.message || `HTTP ${response.status}`;
-        throw new Error(message);
-      }
-      if (!data?.graph) {
-        throw new Error('Response did not include a match graph.');
-      }
-      setArbableSummary(data.graph as MatchGraph);
-    } catch (error: any) {
-      console.error('Failed to run match-graph preview:', error);
-      setMatchError(error?.message || 'Failed to run Gemini match');
-    } finally {
-      setIsRunningMatch(false);
-    }
-  };
-
-  const handleImportMatchGraph = async () => {
-    setIsImporting(true);
-    setImportError(null);
-    setImportResult(null);
-    try {
-      let parsed;
-      try {
-        parsed = JSON.parse(manualJson);
-      } catch (error) {
-        throw new Error('Pasted text is not valid JSON');
-      }
-
-      const response = await fetch('/api/match-graph/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events: parsed }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
-      }
-
-      setImportResult(
-        `Imported ${data.clusters} clusters and ${data.edges} edges at ${data.generatedAt}`
-      );
-    } catch (error: any) {
-      console.error('Failed to import manual match graph:', error);
-      setImportError(error?.message || 'Failed to import manual match graph');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -252,14 +133,6 @@ export default function DashboardPage() {
   const totalBalance = kalshiBalance + polymarketBalance + sxbetBalance;
   const totalCash = kalshiCash + polymarketCash + sxbetBalance;
 
-  // Debug logs to verify data flow [UPDATED]
-  console.log('Dashboard Balance Data [FIXED]:', {
-    kalshi: { total: kalshiBalance, cash: kalshiCash },
-    polymarket: { total: polymarketBalance, cash: polymarketCash },
-    sxbet: { total: sxbetBalance, cash: sxbetBalance },
-    total: { total: totalBalance, cash: totalCash }
-  });
-
   const avgDailyProfit = dailyStats.length > 0
     ? dailyStats.reduce((sum, stat) => sum + stat.totalProfit, 0) / dailyStats.length
     : 0;
@@ -267,59 +140,19 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header with Bot Control */}
+        {/* Header with Live Betting Link */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 mt-1">Monitor your arbitrage trading bot</p>
-            {botHealth && botRunning && (
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center space-x-4 text-sm">
-                  <div className={`flex items-center ${botHealth.healthy ? 'text-green-600' : 'text-red-600'}`}>
-                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${botHealth.healthy ? 'bg-green-600' : 'bg-red-600'} animate-pulse`}></span>
-                    {botHealth.healthy ? 'Healthy' : 'Unhealthy'}
-                  </div>
-                  <span className="text-gray-500">•</span>
-                  <span className="text-gray-600">
-                    {botHealth.totalScans} scans
-                  </span>
-                  {botHealth.minutesSinceLastScan !== undefined && (
-                    <>
-                      <span className="text-gray-500">•</span>
-                      <span className="text-gray-600">
-                        Last: {botHealth.minutesSinceLastScan}m ago
-                      </span>
-                    </>
-                  )}
-                  {botHealth.averageScanDurationMs && (
-                    <>
-                      <span className="text-gray-500">•</span>
-                      <span className="text-gray-600">
-                        Avg: {(botHealth.averageScanDurationMs / 1000).toFixed(1)}s
-                      </span>
-                    </>
-                  )}
-                </div>
-                {!botHealth.healthy && botHealth.healthReasons && botHealth.healthReasons.length > 0 && (
-                  <div className="text-xs text-red-600">
-                    {botHealth.healthReasons.join(' • ')}
-                  </div>
-                )}
-                {botHealth.restartThrottled && (
-                  <div className="text-xs text-orange-600">
-                    ⚠️ Restart throttled ({botHealth.restartAttempts}/3 restarts in last hour)
-                  </div>
-                )}
-              </div>
-            )}
+            <p className="text-gray-600 mt-1">Monitor your live arbitrage trading</p>
           </div>
           <div className="flex items-center space-x-4">
             <Link
               href="/live-arb"
-              className="px-4 py-3 rounded-lg font-semibold transition-colors bg-cyan-600 hover:bg-cyan-700 text-white flex items-center space-x-2"
+              className="px-6 py-3 rounded-lg font-semibold transition-colors bg-cyan-600 hover:bg-cyan-700 text-white flex items-center space-x-2"
             >
-              <Radio className="w-4 h-4" />
-              <span>Live Betting</span>
+              <Radio className="w-5 h-5" />
+              <span>Live Betting Control</span>
             </Link>
             <button
               onClick={handleRefreshBalances}
@@ -329,23 +162,6 @@ export default function DashboardPage() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span>{refreshing ? 'Refreshing...' : 'Refresh Balances'}</span>
             </button>
-            <button
-              onClick={handleBotToggle}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                botRunning
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
-              {botRunning ? '⏸ Stop Bot' : '▶ Start Bot'}
-            </button>
-            <div
-              className={`px-4 py-2 rounded-lg font-medium ${
-                botRunning ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              {botRunning ? '🟢 Running' : '🔴 Stopped'}
-            </div>
           </div>
         </div>
 
@@ -448,122 +264,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Snapshot Downloads - allows grabbing the cached snapshots from Redis/KV */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-2">Download latest snapshots</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Downloads the latest cached MarketSnapshot JSON directly from Redis / KV for offline inspection.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {snapshotDownloadLinks.map(({ platform, label }) => (
-              <a
-                key={platform}
-                href={`/api/snapshots/raw?platform=${platform}`}
-                className="inline-flex items-center justify-center px-4 py-3 rounded-lg bg-gray-900 text-white font-semibold hover:bg-gray-800 transition-colors text-center"
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {/* LLM-ready Snapshot Downloads - stripped JSON ready to feed into DeepSeek */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-2">Download LLM-ready snapshots</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            These snapshots are stripped down to only the fields needed for semantic matching (id, platform, type, title, expiry) so they can be sent to the LLM efficiently.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {llmSnapshotDownloadLinks.map(({ platform, label }) => (
-              <a
-                key={platform}
-                href={`/api/snapshots/llm?platform=${platform}`}
-                className="inline-flex items-center justify-center px-4 py-3 rounded-lg bg-gray-900 text-white font-semibold hover:bg-gray-800 transition-colors text-center"
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {/* Manual Match Graph Import */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-2">Manual Match Graph Import</h2>
-          <p className="text-sm text-gray-600 mb-3">
-            Paste JSON output from the Gemini UI (array of events with platforms/ids) and save it
-            as the current MatchGraph. This overwrites the existing graph in Upstash.
-          </p>
-          <textarea
-            value={manualJson}
-            onChange={(event) => setManualJson(event.target.value)}
-            rows={10}
-            className="w-full text-xs font-mono border rounded p-2 mb-3"
-            placeholder='[{ "event_name": "...", "markets": [{ "platform": "sxbet", "id": "..." }] }]'
-          />
-          <button
-            type="button"
-            onClick={handleImportMatchGraph}
-            disabled={isImporting}
-            className="px-3 py-2 rounded border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isImporting ? 'Saving…' : 'Save manual match graph'}
-          </button>
-          {importResult && (
-            <p className="mt-2 text-xs text-green-700">
-              {importResult}
-            </p>
-          )}
-          {importError && (
-            <p className="mt-2 text-xs text-red-600">
-              Error: {importError}
-            </p>
-          )}
-        </div>
-
-        {/* Gemini Arbable Markets (On Demand) */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold mb-2">Gemini Arbable Markets (On Demand)</h2>
-              <p className="text-sm text-gray-600">
-                Run the same Gemini-based matcher that powers the nightly cron. Defaults to a preview run that does not overwrite the canonical graph.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleRunMatch}
-              disabled={isRunningMatch}
-              className="px-3 py-2 rounded border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isRunningMatch ? 'Running…' : 'Run LLM match now'}
-            </button>
-          </div>
-          {arbableSummary && (
-            <div className="mt-2 text-xs text-gray-600">
-              Last on-demand run:{' '}
-              {new Date(arbableSummary.generatedAt).toLocaleString(undefined, {
-                timeZone: 'UTC',
-              })}{' '}
-              UTC — {arbableSummary.edges.length} arbable edges
-            </div>
-          )}
-          {matchError && (
-            <div className="mt-2 text-xs text-red-600">
-              Error: {matchError}
-            </div>
-          )}
-          {arbableSummary && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-xs underline">
-                Show arbable JSON
-              </summary>
-              <pre className="mt-2 max-h-80 overflow-auto text-xs bg-gray-900 text-gray-100 p-2 rounded">
-                {JSON.stringify(arbableSummary.edges, null, 2)}
-              </pre>
-            </details>
-          )}
-        </div>
-
         {/* Configuration Panel */}
         <ConfigPanel onUpdate={fetchData} />
 
@@ -573,4 +273,3 @@ export default function DashboardPage() {
     </DashboardLayout>
   );
 }
-

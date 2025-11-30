@@ -1,4 +1,4 @@
-// Core types for the arbitrage bot
+// Core types for the live arbitrage betting system
 
 export interface Market {
   id: string;
@@ -33,61 +33,6 @@ export interface MarketFilterInput {
   eventTypes?: string[];
   leagueTickers?: string[];
 }
-
-export type MarketFilterToken = keyof MarketFilterInput;
-
-export interface FilterBinding {
-  param: string;
-  strategy?: 'direct' | 'boolean' | 'csv' | 'repeat';
-  trueValue?: string | number | boolean;
-  falseValue?: string | number | boolean;
-  omitIfFalse?: boolean;
-  joinWith?: string;
-  format?: 'iso8601' | 'unixSeconds';
-  extraParams?: string[];
-}
-
-export interface AdapterPaginationConfig {
-  cursorParam?: string;
-  nextCursorPath?: string;
-  maxPages?: number;
-  limitParam?: string;
-  limit?: number;
-}
-
-export interface SnapshotMeta {
-  rawMarkets?: number;
-  withinWindow?: number;
-  hydratedWithOdds?: number;
-  stopReason?: string;
-  pagesFetched?: number;
-  reusedOdds?: number;
-  writer?: string;
-}
-
-export interface MarketAdapterConfig {
-  id: string;
-  name: string;
-  description?: string;
-  adapterType: string;
-  endpoint: string;
-  method?: 'GET' | 'POST';
-  staticParams?: Record<string, string | number | boolean>;
-  filterBindings?: Partial<Record<MarketFilterToken, FilterBinding>>;
-  pagination?: AdapterPaginationConfig;
-  minMarkets?: number;
-  notes?: string;
-}
-
-export interface PlatformSourceConfig {
-  platform: MarketPlatform;
-  docUrl?: string;
-  defaultAdapter: string;
-  supportedFilters: MarketFilterToken[];
-  adapters: Record<string, MarketAdapterConfig>;
-}
-
-export type MarketSourceConfig = Record<MarketPlatform, PlatformSourceConfig>;
 
 export interface ArbitrageOpportunity {
   id: string;
@@ -150,7 +95,7 @@ export type ExecutionMode = 'DRY_FIRE' | 'LIVE';
 
 export interface BotConfig {
   maxBetPercentage: number; // Max % of balance to bet (default 10%)
-  maxDaysToExpiry: number;   // Max days until market expiry to EXECUTE bets (default 10) - scans all markets but only bets on near-term
+  maxDaysToExpiry: number;   // Max days until market expiry to EXECUTE bets (default 10)
   minProfitMargin: number;   // Min profit margin to execute (default 1%)
   balanceThresholds: {
     kalshi: number;
@@ -163,7 +108,6 @@ export interface BotConfig {
   };
   simulationMode: boolean;   // When true, logs opportunities without placing bets (default: false)
   marketFilters?: MarketFilterPreferences;
-  matchGraphEnabled?: boolean;
   /**
    * Live arb execution mode (runtime toggle via dashboard)
    * - 'DRY_FIRE': Paper trading only (default)
@@ -204,15 +148,7 @@ export interface TrackedPlatformMarket {
 }
 
 /**
- * Storage structure for tracked markets in GitHub
- */
-export interface TrackedMarketsData {
-  markets: TrackedMarket[];
-  lastUpdated: Date;
-}
-
-/**
- * Opportunity Log - Records all arbitrage opportunities found (for simulation mode)
+ * Opportunity Log - Records all arbitrage opportunities found
  */
 export interface OpportunityLog {
   id: string;
@@ -253,71 +189,6 @@ export interface DataStore {
 export interface ProfitData {
   date: string;
   profit: number;
-}
-
-export interface MarketSnapshot {
-  schemaVersion: number;
-  platform: MarketPlatform;
-  fetchedAt: string;
-  maxDaysToExpiry?: number;
-  adapterId?: string;
-  filters?: MarketFilterInput;
-  totalMarkets: number;
-  markets: Market[];
-  meta?: SnapshotMeta;
-}
-
-export interface LlmReadyMarket {
-  id: string;
-  platform: MarketPlatform;
-  type: 'prediction' | 'sportsbook';
-  title: string;
-  expiry: string;
-  category?: string;
-  leagueOrTopic?: string;
-}
-
-export interface LlmReadySnapshot {
-  platform: MarketPlatform;
-  generatedAt: string;
-  totalMarkets: number;
-  markets: LlmReadyMarket[];
-}
-
-export type MarketKey = `${MarketPlatform}:${string}`;
-
-export type MatchEdgeType =
-  | 'same_event'
-  | 'same_outcome'
-  | 'opposite_outcome'
-  | 'subset';
-
-export interface MatchEdge {
-  id: string;
-  type: MatchEdgeType;
-  markets: MarketKey[];
-  confidence: number;
-  annotation?: string;
-}
-
-export interface EventCluster {
-  id: string;
-  label?: string;
-  markets: MarketKey[];
-}
-
-export interface MatchGraphMetadata {
-  model?: string;
-  requestMarkets?: Record<MarketPlatform, number>;
-  notes?: string[];
-}
-
-export interface MatchGraph {
-  version: number;
-  generatedAt: string;
-  clusters: EventCluster[];
-  edges: MatchEdge[];
-  metadata?: MatchGraphMetadata;
 }
 
 // Re-export live-arb types for convenience

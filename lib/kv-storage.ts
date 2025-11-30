@@ -48,7 +48,6 @@ const DEFAULT_CONFIG: BotConfig = {
     eventTypes: [],
     leagueTickers: [],
   },
-  matchGraphEnabled: false,
   liveExecutionMode: 'DRY_FIRE', // Default to paper trading for safety
 };
 

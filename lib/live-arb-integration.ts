@@ -1,14 +1,13 @@
 /**
  * Live Arb Integration
  *
- * Provides integration hooks for the bot to initialize and use
- * live-event arbitrage alongside the existing snapshot pipeline.
+ * Provides integration hooks for initializing and using the live-event arbitrage system.
  *
  * SAFETY CHECK ARCHITECTURE:
  * ==========================
- * This module integrates live arb safety checks with the existing risk logic:
+ * This module provides layered safety checks:
  *
- * 1. EXISTING RISK CHECKS (in bot.ts):
+ * 1. CORE RISK CHECKS:
  *    - validateOpportunity() - profit margin validation
  *    - Expiry window checks (maxDaysToExpiry)
  *    - Bet size limits (maxBetPercentage)
@@ -26,12 +25,12 @@
  *    - Then standard risk checks apply
  *    - Both must pass for execution
  *
- * Usage in bot.ts:
+ * Usage:
  * ```
  * import { initializeLiveArb, shutdownLiveArb, checkLiveArbSafety } from './live-arb-integration';
  *
- * // In bot startup:
- * await initializeLiveArb(config, hotMarketTracker);
+ * // Initialize:
+ * await initializeLiveArb(config);
  *
  * // Before executing a live opportunity:
  * const safetyResult = checkLiveArbSafety(liveOpp);
@@ -39,9 +38,8 @@
  *   console.log('Blocked:', safetyResult.blockers);
  *   return;
  * }
- * // Then proceed with existing execution (bet sizes, validation, etc.)
  *
- * // In bot shutdown:
+ * // Shutdown:
  * await shutdownLiveArb();
  * ```
  */
@@ -53,7 +51,6 @@ import {
   LiveArbSafetyChecker,
   ComprehensiveSafetyCheck,
 } from './live-arb-safety';
-import { HotMarketTracker } from './hot-market-tracker';
 import {
   LiveArbConfig,
   LiveArbOpportunity,
@@ -100,12 +97,10 @@ export function buildLiveArbConfig(
  * Call this during bot startup if live arb is enabled.
  *
  * @param botConfig Current bot configuration
- * @param hotMarketTracker Reference to the HotMarketTracker
  * @returns Whether initialization succeeded
  */
 export async function initializeLiveArb(
-  botConfig: BotConfig,
-  hotMarketTracker?: HotMarketTracker
+  botConfig: BotConfig
 ): Promise<boolean> {
   const runtimeConfig = await loadLiveArbRuntimeConfig();
   const config = buildLiveArbConfig(botConfig, runtimeConfig);
@@ -119,7 +114,7 @@ export async function initializeLiveArb(
     console.log('[LiveArbIntegration] Initializing live arb system...');
 
     // Initialize the manager
-    await LiveArbManager.initialize(config, hotMarketTracker);
+    await LiveArbManager.initialize(config);
 
     // Initialize safety checker
     getLiveArbSafetyChecker({
@@ -515,10 +510,7 @@ export function isLiveArbActive(): boolean {
  * Filter markets to only include live/in-play events.
  * Uses SX.bet notion of "live" and time-based heuristics for others.
  */
-export function filterLiveEvents(
-  markets: Market[],
-  hotMarketTracker?: HotMarketTracker
-): Market[] {
+export function filterLiveEvents(markets: Market[]): Market[] {
   const now = Date.now();
   const oneHourMs = 3600000;
   const threeHoursMs = 3 * oneHourMs;

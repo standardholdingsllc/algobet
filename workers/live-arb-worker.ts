@@ -1,4 +1,4 @@
-import { MarketFeedService } from '../lib/market-feed-service';
+import { LiveMarketFetcher } from '../lib/live-market-fetcher';
 import { KVStorage } from '../lib/kv-storage';
 import { BotConfig, AccountBalance } from '@/types';
 import { LiveArbManager } from '../lib/live-arb-manager';
@@ -22,7 +22,7 @@ const DEFAULT_REFRESH_INTERVAL_MS = parseInt(
 );
 
 class LiveArbWorker {
-  private feedService = new MarketFeedService();
+  private marketFetcher = new LiveMarketFetcher();
   private running = false;
   private refreshTimer: NodeJS.Timeout | null = null;
   private adapters: PlatformAdapters;
@@ -92,18 +92,18 @@ class LiveArbWorker {
 
   private async refreshMarkets(botConfig: BotConfig): Promise<void> {
     try {
-      const filters = this.feedService.buildFiltersFromConfig(botConfig);
-      const results = await this.feedService.fetchLiveMarketsForPlatforms(filters);
-      const markets = Object.values(results).flatMap(({ markets }) => markets);
+      const filters = this.marketFetcher.buildFiltersFromConfig(botConfig);
+      const results = await this.marketFetcher.fetchAllPlatforms(filters);
+      const markets = Object.values(results).flatMap((r) => r.markets);
 
       await refreshRegistry(markets);
 
       liveArbLog('debug', WORKER_TAG, 'Registry refresh complete', {
         totalMarkets: markets.length,
         perPlatform: Object.fromEntries(
-          Object.entries(results).map(([platform, { markets }]) => [
+          Object.entries(results).map(([platform, result]) => [
             platform,
-            markets.length,
+            result.markets.length,
           ])
         ),
       });
@@ -208,4 +208,3 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   worker.stop().finally(() => process.exit(0));
 });
-

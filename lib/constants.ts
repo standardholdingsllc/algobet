@@ -15,19 +15,7 @@ export const MIN_PROFIT_THRESHOLD = 0.5; // 0.5% minimum profit after fees
 // Refresh intervals
 export const MARKET_SCAN_INTERVAL = 30000; // 30 seconds
 export const BALANCE_CHECK_INTERVAL = 300000; // 5 minutes
-export const SNAPSHOT_REFRESH_INTERVAL_MS = 20000; // 20 seconds default snapshot refresh
-
-// Market snapshot settings
-export const MARKET_SNAPSHOT_TTL_SECONDS = 300; // 5 minutes
-export const MARKET_SNAPSHOT_KV_PREFIX = 'market-snapshots';
-
-// Match graph settings
-export const MATCH_GRAPH_VERSION = 1;
-export const MATCH_GRAPH_KV_KEY = 'match-graph:latest';
-export const MATCH_GRAPH_TTL_SECONDS = 86400; // 24 hours
-export const MATCH_GRAPH_FILE_NAME = 'match-graph.json';
 
 // Data file paths
 export const DATA_FILE_PATH = 'data/store.json';
 export const PROFIT_HISTORY_PATH = 'data/profit_history.json';
-

@@ -13,13 +13,12 @@
  *
  * From your logs + ARCHITECTURE:
  *
- *   - The Bot Engine (lib/bot.ts) calls your Polymarket client (lib/markets/polymarket.ts)
+ *   - The live-arb worker calls this Polymarket client (lib/markets/polymarket.ts)
  *     to fetch markets.
  *
  *   - Those markets are normalized and fed into:
  *       - Arbitrage detector (lib/arbitrage.ts)
- *       - Hot Market Tracker (lib/hot-market-tracker.ts)
- *       - Adaptive Scanner (lib/adaptive-scanner.ts)
+ *       - Live event registry and matcher
  *
  *   - Risk constraints (maxDaysToExpiry, etc) are applied in the arbitrage layer,
  *     not inside the Polymarket client itself. So the client's job is:
@@ -129,7 +128,7 @@
  *             }[]
  *           }
  *
- *       - This fits your `lib/arbitrage.ts` / `lib/hot-market-tracker.ts` style:
+ *       - This fits the `lib/arbitrage.ts` style:
  *           - platform-specific clients normalize into a common shape
  *           - arbitrage engine only cares about platform + outcomes + prices + expiry
  *

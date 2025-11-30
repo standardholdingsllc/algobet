@@ -6,7 +6,7 @@
  * This script tests the live arb components:
  * 1. LivePriceCache operations
  * 2. WebSocket client connections (if credentials are available)
- * 3. Integration with existing MarketFeedService
+ * 3. Safety checks and configuration
  */
 
 import { LivePriceCache, priceToImpliedProbability } from '../lib/live-price-cache';

@@ -7,9 +7,7 @@
  * - LiveEventMatcher updates
  * - LiveEventWatchers management
  * - Rate limiting for REST calls
- * - Integration with existing bot infrastructure
- *
- * This runs alongside (not replacing) the existing HotMarketTracker system.
+ * - Integration with the live-arb worker infrastructure
  */
 
 import {

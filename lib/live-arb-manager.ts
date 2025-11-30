@@ -5,14 +5,12 @@
  * This is the main integration point that ties:
  * - WebSocket clients (SX.bet, Polymarket, Kalshi)
  * - LivePriceCache
- * - HotMarketTracker
- * - Existing arbitrage detection
+ * - Arbitrage detection via live-sports-orchestrator
  *
  * Design decisions:
  * - Singleton pattern matching existing lib/ modules
  * - Non-blocking initialization (WS connects can happen in background)
- * - Integrates with existing AdaptiveScanner and HotMarketTracker
- * - Respects existing circuit breakers and config
+ * - Respects circuit breakers and config
  * - Smart subscription management to avoid subscribing to everything
  * - Debounced subscription updates to prevent thrashing
  */
@@ -35,7 +33,6 @@ import { LivePriceCache } from './live-price-cache';
 import { getSxBetWsClient, SxBetWsClient } from '@/services/sxbet-ws';
 import { getPolymarketWsClient, PolymarketWsClient } from '@/services/polymarket-ws';
 import { getKalshiWsClient, KalshiWsClient } from '@/services/kalshi-ws';
-import { HotMarketTracker } from './hot-market-tracker';
 import { scanArbitrageOpportunities } from './arbitrage';
 import { liveArbLog } from './live-arb-logger';
 
@@ -90,7 +87,7 @@ class LiveArbManagerImpl {
   private polymarketWs: PolymarketWsClient | null = null;
   private kalshiWs: KalshiWsClient | null = null;
 
-  private hotMarketTracker: HotMarketTracker | null = null;
+  private trackedMarkets: TrackedMarket[] = [];
   private isInitialized = false;
 
   private priceUpdateHandlers: Set<LivePriceHandler> = new Set();
@@ -139,8 +136,7 @@ class LiveArbManagerImpl {
    * Connects to all WebSocket feeds and sets up event handlers.
    */
   async initialize(
-    config?: Partial<LiveArbConfig>,
-    tracker?: HotMarketTracker
+    config?: Partial<LiveArbConfig>
   ): Promise<void> {
     if (this.isInitialized) {
       liveArbLog('debug', LOG_TAG, 'initialize() called but manager is already initialized');
@@ -181,8 +177,6 @@ class LiveArbManagerImpl {
       LOG_TAG,
       `Config snapshot: liveEventsOnly=${this.subscriptionConfig.liveEventsOnly}, maxMarketsPerPlatform=${this.subscriptionConfig.maxMarketsPerPlatform}`
     );
-
-    this.hotMarketTracker = tracker ?? null;
 
     // Set up cache event handlers
     this.setupCacheHandlers();
@@ -380,15 +374,15 @@ class LiveArbManagerImpl {
   }
 
   /**
-   * Update subscriptions based on current hot markets.
+   * Update subscriptions based on current tracked markets.
    * Called after debounce timer expires.
    */
   private updateSubscriptions(reasons: string[] = []): void {
-    if (!this.isInitialized || !this.hotMarketTracker) {
+    if (!this.isInitialized) {
       liveArbLog(
         'debug',
         LOG_TAG,
-        'Skipping subscription update because HotMarketTracker is unavailable or manager not initialized'
+        'Skipping subscription update because manager not initialized'
       );
       return;
     }
@@ -459,21 +453,17 @@ class LiveArbManagerImpl {
    * Filters based on config (live events only, max per platform, etc.)
    */
   private getMarketsToSubscribe(): TrackedMarket[] {
-    if (!this.hotMarketTracker) {
-      return [];
-    }
-
-    let trackedMarkets = this.hotMarketTracker.getAllTrackedMarkets();
+    let result = [...this.trackedMarkets];
 
     // Filter to live events only if configured
     if (this.subscriptionConfig.liveEventsOnly) {
-      trackedMarkets = trackedMarkets.filter(m => m.isLive);
+      result = result.filter(m => m.isLive);
     } else {
       // Otherwise, include imminent events (expiring soon)
       const now = Date.now();
       const imminentCutoff = now + this.subscriptionConfig.imminentHours * 60 * 60 * 1000;
       
-      trackedMarkets = trackedMarkets.filter(m => {
+      result = result.filter(m => {
         if (m.isLive) return true;
         const expiryMs = new Date(m.expiryDate).getTime();
         return expiryMs > now && expiryMs <= imminentCutoff;
@@ -481,13 +471,13 @@ class LiveArbManagerImpl {
     }
 
     // Sort by priority: live first, then by expiry (soonest first)
-    trackedMarkets.sort((a, b) => {
+    result.sort((a, b) => {
       if (a.isLive && !b.isLive) return -1;
       if (!a.isLive && b.isLive) return 1;
       return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
     });
 
-    return trackedMarkets;
+    return result;
   }
 
   /**
@@ -553,7 +543,6 @@ class LiveArbManagerImpl {
 
   /**
    * Subscribe to live updates for tracked markets.
-   * Call this after HotMarketTracker has been populated.
    * Now uses debounced smart subscription management.
    */
   subscribeToTrackedMarkets(trackedMarkets: TrackedMarket[]): void {
@@ -606,10 +595,7 @@ class LiveArbManagerImpl {
     this.lastArbCheckTime = now;
 
     // Find matching markets across platforms
-    if (!this.hotMarketTracker) return;
-
-    const tracked = this.hotMarketTracker.getAllTrackedMarkets();
-    const matchingTracked = tracked.find((t) =>
+    const matchingTracked = this.trackedMarkets.find((t) =>
       t.platforms.some((p) => p.marketId === marketId && p.platform === platform)
     );
 
@@ -936,11 +922,11 @@ class LiveArbManagerImpl {
   }
 
   /**
-   * Set the HotMarketTracker reference
+   * Set tracked markets for subscription management
    */
-  setHotMarketTracker(tracker: HotMarketTracker): void {
-    this.hotMarketTracker = tracker;
-    // Trigger subscription update with new tracker
+  setTrackedMarkets(markets: TrackedMarket[]): void {
+    this.trackedMarkets = markets;
+    // Trigger subscription update with new markets
     this.scheduleSubscriptionUpdate();
   }
 
