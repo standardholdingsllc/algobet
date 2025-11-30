@@ -45,9 +45,9 @@ Each platform has a dedicated WebSocket client following the same pattern:
 
 | Platform | Location | Features |
 |----------|----------|----------|
-| **SX.bet** | `services/sxbet-ws.ts` | Best-odds, live-scores, line-changes feeds; individual market subscriptions |
+| **SX.bet** | `services/sxbet-ws.ts` | Best-odds, live-scores, line-changes feeds; configurable WS endpoint via `SXBET_WS_URL` (empty = REST-only fallback) |
 | **Polymarket** | `services/polymarket-ws.ts` | Orderbook updates and last trade prices per market |
-| **Kalshi** | `services/kalshi-ws.ts` | Orderbook deltas and ticker updates |
+| **Kalshi** | `services/kalshi-ws.ts` | Orderbook deltas and ticker updates (WS handshake reuses RSA-PSS headers via `buildKalshiAuthHeaders`) |
 
 ### 2.3 Market Fetching
 
@@ -376,7 +376,7 @@ This ensures all feature flags can be changed via the UI without redeployment.
 | `LIVE_ARB_MAX_SLIPPAGE_BPS` | `100` | Max slippage (basis points) |
 | `LIVE_ARB_LOG_LEVEL` | `info` | Log level (`info` or `debug`) |
 | `LIVE_ARB_WORKER_REFRESH_MS` | `15000` | Market refresh interval |
-| `SXBET_WS_URL` | `wss://api.sx.bet/ws` | SX.bet WebSocket URL |
+| `SXBET_WS_URL` | _(none — configure vendor URL)_ | SX.bet WebSocket URL (set to Ably endpoint; leave blank to disable WS client) |
 | `POLYMARKET_WS_URL` | `wss://ws-subscriptions-clob.polymarket.com/ws/market` | Polymarket WS |
 
 ---

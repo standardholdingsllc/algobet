@@ -5,6 +5,7 @@ import { isDryFireMode } from '../execution-wrapper';
 
 const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';
+export const KALSHI_WS_SIGNATURE_PATH = '/trade-api/ws/v2';
 const KALSHI_PAGE_LIMIT = 200;
 const KALSHI_MAX_PAGES = 8;
 const KALSHI_TARGET_MARKETS = 150;
@@ -39,6 +40,116 @@ interface KalshiMarketsResponse {
   cursor?: string;
 }
 
+let cachedKalshiPrivateKey: string | null = null;
+
+function formatKalshiPrivateKey(key: string): string {
+  if (!key) return '';
+
+  let formattedKey = key.trim();
+
+  if (formattedKey.includes('\\n')) {
+    formattedKey = formattedKey.replace(/\\n/g, '\n');
+  }
+
+  if (formattedKey.includes('-----BEGIN') && !formattedKey.includes('\n')) {
+    formattedKey = formattedKey
+      .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, match => `${match}\n`)
+      .replace(/-----END (RSA )?PRIVATE KEY-----/, match => `\n${match}`)
+      .replace(/\s+/g, '\n');
+  }
+
+  if (!formattedKey.includes('-----BEGIN')) {
+    formattedKey = `-----BEGIN RSA PRIVATE KEY-----\n${formattedKey}\n-----END RSA PRIVATE KEY-----`;
+  }
+
+  if (formattedKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+    try {
+      const keyObject = crypto.createPrivateKey({
+        key: formattedKey,
+        format: 'pem',
+        type: 'pkcs1',
+      });
+      formattedKey = keyObject.export({
+        type: 'pkcs8',
+        format: 'pem',
+      }) as string;
+    } catch (error) {
+      console.error('Failed to convert RSA key to PKCS#8:', (error as Error).message);
+    }
+  }
+
+  return formattedKey;
+}
+
+function getFormattedKalshiPrivateKey(): string {
+  if (cachedKalshiPrivateKey) {
+    return cachedKalshiPrivateKey;
+  }
+  cachedKalshiPrivateKey = formatKalshiPrivateKey(process.env.KALSHI_PRIVATE_KEY || '');
+  return cachedKalshiPrivateKey;
+}
+
+function serializeKalshiBody(body?: any): string {
+  if (body === undefined || body === null) {
+    return '';
+  }
+
+  if (typeof body === 'string') {
+    return body === '{}' ? '' : body;
+  }
+
+  const serialized = JSON.stringify(body);
+  return serialized === '{}' ? '' : serialized;
+}
+
+export async function buildKalshiAuthHeaders(
+  method: string,
+  path: string,
+  body?: any
+): Promise<Record<string, string>> {
+  const apiKey = process.env.KALSHI_API_KEY || '';
+  const email = process.env.KALSHI_EMAIL || '';
+  const privateKey = getFormattedKalshiPrivateKey();
+
+  if (!apiKey || !privateKey) {
+    throw new Error('Missing Kalshi API credentials');
+  }
+
+  const timestamp = Date.now().toString();
+  const bodyString = serializeKalshiBody(body);
+  const message = `${timestamp}${method.toUpperCase()}${path}${bodyString}`;
+
+  let signature: string;
+  try {
+    signature = crypto
+      .sign('sha256', Buffer.from(message), {
+        key: privateKey,
+        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+        saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
+      })
+      .toString('base64');
+  } catch (error: any) {
+    console.error('Error signing Kalshi request:', error.message);
+    throw error;
+  }
+
+  const headers: Record<string, string> = {
+    'KALSHI-ACCESS-KEY': apiKey,
+    'KALSHI-ACCESS-SIGNATURE': signature,
+    'KALSHI-ACCESS-TIMESTAMP': timestamp,
+  };
+
+  if (email) {
+    headers['KALSHI-ACCESS-EMAIL'] = email;
+  }
+
+  if (bodyString) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  return headers;
+}
+
 export class KalshiAPI {
   private apiKey: string;
   private privateKey: string;
@@ -46,60 +157,8 @@ export class KalshiAPI {
 
   constructor() {
     this.apiKey = process.env.KALSHI_API_KEY || '';
-    this.privateKey = this.formatPrivateKey(process.env.KALSHI_PRIVATE_KEY || '');
+    this.privateKey = getFormattedKalshiPrivateKey();
     this.email = process.env.KALSHI_EMAIL || '';
-  }
-
-  private formatPrivateKey(key: string): string {
-    if (!key) return '';
-    
-    let formattedKey = key;
-
-    // 1. Handle escaped newlines (common in .env files)
-    // Replaces literal "\n" with actual newline character
-    if (formattedKey.includes('\\n')) {
-      formattedKey = formattedKey.replace(/\\n/g, '\n');
-    }
-    
-    // 2. Handle if the key was flattened to a single line without escaped newlines
-    // e.g. "-----BEGIN PRIVATE KEY----- MII... -----END PRIVATE KEY-----"
-    if (formattedKey.includes('-----BEGIN') && !formattedKey.includes('\n')) {
-      formattedKey = formattedKey
-        .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, match => `${match}\n`)
-        .replace(/-----END (RSA )?PRIVATE KEY-----/, match => `\n${match}`)
-        .replace(/\s+/g, '\n'); // Be careful with this, it might break the body if there are spaces
-    }
-
-    // 3. Ensure it has headers if missing (raw base64)
-    if (!formattedKey.includes('-----BEGIN')) {
-      // If missing headers, it's likely a raw RSA key. 
-      // Use RSA PRIVATE KEY as standard wrapper for raw keys.
-      formattedKey = `-----BEGIN RSA PRIVATE KEY-----\n${formattedKey}\n-----END RSA PRIVATE KEY-----`;
-    }
-
-    // 4. Try to convert RSA PRIVATE KEY (PKCS#1) to PRIVATE KEY (PKCS#8) if needed
-    // Kalshi often provides RSA keys, but Node.js crypto prefers PKCS#8
-    if (formattedKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-      try {
-        const crypto = require('crypto');
-        // Try to parse as RSA key and convert to PKCS#8
-        const keyObject = crypto.createPrivateKey({
-          key: formattedKey,
-          format: 'pem',
-          type: 'pkcs1'
-        });
-        // Export as PKCS#8 format
-        formattedKey = keyObject.export({
-          type: 'pkcs8',
-          format: 'pem'
-        }) as string;
-      } catch (error) {
-        // If conversion fails, return original
-        console.error('Failed to convert RSA key to PKCS#8:', error);
-      }
-    }
-    
-    return formattedKey;
   }
 
   /**
@@ -156,62 +215,12 @@ export class KalshiAPI {
     return feePercentage;
   }
 
-  private async generateAuthHeaders(method: string, path: string, body?: any): Promise<Record<string, string>> {
-    const timestamp = Date.now().toString();
-    
-    // CRITICAL: For GET/DELETE requests, body MUST be empty string, not undefined, null, or {}
-    // Kalshi signature format: ${timestamp}${METHOD}${path}${body}
-    // Any deviation (including "{}", "undefined", "null", or spaces) breaks authentication
-    let bodyString = '';
-    if (body !== undefined && body !== null) {
-      const serialized = JSON.stringify(body);
-      // Only use body if it's not an empty object
-      if (serialized !== '{}') {
-        bodyString = serialized;
-      }
-    }
-    
-    // Create signature - EXACT format required by Kalshi
-    // CRITICAL: Kalshi requires RSA-PSS signature, not PKCS#1 v1.5!
-    const message = `${timestamp}${method.toUpperCase()}${path}${bodyString}`;
-    
-    let signature;
-    try {
-      // Use RSA-PSS padding as required by Kalshi API
-      signature = crypto.sign('sha256', Buffer.from(message), {
-        key: this.privateKey,
-        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-        saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
-      });
-      
-      // Convert to base64
-      signature = signature.toString('base64');
-    } catch (error: any) {
-      console.error('Error signing Kalshi request:', error.message);
-      // Log key debug info (safe)
-      const keyLines = this.privateKey.split('\n');
-      console.error('Key format debug:', {
-        length: this.privateKey.length,
-        hasHeaders: this.privateKey.includes('-----BEGIN'),
-        headerType: keyLines[0],
-        lines: keyLines.length
-      });
-      throw error;
-    }
-
-    // Build headers - only include Content-Type for requests with body
-    const headers: Record<string, string> = {
-      'KALSHI-ACCESS-KEY': this.apiKey,
-      'KALSHI-ACCESS-SIGNATURE': signature,
-      'KALSHI-ACCESS-TIMESTAMP': timestamp,
-    };
-    
-    // Only add Content-Type if we have a body
-    if (bodyString) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
+  private async generateAuthHeaders(
+    method: string,
+    path: string,
+    body?: any
+  ): Promise<Record<string, string>> {
+    return buildKalshiAuthHeaders(method, path, body);
   }
 
   async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {

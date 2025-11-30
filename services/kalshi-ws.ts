@@ -22,6 +22,7 @@ import {
 } from '@/types/live-arb';
 import { LivePriceCache } from '@/lib/live-price-cache';
 import { liveArbLog } from '@/lib/live-arb-logger';
+import { buildKalshiAuthHeaders, KALSHI_WS_SIGNATURE_PATH } from '@/lib/markets/kalshi';
 
 const WS_LOG_TAG = 'KALSHI-WS';
 const RECONNECT_WARNING_MS = 15000;
@@ -134,6 +135,17 @@ export class KalshiWsClient {
       return;
     }
 
+    let authHeaders: Record<string, string>;
+    try {
+      authHeaders = await buildKalshiAuthHeaders('GET', KALSHI_WS_SIGNATURE_PATH);
+    } catch (error: any) {
+      const message = error?.message ?? 'Failed to build Kalshi auth headers';
+      wsError(message);
+      this.errorMessage = message;
+      this.setState('error');
+      return;
+    }
+
     this.setState('connecting');
     wsInfo(`Connecting to ${this.wsUrl}...`);
 
@@ -148,7 +160,9 @@ export class KalshiWsClient {
       }, this.config.connectionTimeoutMs);
 
       try {
-        this.ws = new WebSocket(this.wsUrl);
+        this.ws = new WebSocket(this.wsUrl, {
+          headers: authHeaders,
+        });
 
         this.ws.on('open', () => {
           clearTimeout(timeout);

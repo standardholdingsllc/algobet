@@ -49,8 +49,8 @@ import { liveArbLog } from '@/lib/live-arb-logger';
 // Configuration
 // ============================================================================
 
-/** Default SX.bet WebSocket URL - may need to be Ably endpoint in production */
-const DEFAULT_SXBET_WS_URL = 'wss://api.sx.bet/ws';
+/** SX.bet WebSocket URL (configured via env; empty disables WS client) */
+const CONFIGURED_SXBET_WS_URL = (process.env.SXBET_WS_URL || '').trim();
 const WS_LOG_TAG = 'SXBET-WS';
 const RECONNECT_WARNING_MS = 15000;
 const wsInfo = (message: string, meta?: unknown) =>
@@ -150,11 +150,17 @@ export class SxBetWsClient {
 
   private readonly wsUrl: string;
   private readonly apiKey: string;
+  private readonly wsDisabled: boolean;
 
   constructor(config?: Partial<WsClientConfig>) {
     this.config = { ...DEFAULT_WS_CONFIG, ...config };
-    this.wsUrl = process.env.SXBET_WS_URL || DEFAULT_SXBET_WS_URL;
+    this.wsUrl = CONFIGURED_SXBET_WS_URL;
     this.apiKey = process.env.SXBET_API_KEY || '';
+    this.wsDisabled = !this.wsUrl;
+
+    if (this.wsDisabled) {
+      wsWarn('SXBET_WS_URL not configured; SX.bet WebSocket client disabled (REST-only mode).');
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -169,6 +175,13 @@ export class SxBetWsClient {
    * 2. Using the Ably client library instead of raw WebSocket
    */
   async connect(): Promise<void> {
+    if (this.wsDisabled) {
+      const error = 'SXBET_WS_URL not configured';
+      this.errorMessage = error;
+      this.setState('error');
+      return;
+    }
+
     if (this.state === 'connected' || this.state === 'connecting') {
       wsInfo('Already connected or connecting');
       return;
