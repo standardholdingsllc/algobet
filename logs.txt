@@ -1,26 +1,30 @@
-2025-11-23 05:01:10.767 [info] [2025-11-23T05:01:10.767Z] Cron scan starting...
-2025-11-23 05:01:10.769 [info] [2025-11-23T05:01:10.769Z] Scanning for arbitrage opportunities...
-2025-11-23 05:01:10.928 [info] [Kalshi] ✅ Cash balance: $0.83
-2025-11-23 05:01:10.928 [info] [Kalshi] 💼 Portfolio value: $27.97
-2025-11-23 05:01:10.928 [info] [Kalshi] 💰 Positions value: $27.14
-2025-11-23 05:01:10.928 [info] [Kalshi] 💵 Total value: $27.97
-2025-11-23 05:01:10.973 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
-2025-11-23 05:01:11.072 [info] [Polymarket] 💵 Available cash: $10.01
-2025-11-23 05:01:11.072 [info] [Polymarket] 📊 Positions value: $23.36
-2025-11-23 05:01:11.072 [info] [Polymarket] ✅ Total account value: $33.37
-2025-11-23 05:01:11.304 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
-2025-11-23 05:01:11.304 [info] 💰 Polymarket: Total $33.37 (Cash: $10.01, Positions: $23.36)
-2025-11-23 05:01:11.304 [info] 💰 SX.bet: $0.00
-2025-11-23 05:01:11.329 [info] [BotConfig] maxDaysToExpiry=10d, minProfitMargin=0.5%, maxBetPercentage=10%, simulationMode=false. Snapshot window: 2025-11-23T05:01:11.329Z → 2025-12-03T05:01:11.329Z. Filters: sportsOnly=false, categories=0, eventTypes=0, leagues=0, maxMarkets=∞
-2025-11-23 05:01:11.406 [info] [MarketFeed] Using redis snapshot for kalshi: fetched 11.8s ago (max 5.0m) at 2025-11-23T05:00:59.597Z, schema v2, markets=1600/1600, adapter=rest-default, maxDaysToExpiry=10, filters=[start=2025-11-23T05:00:11.396Z, end=2025-12-03T05:00:11.396Z], rawMarkets=n/a, withinWindow=n/a, hydratedWithOdds=n/a, reusedOdds=n/a, writer=bot-self-heal, stopReason=n/a
-2025-11-23 05:01:11.473 [info] [MarketFeed] Using redis snapshot for polymarket: fetched 11.9s ago (max 5.0m) at 2025-11-23T05:00:59.603Z, schema v2, markets=1995/1995, adapter=hybrid-clob, maxDaysToExpiry=10, filters=[start=2025-11-23T05:00:11.396Z, end=2025-12-03T05:00:11.396Z], rawMarkets=n/a, withinWindow=n/a, hydratedWithOdds=n/a, reusedOdds=n/a, writer=bot-self-heal, stopReason=n/a
-2025-11-23 05:01:11.500 [info] [MarketFeed] Using redis snapshot for sxbet: fetched 11.9s ago (max 5.0m) at 2025-11-23T05:00:59.611Z, schema v2, markets=894/894, adapter=rest-active, maxDaysToExpiry=10, filters=[start=2025-11-23T05:00:11.396Z, end=2025-12-03T05:00:11.396Z], rawMarkets=2000, withinWindow=1341, hydratedWithOdds=894, reusedOdds=0, writer=bot-self-heal, stopReason=maxPages cap (40)
-2025-11-23 05:01:11.517 [info] [MarketFilter] kalshi: total=1600, withinExecutionWindow=1600, expired=0, beyondWindow=0, invalidExpiry=0
-2025-11-23 05:01:11.517 [info] [MarketFilter] polymarket: total=1995, withinExecutionWindow=1995, expired=0, beyondWindow=0, invalidExpiry=0
-2025-11-23 05:01:11.517 [info] [MarketFilter] sxbet: total=894, withinExecutionWindow=894, expired=0, beyondWindow=0, invalidExpiry=0
-2025-11-23 05:01:11.517 [info] Found 1600 Kalshi, 1995 Polymarket, and 894 sx.bet markets
-2025-11-23 05:01:11.539 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
-2025-11-23 05:01:11.539 [info] [HotMarketTracker] tracked=0, new=0, dropped=0, sample=none
-2025-11-23 05:01:11.539 [info] [ArbMatch] Cross-platform candidate pairs=0 across 0 tracked market(s)
-2025-11-23 05:01:11.539 [warning] [Bot] No cross-platform candidates after filters; per-platform totals kalshi=1600, polymarket=1995, sxbet=894. If this persists, review filter config or snapshot freshness.
-2025-11-23 05:01:11.539 [info] [ArbMatch] Tracked combinations summary: candidates=0, profitablePairs=0, opportunities=0 (minProfitMargin=0.5%)
+2025-11-30 04:09:48.724 [info] [ArbMatch] General scan summary: candidates=0, profitablePairs=0, opportunities=0 (minProfitMargin=0.5%)
+2025-11-30 04:09:48.724 [info] Found 0 total arbitrage opportunities (0 from tracked markets, 0 from general scan)
+2025-11-30 04:09:48.742 [info] 🔴 LIVE EVENTS DETECTED (145) - Scanning every 5 seconds
+2025-11-30 04:09:48.742 [info] [2025-11-30T04:09:48.734Z] Cron scan completed successfully in 24487ms
+2025-11-30 04:09:24.247 [info] [2025-11-30T04:09:24.247Z] Cron scan starting...
+2025-11-30 04:09:24.248 [info] [2025-11-30T04:09:24.247Z] Scanning for arbitrage opportunities...
+2025-11-30 04:09:24.508 [info] [Kalshi] ✅ Cash balance: $0.83
+2025-11-30 04:09:24.508 [info] [Kalshi] 💼 Portfolio value: $27.97
+2025-11-30 04:09:24.508 [info] [Kalshi] 💰 Positions value: $27.14
+2025-11-30 04:09:24.508 [info] [Kalshi] 💵 Total value: $27.97
+2025-11-30 04:09:24.579 [info] [Polymarket] 💵 Wallet USDC balance: $10.01
+2025-11-30 04:09:24.630 [info] [Polymarket] 💵 Available cash: $10.01
+2025-11-30 04:09:24.630 [info] [Polymarket] 📊 Positions value: $24.02
+2025-11-30 04:09:24.630 [info] [Polymarket] ✅ Total account value: $34.03
+2025-11-30 04:09:24.726 [info] 💰 Kalshi: Total $27.97 (Cash: $0.83, Positions: $27.14)
+2025-11-30 04:09:24.726 [info] 💰 Polymarket: Total $34.03 (Cash: $10.01, Positions: $24.02)
+2025-11-30 04:09:24.726 [info] 💰 SX.bet: $0.00
+2025-11-30 04:09:24.732 [info] [BotConfig] maxDaysToExpiry=10d, minProfitMargin=0.5%, maxBetPercentage=10%, simulationMode=true. Snapshot window: 2025-11-30T04:09:24.732Z → 2025-12-10T04:09:24.732Z. Filters: sportsOnly=false, categories=0, eventTypes=0, leagues=0, maxMarkets=∞
+2025-11-30 04:09:24.748 [info] [MarketFeed] Using redis snapshot for kalshi: fetched 2.1m ago (max 5.0m) at 2025-11-30T04:07:18.876Z, schema v2, markets=1600/1600, adapter=rest-default, maxDaysToExpiry=10, filters=[start=2025-11-30T04:06:24.716Z, end=2025-12-10T04:06:24.716Z, sportsOnly=false], rawMarkets=n/a, withinWindow=n/a, hydratedWithOdds=n/a, reusedOdds=n/a, writer=bot-self-heal, stopReason=n/a
+2025-11-30 04:09:24.769 [info] [MarketFeed] Using redis snapshot for polymarket: fetched 2.1m ago (max 5.0m) at 2025-11-30T04:07:18.880Z, schema v2, markets=1896/1896, adapter=hybrid-clob, maxDaysToExpiry=10, filters=[start=2025-11-30T04:06:24.716Z, end=2025-12-10T04:06:24.716Z, sportsOnly=false], rawMarkets=n/a, withinWindow=n/a, hydratedWithOdds=n/a, reusedOdds=n/a, writer=bot-self-heal, stopReason=n/a
+2025-11-30 04:09:24.778 [info] [MarketFeed] Using redis snapshot for sxbet: fetched 2.1m ago (max 5.0m) at 2025-11-30T04:07:18.884Z, schema v2, markets=892/892, adapter=rest-active, maxDaysToExpiry=10, filters=[start=2025-11-30T04:06:24.716Z, end=2025-12-10T04:06:24.716Z, sportsOnly=false], rawMarkets=2000, withinWindow=1255, hydratedWithOdds=892, reusedOdds=0, writer=bot-self-heal, stopReason=maxPages cap (40)
+2025-11-30 04:09:24.780 [info] [MarketFilter] kalshi: total=1600, withinExecutionWindow=1600, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-30 04:09:24.780 [info] [MarketFilter] polymarket: total=1896, withinExecutionWindow=1896, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-30 04:09:24.780 [info] [MarketFilter] sxbet: total=892, withinExecutionWindow=892, expired=0, beyondWindow=0, invalidExpiry=0
+2025-11-30 04:09:24.780 [info] Found 1600 Kalshi, 1896 Polymarket, and 892 sx.bet markets
+2025-11-30 04:09:24.803 [info] 🎯 Tracking 0 markets across platforms (0 live, 0 platform combinations)
+2025-11-30 04:09:24.803 [info] [HotMarketTracker] tracked=0, new=0, dropped=0, sample=none
+2025-11-30 04:09:24.809 [info] [ArbMatch] Cross-platform candidate pairs=0 across 0 tracked market(s)
+2025-11-30 04:09:24.809 [warning] [Bot] No cross-platform candidates after filters; per-platform totals kalshi=1600, polymarket=1896, sxbet=892. If this persists, review filter config or snapshot freshness.
+2025-11-30 04:09:24.809 [info] [ArbMatch] Tracked combinations summary: candidates=0, profitablePairs=0, opportunities=0 (minProfitMargin=0.5%)

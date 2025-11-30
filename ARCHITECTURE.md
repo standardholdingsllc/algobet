@@ -182,6 +182,12 @@ MatchGraph {
 - `AdaptiveScanner` adjusts scan cadence between 5s and 60s based on live-event signals and recent opportunity counts.
 - `calculateBetSizes` enforces per-platform `maxBetPercentage` and available cash, while execution code double-checks expiry windows before sending orders.
 
+### Snapshot arb feature flags
+- `SNAPSHOT_ARB_ENABLED` (env, default `true`) wraps the entire cron path. When set to `false`, `/api/bot/cron` returns immediately without touching `MarketFeedService`, Kalshi/Polymarket/SX.bet adapters, or HotMarketTracker so SX.bet pagination jobs are never triggered.
+- `BotConfig.snapshotArbEnabled` (default `false`) mirrors the env flag for KV-backed control; both must be `true` for the snapshot scanner to run, so new live-only environments stay quiet unless explicitly re-enabled.
+- `MATCH_GRAPH_ENABLED` (env, default `false`) + `BotConfig.matchGraphEnabled` gate Gemini/MatchGraph usage and every HotMarketTracker log. When disabled, the cron bot still loads single-platform snapshots if snapshot arb is enabled, but it skips cross-book tracking entirely.
+- The live-event arbitrage system (Section&nbsp;12) remains independent and continues to be controlled by `LIVE_ARB_ENABLED`, `LIVE_ARB_WORKER`, and the execution-mode toggle (`DRY_FIRE_MODE` + `BotConfig.liveExecutionMode`).
+
 ---
 
 ## 6. Platform Integrations

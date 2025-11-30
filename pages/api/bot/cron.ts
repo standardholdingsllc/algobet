@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { ArbitrageBotEngine } from '@/lib/bot';
+import { SNAPSHOT_ARB_ENABLED } from '@/lib/runtime-flags';
 import { getBotStatus, updateBotHealth } from './status';
 
 /**
@@ -22,6 +23,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   if (!isVercelCron && !isExternalCron) {
     return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (!SNAPSHOT_ARB_ENABLED) {
+    console.info(
+      '[CronBot] Snapshot arb disabled by config (SNAPSHOT_ARB_ENABLED=false); exiting early.'
+    );
+    return res.status(200).json({
+      ok: true,
+      snapshotArbEnabled: false,
+      message: 'Snapshot arb disabled by config',
+      timestamp: new Date().toISOString(),
+    });
   }
 
   try {

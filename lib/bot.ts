@@ -8,6 +8,10 @@ import { KVStorage } from './kv-storage';
 import { MarketFeedService } from './market-feed-service';
 import { MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { sendBalanceAlert } from './email';
+import {
+  resolveMatchGraphEnabled,
+  resolveSnapshotArbEnabled,
+} from './runtime-flags';
 import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog, BotConfig, TrackedMarket, MarketFilterInput } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -108,6 +112,15 @@ export class ArbitrageBotEngine {
 
     // Get configuration
     const config = await KVStorage.getConfig();
+    const snapshotArbEnabled = resolveSnapshotArbEnabled(config);
+    const matchGraphEnabled = resolveMatchGraphEnabled(config);
+
+    if (!snapshotArbEnabled) {
+      console.info(
+        '[CronBot] Snapshot arbitrage disabled by config; skipping scan cycle.'
+      );
+      return;
+    }
 
     // Get detailed balance information (total value, available cash, positions)
     const kalshiBalances = await this.kalshi.getTotalBalance();
@@ -213,76 +226,82 @@ export class ArbitrageBotEngine {
 
     const allMarkets = [...kalshiMarkets, ...polymarketMarkets, ...sxbetMarkets];
 
-    // 🎯 HOT MARKET TRACKING
-    // Add all markets to the tracker - it will automatically group markets that exist on multiple platforms
-    const trackingChanges = this.hotMarketTracker.addMarkets(allMarkets);
-    
-    // Remove expired markets from tracking
-    const expiredCount = this.hotMarketTracker.removeExpired();
-    if (expiredCount > 0) {
-      console.log(`✅ Removed ${expiredCount} expired markets from tracking`);
-    }
-
-    // Get tracking stats
-    const trackingStats = this.hotMarketTracker.getStats();
-    const trackedMarkets = this.hotMarketTracker.getAllTrackedMarkets();
-    const trackedSample = trackedMarkets
-      .slice(0, 3)
-      .map(
-        (market) =>
-          `${market.displayTitle} (${market.platforms.length}p)`
-      )
-      .join(' | ');
-    console.log(
-      `🎯 Tracking ${trackingStats.totalTracked} markets across platforms ` +
-      `(${trackingStats.liveTracked} live, ${trackingStats.totalPlatformCombinations} platform combinations)`
-    );
-    console.log(
-      `[HotMarketTracker] tracked=${trackingStats.totalTracked}, ` +
-        `new=${trackingChanges.newlyTracked}, dropped=${expiredCount}, ` +
-        `sample=${trackedSample || 'none'}`
-    );
-    const crossPlatformPairs = this.countCrossPlatformPairs(trackedMarkets);
-    console.log(
-      `[ArbMatch] Cross-platform candidate pairs=${crossPlatformPairs} across ${trackedMarkets.length} tracked market(s)`
-    );
-    if (trackingStats.totalTracked === 0) {
-      this.logEmptyTrackerHint(platformSummaries);
-    }
-
-    // STRATEGY 1: Check all tracked markets (priority)
-    // For each market that exists on multiple platforms, check ALL platform combinations
+    // 🎯 HOT MARKET TRACKING (gated by match graph flag)
     let trackedOpportunities: ArbitrageOpportunity[] = [];
     let trackedCandidateCount = 0;
     let trackedProfitableCount = 0;
-    
-    for (const trackedMarket of trackedMarkets) {
-      const combinations = this.hotMarketTracker.getAllCombinations(trackedMarket);
-      
-      for (const [market1, market2] of combinations) {
-        const scanResult = scanArbitrageOpportunities(
-          [market1],
-          [market2],
-          config.minProfitMargin,
-          { label: 'tracked', silent: true }
-        );
-        trackedCandidateCount += scanResult.matchCount;
-        trackedProfitableCount += scanResult.profitableCount;
-        const opps = scanResult.opportunities;
-        if (opps.length > 0) {
-          console.log(
-            `🔥 Found ${opps.length} arb(s) for tracked market: ${trackedMarket.displayTitle} ` +
-            `(${market1.platform} vs ${market2.platform})`
+
+    if (!matchGraphEnabled) {
+      console.info(
+        '[CronBot] MatchGraph / HotMarketTracker disabled by config; skipping cross-platform tracking.'
+      );
+    } else {
+      // Add all markets to the tracker - it will automatically group markets that exist on multiple platforms
+      const trackingChanges = this.hotMarketTracker.addMarkets(allMarkets);
+
+      // Remove expired markets from tracking
+      const expiredCount = this.hotMarketTracker.removeExpired();
+      if (expiredCount > 0) {
+        console.log(`✅ Removed ${expiredCount} expired markets from tracking`);
+      }
+
+      // Get tracking stats
+      const trackingStats = this.hotMarketTracker.getStats();
+      const trackedMarkets = this.hotMarketTracker.getAllTrackedMarkets();
+      const trackedSample = trackedMarkets
+        .slice(0, 3)
+        .map(
+          (market) =>
+            `${market.displayTitle} (${market.platforms.length}p)`
+        )
+        .join(' | ');
+      console.log(
+        `🎯 Tracking ${trackingStats.totalTracked} markets across platforms ` +
+        `(${trackingStats.liveTracked} live, ${trackingStats.totalPlatformCombinations} platform combinations)`
+      );
+      console.log(
+        `[HotMarketTracker] tracked=${trackingStats.totalTracked}, ` +
+          `new=${trackingChanges.newlyTracked}, dropped=${expiredCount}, ` +
+          `sample=${trackedSample || 'none'}`
+      );
+      const crossPlatformPairs = this.countCrossPlatformPairs(trackedMarkets);
+      console.log(
+        `[ArbMatch] Cross-platform candidate pairs=${crossPlatformPairs} across ${trackedMarkets.length} tracked market(s)`
+      );
+      if (trackingStats.totalTracked === 0) {
+        this.logEmptyTrackerHint(platformSummaries);
+      }
+
+      // STRATEGY 1: Check all tracked markets (priority)
+      // For each market that exists on multiple platforms, check ALL platform combinations
+      for (const trackedMarket of trackedMarkets) {
+        const combinations = this.hotMarketTracker.getAllCombinations(trackedMarket);
+
+        for (const [market1, market2] of combinations) {
+          const scanResult = scanArbitrageOpportunities(
+            [market1],
+            [market2],
+            config.minProfitMargin,
+            { label: 'tracked', silent: true }
           );
-          trackedOpportunities.push(...opps);
+          trackedCandidateCount += scanResult.matchCount;
+          trackedProfitableCount += scanResult.profitableCount;
+          const opps = scanResult.opportunities;
+          if (opps.length > 0) {
+            console.log(
+              `🔥 Found ${opps.length} arb(s) for tracked market: ${trackedMarket.displayTitle} ` +
+              `(${market1.platform} vs ${market2.platform})`
+            );
+            trackedOpportunities.push(...opps);
+          }
         }
       }
+      console.log(
+        `[ArbMatch] Tracked combinations summary: candidates=${trackedCandidateCount}, ` +
+          `profitablePairs=${trackedProfitableCount}, opportunities=${trackedOpportunities.length} ` +
+          `(minProfitMargin=${config.minProfitMargin}%)`
+      );
     }
-    console.log(
-      `[ArbMatch] Tracked combinations summary: candidates=${trackedCandidateCount}, ` +
-        `profitablePairs=${trackedProfitableCount}, opportunities=${trackedOpportunities.length} ` +
-        `(minProfitMargin=${config.minProfitMargin}%)`
-    );
 
     // STRATEGY 2: General scan for new markets we haven't found yet
     const generalScan = scanArbitrageOpportunities(
