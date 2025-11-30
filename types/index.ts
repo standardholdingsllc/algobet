@@ -29,6 +29,7 @@ export interface MarketFilterInput {
   windowEnd: string;
   maxMarkets?: number;
   sportsOnly?: boolean;
+  liveOnly?: boolean;
   categories?: string[];
   eventTypes?: string[];
   leagueTickers?: string[];

@@ -3,14 +3,18 @@
  * 
  * Simple module for fetching live markets directly from platform APIs.
  * Used by the live-arb worker to populate the event registry.
+ * 
+ * Supports live-only filtering via the liveOnly flag from LiveArbRuntimeConfig.
  */
 
 import { Market, MarketPlatform, BotConfig, MarketFilterInput } from '@/types';
+import { LiveArbRuntimeConfig } from '@/types/live-arb';
 import { KalshiAPI } from './markets/kalshi';
 import { PolymarketAPI } from './markets/polymarket';
 import { SXBetAPI } from './markets/sxbet';
 
 const DAY_MS = 86_400_000;
+const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 
 export interface FetchResult {
   platform: MarketPlatform;
@@ -25,16 +29,26 @@ export class LiveMarketFetcher {
   private sxbetApi = new SXBetAPI();
 
   /**
-   * Build filter parameters from BotConfig
+   * Build filter parameters from BotConfig and optional LiveArbRuntimeConfig.
+   * The liveOnly flag is derived from runtimeConfig.liveEventsOnly.
    */
-  buildFiltersFromConfig(config: BotConfig): MarketFilterInput {
+  buildFiltersFromConfig(
+    botConfig: BotConfig,
+    runtimeConfig?: LiveArbRuntimeConfig
+  ): MarketFilterInput {
     const now = new Date();
-    const maxDate = new Date(now.getTime() + config.maxDaysToExpiry * DAY_MS);
-    const preferences = config.marketFilters || {};
+    const maxDate = new Date(now.getTime() + botConfig.maxDaysToExpiry * DAY_MS);
+    const preferences = botConfig.marketFilters || {};
+    
+    // Derive liveOnly from runtime config if provided
+    const liveOnly = runtimeConfig?.liveEventsOnly ?? false;
+    const sportsOnly = runtimeConfig?.sportsOnly ?? preferences.sportsOnly ?? false;
+    
     return {
       windowStart: now.toISOString(),
       windowEnd: maxDate.toISOString(),
-      sportsOnly: preferences.sportsOnly,
+      sportsOnly,
+      liveOnly,
       categories: preferences.categories?.filter(Boolean),
       eventTypes: preferences.eventTypes?.filter(Boolean),
       leagueTickers: preferences.leagueTickers?.filter(Boolean),
@@ -84,6 +98,16 @@ export class LiveMarketFetcher {
           break;
       }
       
+      // Apply live-only filter if enabled
+      if (filters.liveOnly) {
+        markets = this.filterToLiveEvents(markets, platform);
+      }
+      
+      // Apply sports-only filter if enabled
+      if (filters.sportsOnly) {
+        markets = this.filterToSportsEvents(markets);
+      }
+      
       return { platform, markets, fetchedAt };
     } catch (error: any) {
       console.error(`[LiveMarketFetcher] Failed to fetch ${platform}:`, error.message);
@@ -94,6 +118,52 @@ export class LiveMarketFetcher {
         error: error.message 
       };
     }
+  }
+
+  /**
+   * Filter markets to only include live/in-play events.
+   * Uses time-based heuristics and market type signals.
+   */
+  private filterToLiveEvents(markets: Market[], platform: MarketPlatform): Market[] {
+    const now = Date.now();
+    
+    return markets.filter((market) => {
+      const expiryMs = new Date(market.expiryDate).getTime();
+      const timeToExpiry = expiryMs - now;
+      
+      // Already expired - not live
+      if (timeToExpiry < 0) return false;
+      
+      // For sportsbook markets (primarily SX.bet), consider "live" if:
+      // - Expiring within 3 hours (likely in-progress game)
+      if (market.marketType === 'sportsbook') {
+        return timeToExpiry <= THREE_HOURS_MS;
+      }
+      
+      // For prediction markets (Kalshi, Polymarket), consider "live" if:
+      // - Expiring within 3 hours
+      // - This is a heuristic; true live status would require platform-specific flags
+      return timeToExpiry <= THREE_HOURS_MS;
+    });
+  }
+
+  /**
+   * Filter markets to only include sports-related events.
+   * Uses market type and title pattern matching.
+   */
+  private filterToSportsEvents(markets: Market[]): Market[] {
+    return markets.filter((market) => {
+      // Sportsbook markets are definitionally sports
+      if (market.marketType === 'sportsbook') return true;
+      
+      // Use title patterns for prediction markets
+      const title = market.title.toLowerCase();
+      return (
+        /\b(vs|@|versus)\b/.test(title) ||
+        /\b(nba|nfl|mlb|nhl|mls|ncaa|premier league|la liga|serie a|bundesliga)\b/.test(title) ||
+        /\b(game|match|bout|fight|race)\b/.test(title)
+      );
+    });
   }
 
   private async fetchKalshiMarkets(filters: MarketFilterInput): Promise<Market[]> {

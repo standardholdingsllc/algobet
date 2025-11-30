@@ -1,6 +1,7 @@
 import { LiveMarketFetcher } from '../lib/live-market-fetcher';
 import { KVStorage } from '../lib/kv-storage';
 import { BotConfig, AccountBalance } from '@/types';
+import { LiveArbRuntimeConfig } from '@/types/live-arb';
 import { LiveArbManager } from '../lib/live-arb-manager';
 import { loadLiveArbRuntimeConfig } from '../lib/live-arb-runtime-config';
 import { buildLiveArbConfig } from '../lib/live-arb-integration';
@@ -59,8 +60,8 @@ class LiveArbWorker {
       this.logExecutionMode(botConfig);
 
       this.running = true;
-      await this.refreshMarkets(botConfig);
-      this.scheduleLoop(botConfig);
+      await this.refreshMarkets(botConfig, runtimeConfig);
+      this.scheduleLoop(botConfig, runtimeConfig);
     } catch (error) {
       liveArbLog('error', WORKER_TAG, 'Failed to start live-arb worker', error as Error);
       await this.stop();
@@ -80,19 +81,25 @@ class LiveArbWorker {
     liveArbLog('info', WORKER_TAG, 'Stopped live-arb worker');
   }
 
-  private scheduleLoop(botConfig: BotConfig): void {
+  private scheduleLoop(botConfig: BotConfig, runtimeConfig: LiveArbRuntimeConfig): void {
     const loop = async () => {
       if (!this.running) return;
-      await this.refreshMarkets(botConfig);
+      // Reload runtime config each cycle to pick up changes
+      const latestRuntimeConfig = await loadLiveArbRuntimeConfig();
+      await this.refreshMarkets(botConfig, latestRuntimeConfig);
       this.refreshTimer = setTimeout(loop, this.refreshIntervalMs);
     };
 
     this.refreshTimer = setTimeout(loop, this.refreshIntervalMs);
   }
 
-  private async refreshMarkets(botConfig: BotConfig): Promise<void> {
+  private async refreshMarkets(
+    botConfig: BotConfig,
+    runtimeConfig: LiveArbRuntimeConfig
+  ): Promise<void> {
     try {
-      const filters = this.marketFetcher.buildFiltersFromConfig(botConfig);
+      // Build filters with runtime config for liveEventsOnly and sportsOnly
+      const filters = this.marketFetcher.buildFiltersFromConfig(botConfig, runtimeConfig);
       const results = await this.marketFetcher.fetchAllPlatforms(filters);
       const markets = Object.values(results).flatMap((r) => r.markets);
 
@@ -100,6 +107,8 @@ class LiveArbWorker {
 
       liveArbLog('debug', WORKER_TAG, 'Registry refresh complete', {
         totalMarkets: markets.length,
+        liveOnly: runtimeConfig.liveEventsOnly,
+        sportsOnly: runtimeConfig.sportsOnly,
         perPlatform: Object.fromEntries(
           Object.entries(results).map(([platform, result]) => [
             platform,

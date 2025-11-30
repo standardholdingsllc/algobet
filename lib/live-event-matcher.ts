@@ -322,16 +322,30 @@ function buildGroupFromComponent(
 // ============================================================================
 
 /**
+ * Options for the updateMatches function
+ */
+export interface UpdateMatchesOptions {
+  /** If true, only consider events with status === 'LIVE' */
+  liveOnly?: boolean;
+}
+
+/**
  * Update matches based on current registry state
  */
-export function updateMatches(snapshot?: LiveEventRegistrySnapshot): void {
+export function updateMatches(
+  snapshot?: LiveEventRegistrySnapshot,
+  options?: UpdateMatchesOptions
+): void {
   const config = buildLiveEventMatcherConfig();
   const registrySnapshot = snapshot || getSnapshot();
   const now = Date.now();
+  const liveOnly = options?.liveOnly ?? false;
   
-  // Get live and near-live events
+  // Get live and near-live events (or only live if liveOnly is true)
   const activeEvents = registrySnapshot.events.filter(e => {
     if (e.status === 'LIVE') return true;
+    // If liveOnly is true, skip PRE events
+    if (liveOnly) return false;
     if (e.status === 'PRE' && e.startTime) {
       const timeToStart = e.startTime - now;
       return timeToStart <= config.preGameWindow && timeToStart >= 0;

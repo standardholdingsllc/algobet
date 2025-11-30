@@ -55,9 +55,20 @@ The `LiveMarketFetcher` (`lib/live-market-fetcher.ts`) provides a simple interfa
 
 ```typescript
 const fetcher = new LiveMarketFetcher();
-const filters = fetcher.buildFiltersFromConfig(botConfig);
+const filters = fetcher.buildFiltersFromConfig(botConfig, runtimeConfig);
 const results = await fetcher.fetchAllPlatforms(filters);
 ```
+
+**Filter Parameters** (from `MarketFilterInput`):
+- `liveOnly`: When true, only fetch markets expiring within 3 hours (derived from `LiveArbRuntimeConfig.liveEventsOnly`)
+- `sportsOnly`: When true, only fetch sports-related markets
+- `windowStart` / `windowEnd`: Time window for market expiry
+
+**Live-Only Filtering Logic**:
+When `liveEventsOnly` is enabled in runtime config:
+1. Markets are filtered to those expiring within 3 hours (likely in-play)
+2. Sports markets use the `sportsbook` market type or title pattern matching
+3. Each platform's response is filtered before populating the registry
 
 This calls the platform-specific APIs:
 - **Kalshi**: `KalshiAPI.getOpenMarkets(maxDays)`
@@ -248,7 +259,11 @@ All runtime configuration is managed via KV storage (no boolean env flags):
 - `liveArbEnabled`: Master switch for WebSocket ingestion + execution
 - `ruleBasedMatcherEnabled`: Controls the rule-based matcher
 - `sportsOnly`: Filters registry inputs to sports markets only
-- `liveEventsOnly`: Prefer live/in-play events for subscriptions
+- `liveEventsOnly`: **Critical for live-only mode**:
+  - When `true`: Only fetches markets expiring within 3 hours
+  - Filters VendorEvents to `status === 'LIVE'` in matcher
+  - Excludes PRE (pre-game) events from matched groups
+  - This is the primary control for running as a pure live-betting engine
 
 ---
 
@@ -308,6 +323,14 @@ The main entry point for live betting. Run via `npm run live-arb-worker`.
 5. Start `LiveSportsOrchestrator` with platform adapters
 6. Continuously refresh registry by fetching live markets via `LiveMarketFetcher`
 
+**Market Refresh Loop:**
+Each refresh cycle (default every 15s):
+1. Reload `LiveArbRuntimeConfig` to pick up config changes
+2. Build filters from `BotConfig` + `runtimeConfig` (includes `liveOnly`, `sportsOnly`)
+3. Fetch from all platforms with filtering applied
+4. Update registry via `refreshRegistry()`
+5. If `liveEventsOnly=true`, matcher only considers `LIVE` status events
+
 **Logging tags:**
 - `[LiveArbWorker]`: Startup, refresh summaries, shutdown
 - `[LiveArbManager]`: Initialization, subscription diffs, circuit-breaker activity
@@ -320,7 +343,12 @@ The main entry point for live betting. Run via `npm run live-arb-worker`.
 
 ## 11. Environment Variables
 
-Runtime toggles live in KV/UI; the remaining env vars are for credentials and optional tuning:
+**Important**: This system uses **NO boolean environment variables** for feature flags. All runtime toggles are controlled via KV-backed configuration (`BotConfig`, `LiveArbRuntimeConfig`). Environment variables are used **only** for:
+- API credentials (keys, secrets)
+- URLs and endpoints
+- Numeric tuning parameters
+
+This ensures all feature flags can be changed via the UI without redeployment.
 
 ### Required Credentials
 

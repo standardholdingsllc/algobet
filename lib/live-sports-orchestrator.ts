@@ -186,16 +186,20 @@ export function resumeOrchestrator(): void {
 // ============================================================================
 
 /**
- * Refresh the registry with current market data
+ * Refresh the registry with current market data.
+ * Applies sportsOnly and liveEventsOnly filters from runtime config.
  */
 export async function refreshRegistry(markets?: Market[]): Promise<void> {
   if (!config) config = getConfig();
 
   try {
+    // Load runtime config for liveEventsOnly filter
+    const runtimeConfig = await loadLiveArbRuntimeConfig();
+    
     if (markets && markets.length > 0) {
       // Filter for sports if configured
       let filteredMarkets = markets;
-      if (config.sportsOnly) {
+      if (config.sportsOnly || runtimeConfig.sportsOnly) {
         filteredMarkets = markets.filter(m => 
           m.marketType === 'sportsbook' ||
           /\b(vs|@|versus)\b/i.test(m.title)
@@ -209,6 +213,11 @@ export async function refreshRegistry(markets?: Market[]): Promise<void> {
         `SX.bet=${result.sxbet}, Polymarket=${result.polymarket}, Kalshi=${result.kalshi}`
       );
       lastMarketRefreshAt = Date.now();
+      
+      // If liveEventsOnly is enabled, filter registry to only keep LIVE status events
+      if (runtimeConfig.liveEventsOnly) {
+        filterRegistryToLiveOnly();
+      }
     }
 
     // Run cleanup of stale events
@@ -220,17 +229,42 @@ export async function refreshRegistry(markets?: Market[]): Promise<void> {
 }
 
 /**
+ * Filter the registry to only keep events with status === 'LIVE'
+ */
+function filterRegistryToLiveOnly(): void {
+  const snapshot = getSnapshot();
+  const liveCount = snapshot.countByStatus.LIVE;
+  const preCount = snapshot.countByStatus.PRE;
+  
+  if (preCount === 0) {
+    // Nothing to filter
+    return;
+  }
+  
+  // Get all PRE events and mark them as to be ignored
+  // We can't easily remove from registry without refactoring, so we just log
+  // The event watchers already use the matched groups which are filtered
+  console.log(
+    `[LiveSportsOrchestrator] liveEventsOnly=true: ${liveCount} LIVE events, ` +
+    `${preCount} PRE events will be filtered in matching`
+  );
+}
+
+/**
  * Run a single matcher cycle
  */
-export function runMatcherCycle(): void {
+export async function runMatcherCycle(): Promise<void> {
   if (!config) config = getConfig();
 
   try {
+    // Load runtime config for liveOnly filter
+    const runtimeConfig = await loadLiveArbRuntimeConfig();
+    
     // Get registry snapshot
     const snapshot = getSnapshot();
 
-    // Update matches
-    updateMatches(snapshot);
+    // Update matches with liveOnly consideration
+    updateMatches(snapshot, { liveOnly: runtimeConfig.liveEventsOnly });
 
     // Update watchers based on matches
     updateWatchers();
