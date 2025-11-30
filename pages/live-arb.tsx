@@ -539,94 +539,6 @@ function RuleBasedMatcherCard({
   );
 }
 
-function LiveArbControlCard({
-  config,
-  onToggle,
-  isLoading,
-}: {
-  config: LiveArbRuntimeConfigData | null;
-  onToggle: (field: keyof LiveArbRuntimeConfigData, value: boolean) => void;
-  isLoading: boolean;
-}) {
-  const toggles: Array<{
-    key: keyof LiveArbRuntimeConfigData;
-    label: string;
-    description: string;
-  }> = [
-    {
-      key: 'liveArbEnabled',
-      label: 'Live Arb System',
-      description: 'Master switch for WebSocket streaming + execution',
-    },
-    {
-      key: 'ruleBasedMatcherEnabled',
-      label: 'Rule-Based Sports Matcher',
-      description: 'Controls vendor event matching + watchers',
-    },
-    {
-      key: 'sportsOnly',
-      label: 'Sports-Only Mode',
-      description: 'Keep matcher focused on sports contracts only',
-    },
-    {
-      key: 'liveEventsOnly',
-      label: 'Live Events Only',
-      description: 'Prioritize in-play events for subscriptions',
-    },
-  ];
-
-  return (
-    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <ShieldAlert className="w-5 h-5 text-indigo-400" />
-          Live Arb Controls
-        </h3>
-        {isLoading && (
-          <span className="text-xs text-gray-400">Updating…</span>
-        )}
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {toggles.map((toggle) => {
-          const value = config ? config[toggle.key] : false;
-          return (
-            <div
-              key={toggle.key}
-              className="p-4 rounded-lg border border-gray-700 bg-gray-900/40"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <div className="text-white font-medium">{toggle.label}</div>
-                  <div className="text-xs text-gray-400">
-                    {toggle.description}
-                  </div>
-                </div>
-                <button
-                  onClick={() => onToggle(toggle.key, !value)}
-                  disabled={isLoading || !config}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-                    value
-                      ? 'bg-green-900/40 text-green-300 border border-green-600/40'
-                      : 'bg-gray-700 text-gray-300'
-                  } ${isLoading || !config ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-600'}`}
-                >
-                  {value ? 'ON' : 'OFF'}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {!config && (
-        <div className="text-sm text-gray-400 mt-4">
-          Loading runtime config…
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Matched Events Table
 function MatchedEventsTable({ groups }: { groups: MatchedEventGroup[] }) {
   if (groups.length === 0) {
@@ -869,7 +781,6 @@ export default function LiveArbPage() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [botActionLoading, setBotActionLoading] = useState(false);
   const [executionModeLoading, setExecutionModeLoading] = useState(false);
-  const [runtimeConfigLoading, setRuntimeConfigLoading] = useState(false);
 
   // Fetch /api/live-arb/status snapshot (worker + runtime info)
   const fetchLiveArbStatus = useCallback(async () => {
@@ -974,22 +885,6 @@ export default function LiveArbPage() {
     },
     []
   );
-
-  const handleRuntimeToggle = async (
-    field: keyof LiveArbRuntimeConfigData,
-    nextValue: boolean
-  ) => {
-    setRuntimeConfigLoading(true);
-    try {
-      await updateLiveArbConfig({ [field]: nextValue });
-      await Promise.all([fetchLiveArbStatus(), fetchLiveEvents()]);
-    } catch (err: any) {
-      console.error('Failed to update live-arb config:', err);
-      alert('Failed to update live-arb config: ' + err.message);
-    } finally {
-      setRuntimeConfigLoading(false);
-    }
-  };
 
   // Toggle execution mode
   const toggleExecutionMode = useCallback(async (newMode: 'DRY_FIRE' | 'LIVE') => {
@@ -1116,15 +1011,6 @@ export default function LiveArbPage() {
             </div>
           </div>
         )}
-
-        {/* Live Arb Runtime Controls */}
-        <div className="mb-6">
-          <LiveArbControlCard
-            config={runtimeConfig}
-            onToggle={handleRuntimeToggle}
-            isLoading={runtimeConfigLoading}
-          />
-        </div>
 
         {/* Execution Mode Control */}
         <div className="mb-6">

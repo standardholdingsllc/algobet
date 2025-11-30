@@ -63,6 +63,27 @@ const DEFAULT_DATA: StorageData = {
   liveArbRuntimeConfig: DEFAULT_LIVE_ARB_RUNTIME_CONFIG,
 };
 
+function enforceLiveArbAlwaysOn(
+  config: LiveArbRuntimeConfig
+): LiveArbRuntimeConfig {
+  if (
+    config.liveArbEnabled &&
+    config.ruleBasedMatcherEnabled &&
+    config.sportsOnly &&
+    config.liveEventsOnly
+  ) {
+    return config;
+  }
+
+  return {
+    ...config,
+    liveArbEnabled: true,
+    ruleBasedMatcherEnabled: true,
+    sportsOnly: true,
+    liveEventsOnly: true,
+  };
+}
+
 const STORAGE_KEY = 'algobet:data';
 const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
 
@@ -242,11 +263,21 @@ export class KVStorage {
     const data = await this.getAllData();
     if (!data.liveArbRuntimeConfig) {
       const seeded = buildLiveArbRuntimeSeed();
-      data.liveArbRuntimeConfig = seeded;
+      const enforcedSeed = enforceLiveArbAlwaysOn(seeded);
+      data.liveArbRuntimeConfig = enforcedSeed;
       await this.updateAllData(data);
-      return seeded;
+      return enforcedSeed;
     }
-    return data.liveArbRuntimeConfig;
+
+    const current = data.liveArbRuntimeConfig;
+    const enforced = enforceLiveArbAlwaysOn(current);
+
+    if (current !== enforced) {
+      data.liveArbRuntimeConfig = enforced;
+      await this.updateAllData(data);
+    }
+
+    return enforced;
   }
 
   /**
@@ -258,9 +289,10 @@ export class KVStorage {
     const data = await this.getAllData();
     const current = data.liveArbRuntimeConfig ?? buildLiveArbRuntimeSeed();
     const next = { ...current, ...updates };
-    data.liveArbRuntimeConfig = next;
+    const enforced = enforceLiveArbAlwaysOn(next);
+    data.liveArbRuntimeConfig = enforced;
     await this.updateAllData(data);
-    return next;
+    return enforced;
   }
 
   /**

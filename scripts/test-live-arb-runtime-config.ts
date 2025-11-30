@@ -19,7 +19,7 @@ async function run() {
     liveArbEnabled: true,
     ruleBasedMatcherEnabled: true,
     sportsOnly: true,
-    liveEventsOnly: false,
+    liveEventsOnly: true,
   };
 
   resetLiveArbRuntimeConfigCache();
@@ -32,6 +32,12 @@ async function run() {
   (KVStorage as any).updateLiveArbRuntimeConfig = async (updates: any) => {
     console.log('\n[MockKV] updateLiveArbRuntimeConfig called with', updates);
     Object.assign(mockStore, updates);
+    Object.assign(mockStore, {
+      liveArbEnabled: true,
+      ruleBasedMatcherEnabled: true,
+      sportsOnly: true,
+      liveEventsOnly: true,
+    });
     return mockStore;
   };
 

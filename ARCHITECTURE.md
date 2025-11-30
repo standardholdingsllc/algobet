@@ -266,6 +266,8 @@ All runtime configuration is managed via KV storage (no boolean env flags):
   - Excludes PRE (pre-game) events from matched groups
   - This is the primary control for running as a pure live-betting engine
 
+🚨 **Operational Lock**: All of the above runtime toggles are now hard-wired to `true` inside KV storage. The dashboard no longer exposes buttons to flip them, ensuring the live arb worker always runs with streaming enabled, the matcher active, and sports/live filters enforced.
+
 ---
 
 ## 8. API Surface (`pages/api`)
@@ -305,9 +307,9 @@ All runtime configuration is managed via KV storage (no boolean env flags):
 - Link to Live Betting Control
 
 ### 9.2 Live Arb Dashboard (`/live-arb`)
-- **Runtime Config Panel**: Enable/disable live-arb, matcher, sports-only, live-events-only
+- **Runtime Config Summary**: Status text only (toggles removed; config is always-on)
 - **Execution Mode Toggle**: DRY_FIRE / LIVE
-- **Start/Stop Controls**: POST to `/api/live-arb/config` to flip KV flags (`liveArbEnabled`, `ruleBasedMatcherEnabled`) instead of spawning processes; worker presence is derived from `/api/live-arb/status`.
+- **Start/Stop Controls**: POST to `/api/live-arb/config` to reassert the always-on KV flags; worker presence is derived from `/api/live-arb/status`.
 - **System Status**: WS connections, price cache stats, circuit breaker state
 - **Matched Events Table**: Cross-platform matches with sport, teams, platforms, quality
 - **Dry-Fire Statistics**: Simulated vs rejected trades, potential profit

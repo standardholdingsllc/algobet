@@ -239,7 +239,7 @@ export const DEFAULT_LIVE_ARB_RUNTIME_CONFIG: LiveArbRuntimeConfig = {
   liveArbEnabled: true,
   ruleBasedMatcherEnabled: true,
   sportsOnly: true,
-  liveEventsOnly: false,
+  liveEventsOnly: true,
 };
 
 // ============================================================================
