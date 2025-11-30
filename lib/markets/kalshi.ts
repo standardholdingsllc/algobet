@@ -6,6 +6,7 @@ import { isDryFireMode } from '../execution-wrapper';
 const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';
 export const KALSHI_WS_SIGNATURE_PATH = '/trade-api/ws/v2';
+export const DEFAULT_KALSHI_WS_URL = 'wss://api.elections.kalshi.com/trade-api/ws/v2';
 const KALSHI_PAGE_LIMIT = 200;
 const KALSHI_MAX_PAGES = 8;
 const KALSHI_TARGET_MARKETS = 150;
@@ -107,8 +108,8 @@ export async function buildKalshiAuthHeaders(
   path: string,
   body?: any
 ): Promise<Record<string, string>> {
-  const apiKey = process.env.KALSHI_API_KEY || '';
-  const email = process.env.KALSHI_EMAIL || '';
+  const apiKey = (process.env.KALSHI_API_KEY || '').trim();
+  const email = (process.env.KALSHI_EMAIL || '').trim();
   const privateKey = getFormattedKalshiPrivateKey();
 
   if (!apiKey || !privateKey) {

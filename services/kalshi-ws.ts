@@ -22,7 +22,11 @@ import {
 } from '@/types/live-arb';
 import { LivePriceCache } from '@/lib/live-price-cache';
 import { liveArbLog } from '@/lib/live-arb-logger';
-import { buildKalshiAuthHeaders, KALSHI_WS_SIGNATURE_PATH } from '@/lib/markets/kalshi';
+import {
+  buildKalshiAuthHeaders,
+  DEFAULT_KALSHI_WS_URL,
+  KALSHI_WS_SIGNATURE_PATH,
+} from '@/lib/markets/kalshi';
 
 const WS_LOG_TAG = 'KALSHI-WS';
 const RECONNECT_WARNING_MS = 15000;
@@ -113,13 +117,14 @@ export class KalshiWsClient {
   > = new Map();
 
   private readonly wsUrl: string;
+  private readonly wsUrlSource: 'env' | 'default';
 
   constructor(config?: Partial<WsClientConfig>) {
     this.config = { ...DEFAULT_WS_CONFIG, ...config };
     // Kalshi WebSocket URL
-    this.wsUrl =
-      process.env.KALSHI_WS_URL ||
-      'wss://trading-api.kalshi.com/trade-api/ws/v2';
+    const envWsUrl = (process.env.KALSHI_WS_URL || '').trim();
+    this.wsUrl = envWsUrl || DEFAULT_KALSHI_WS_URL;
+    this.wsUrlSource = envWsUrl ? 'env' : 'default';
   }
 
   // --------------------------------------------------------------------------
@@ -135,6 +140,22 @@ export class KalshiWsClient {
       return;
     }
 
+    const apiKey = (process.env.KALSHI_API_KEY || '').trim();
+    const privateKey = (process.env.KALSHI_PRIVATE_KEY || '').trim();
+    if (!apiKey || !privateKey) {
+      const missingVars = [
+        !apiKey ? 'KALSHI_API_KEY' : null,
+        !privateKey ? 'KALSHI_PRIVATE_KEY' : null,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      const message = `Missing Kalshi credentials (${missingVars}); skipping websocket connect.`;
+      wsError(message);
+      this.errorMessage = message;
+      this.setState('error');
+      return;
+    }
+
     let authHeaders: Record<string, string>;
     try {
       authHeaders = await buildKalshiAuthHeaders('GET', KALSHI_WS_SIGNATURE_PATH);
@@ -147,7 +168,9 @@ export class KalshiWsClient {
     }
 
     this.setState('connecting');
-    wsInfo(`Connecting to ${this.wsUrl}...`);
+    wsInfo(
+      `Connecting with signed headers to ${this.wsUrl} (${this.wsUrlSource})...`
+    );
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
