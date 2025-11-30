@@ -17,9 +17,11 @@ import {
   VendorEventStatus,
   LiveEventPlatform,
   LiveEventRegistrySnapshot,
+  MatchedEventGroup,
   Sport,
   buildLiveEventMatcherConfig,
 } from '@/types/live-events';
+import { setMatchedGroups as setMatcherGroups } from './live-event-matcher';
 
 // ============================================================================
 // Internal State
@@ -408,5 +410,103 @@ export function logRegistryState(): void {
   console.log(`  By platform: SX.bet=${stats.byPlatform.SXBET}, Polymarket=${stats.byPlatform.POLYMARKET}, Kalshi=${stats.byPlatform.KALSHI}`);
   console.log(`  By status: PRE=${stats.byStatus.PRE}, LIVE=${stats.byStatus.LIVE}, ENDED=${stats.byStatus.ENDED}`);
   console.log(`  Lifetime: added=${stats.totalAdded}, updated=${stats.totalUpdated}, removed=${stats.totalRemoved}`);
+}
+
+// ============================================================================
+// Matched Groups (Pass-through to Matcher)
+// ============================================================================
+
+/**
+ * Set matched groups (pass-through to matcher module).
+ * This also persists the groups to file.
+ * 
+ * @param groups The matched groups to set
+ */
+export function setGroups(groups: MatchedEventGroup[]): void {
+  setMatcherGroups(groups);
+}
+
+/**
+ * Replace all events for a specific platform (snapshot update)
+ * 
+ * @param platform The platform to update
+ * @param events The new events to set for that platform
+ */
+export function markPlatformSnapshot(platform: LiveEventPlatform, events: VendorEvent[]): void {
+  // Remove all existing events for this platform
+  const keysToRemove: string[] = [];
+  for (const key of byPlatform[platform]) {
+    keysToRemove.push(key);
+  }
+  
+  for (const key of keysToRemove) {
+    const event = eventStore.get(key);
+    if (event) {
+      removeFromIndices(event, key);
+      eventStore.delete(key);
+      totalRemoved++;
+    }
+  }
+  
+  // Add all new events
+  for (const event of events) {
+    const key = makeEventKey(event.platform, event.vendorMarketId);
+    const newEvent: VendorEvent = {
+      ...event,
+      lastUpdatedAt: Date.now(),
+    };
+    eventStore.set(key, newEvent);
+    addToIndices(newEvent, key);
+    totalAdded++;
+  }
+  
+  console.log(
+    `[LiveEventRegistry] Snapshot for ${platform}: ` +
+    `removed ${keysToRemove.length}, added ${events.length}`
+  );
+}
+
+/**
+ * Prune ended events from the registry
+ * 
+ * @param now Current timestamp (epoch ms)
+ */
+export function pruneEndedEvents(now: number): number {
+  const config = buildLiveEventMatcherConfig();
+  let pruned = 0;
+  
+  for (const [key, event] of eventStore) {
+    let shouldPrune = false;
+    
+    // Prune ENDED events after post-game window
+    if (event.status === 'ENDED') {
+      const endedDuration = now - event.lastUpdatedAt;
+      if (endedDuration > config.postGameWindow) {
+        shouldPrune = true;
+      }
+    }
+    
+    // Prune events with start times far in the past that are still marked PRE
+    if (event.status === 'PRE' && event.startTime) {
+      const timeSinceStart = now - event.startTime;
+      // If start time was more than 2 hours ago and still marked as PRE, prune
+      if (timeSinceStart > 2 * 60 * 60 * 1000) {
+        shouldPrune = true;
+      }
+    }
+    
+    if (shouldPrune) {
+      removeFromIndices(event, key);
+      eventStore.delete(key);
+      pruned++;
+      totalRemoved++;
+    }
+  }
+  
+  if (pruned > 0) {
+    console.log(`[LiveEventRegistry] Pruned ${pruned} ended/stale events`);
+  }
+  
+  return pruned;
 }
 

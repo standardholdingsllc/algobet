@@ -25,7 +25,8 @@
     "migrate-kv": "node -r esbuild-register scripts/migrate-to-kv.ts",
     "snapshot-worker": "node -r esbuild-register workers/snapshot-worker.ts",
     "test-live-arb": "node -r esbuild-register scripts/test-live-arb.ts",
-    "test-live-ws": "node -r esbuild-register scripts/test-live-ws-connections.ts"
+    "test-live-ws": "node -r esbuild-register scripts/test-live-ws-connections.ts",
+    "test-live-events": "node -r esbuild-register scripts/test-live-events.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.5",

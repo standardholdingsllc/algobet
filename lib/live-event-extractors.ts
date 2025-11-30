@@ -21,6 +21,7 @@ import {
 } from '@/types/live-events';
 import { Market } from '@/types';
 import { parseTeamsFromTitle, normalizeTeamName } from './live-event-matcher';
+import { normalizeEventTitle } from './text-normalizer';
 import { addOrUpdateEvent, markEventEnded } from './live-event-registry';
 
 // ============================================================================
@@ -282,6 +283,9 @@ export function extractSxBetEvent(
     }
   }
   
+  // Normalize title for token-based matching
+  const { normalizedTitle, tokens } = normalizeEventTitle(title, { sport: sportResult.sport });
+
   return {
     platform: 'SXBET',
     vendorMarketId: marketHash, // NOTE: marketHash is the canonical market ID
@@ -294,6 +298,8 @@ export function extractSxBetEvent(
     status,
     marketType: detectMarketType(title),
     rawTitle: title,
+    normalizedTitle,
+    normalizedTokens: tokens,
     extra: metadata,
     lastUpdatedAt: Date.now(),
     extractionConfidence: sportResult.confidence,
@@ -409,6 +415,9 @@ export function extractPolymarketEvent(
     }
   }
   
+  // Normalize title for token-based matching
+  const { normalizedTitle, tokens } = normalizeEventTitle(title, { sport: sportResult.sport });
+
   return {
     platform: 'POLYMARKET',
     vendorMarketId: conditionId, // NOTE: conditionId is the canonical market ID
@@ -421,6 +430,8 @@ export function extractPolymarketEvent(
     status,
     marketType: detectMarketType(title),
     rawTitle: title,
+    normalizedTitle,
+    normalizedTokens: tokens,
     extra: metadata,
     lastUpdatedAt: Date.now(),
     extractionConfidence: isSports ? 0.9 : sportResult.confidence,
@@ -548,6 +559,9 @@ export function extractKalshiEvent(
     }
   }
   
+  // Normalize title for token-based matching
+  const { normalizedTitle, tokens } = normalizeEventTitle(title, { sport: sportResult.sport });
+
   return {
     platform: 'KALSHI',
     vendorMarketId: ticker, // NOTE: ticker is the canonical market ID
@@ -560,6 +574,8 @@ export function extractKalshiEvent(
     status,
     marketType: detectMarketType(title),
     rawTitle: title,
+    normalizedTitle,
+    normalizedTokens: tokens,
     extra: metadata,
     lastUpdatedAt: Date.now(),
     extractionConfidence: (isSportsTicker || isSportsEvent) ? 0.9 : sportResult.confidence,

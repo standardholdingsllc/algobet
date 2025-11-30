@@ -108,6 +108,18 @@ export interface VendorEvent {
   /** Original market title/description */
   rawTitle: string;
 
+  /**
+   * Fully normalized title string (for internal matching).
+   * Stopwords removed, lowercase, punctuation stripped.
+   */
+  normalizedTitle?: string;
+
+  /**
+   * Tokenized title for token-overlap matching.
+   * Array of meaningful tokens after normalization.
+   */
+  normalizedTokens?: string[];
+
   /** Platform-specific extra data */
   extra?: Record<string, unknown>;
 
@@ -253,7 +265,7 @@ export interface LiveEventMatcherConfig {
   /** Time tolerance for matching events (ms) */
   timeTolerance: number;
 
-  /** Minimum similarity for team name matching (0-1) */
+  /** Minimum similarity for team name matching (0-1) - DEPRECATED, use token matching */
   minTeamSimilarity: number;
 
   /** Maximum number of active watchers */
@@ -273,6 +285,13 @@ export interface LiveEventMatcherConfig {
 
   /** Post-game window to keep ended events (ms) */
   postGameWindow: number;
+
+  // Token-based matching config
+  /** Minimum number of overlapping tokens for a match (default: 2) */
+  minTokenOverlap: number;
+
+  /** Minimum coverage ratio for a match (default: 0.6) */
+  minCoverage: number;
 }
 
 /**
@@ -282,13 +301,15 @@ export const DEFAULT_LIVE_EVENT_MATCHER_CONFIG: LiveEventMatcherConfig = {
   enabled: false,
   sportsOnly: true,
   timeTolerance: 15 * 60 * 1000,         // 15 minutes
-  minTeamSimilarity: 0.7,
+  minTeamSimilarity: 0.7,                // DEPRECATED
   maxWatchers: 50,
   minPlatforms: 2,
   registryRefreshInterval: 30 * 1000,    // 30 seconds
   matcherInterval: 10 * 1000,            // 10 seconds
   preGameWindow: 60 * 60 * 1000,         // 1 hour before
   postGameWindow: 5 * 60 * 1000,         // 5 minutes after
+  minTokenOverlap: 2,                    // At least 2 tokens must match
+  minCoverage: 0.6,                      // 60% coverage required
 };
 
 /**
@@ -306,6 +327,8 @@ export function buildLiveEventMatcherConfig(): LiveEventMatcherConfig {
     matcherInterval: parseInt(process.env.LIVE_MATCHER_INTERVAL_MS || '10000', 10),
     preGameWindow: parseInt(process.env.LIVE_PRE_GAME_WINDOW_MS || '3600000', 10),
     postGameWindow: parseInt(process.env.LIVE_POST_GAME_WINDOW_MS || '300000', 10),
+    minTokenOverlap: parseInt(process.env.LIVE_MIN_TOKEN_OVERLAP || '2', 10),
+    minCoverage: parseFloat(process.env.LIVE_MIN_COVERAGE || '0.6'),
   };
 }
 

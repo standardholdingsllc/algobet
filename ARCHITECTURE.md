@@ -648,29 +648,48 @@ The rule-based live sports matcher provides deterministic cross-platform event m
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **LiveEventRegistry** | `lib/live-event-registry.ts` | In-memory store of vendor events |
-| **LiveEventMatcher** | `lib/live-event-matcher.ts` | Deterministic matching rules |
+| **LiveEventMatcher** | `lib/live-event-matcher.ts` | Token-based matching with connected components |
+| **TextNormalizer** | `lib/text-normalizer.ts` | Generic tokenization and scoring |
 | **LiveEventWatchers** | `lib/live-event-watchers.ts` | Per-event arb monitoring |
 | **LiveEventExtractors** | `lib/live-event-extractors.ts` | Vendor-specific event parsing |
 | **LiveSportsOrchestrator** | `lib/live-sports-orchestrator.ts` | Main coordination module |
 
-### 14.2 Matching Algorithm
+### 14.2 Token-Based Matching Algorithm
 
-**No AI/ML** - Pure deterministic heuristics:
+**No AI/ML, No Large Alias Maps** - Pure deterministic token overlap:
 
-1. **Sport Detection**: Pattern matching against known sports/league keywords
-2. **Team Name Normalization**: Alias map for common variations (e.g., "Lakers" → "Los Angeles Lakers")
-3. **Team Matching**: Jaccard similarity on normalized team names
-4. **Time Tolerance**: Events must start within configurable window (default 15 min)
+1. **Token Normalization**: Titles are normalized to token arrays (stopwords/sport keywords removed)
+2. **Sport + Time Bucketing**: Events are grouped by sport and time bucket (default 15 min tolerance)
+3. **Token Overlap Scoring**: Score `overlap`, `coverage`, and `jaccard` between token sets
+4. **Connected Components**: Events with sufficient overlap form graph edges; matched groups are connected components
 
+**Normalization Process:**
 ```
-Event 1: "Lakers vs Celtics" (SX.bet)
-Event 2: "LA Lakers @ Boston Celtics" (Polymarket)
-Event 3: "NBA-LAKERS-CELTICS-2024" (Kalshi)
+"Detroit Red Wings vs Boston Bruins" (SX.bet)
+→ tokens: ['detroit', 'red', 'wings', 'boston', 'bruins']
 
-→ All normalize to: ["los angeles lakers", "boston celtics"]
-→ Sport: NBA, Time: within tolerance
-→ Match! Create MatchedEventGroup
+"Redwings @ Bruins" (Polymarket)  
+→ tokens: ['redwings', 'bruins']
+
+Overlap = 1 (bruins), Coverage check...
+If overlap >= MIN_TOKEN_OVERLAP (2) AND coverage >= MIN_COVERAGE (0.6) → MATCH
+→ Build MatchedEventGroup via connected components (Union-Find algorithm)
 ```
+
+**Key Functions (`lib/text-normalizer.ts`):**
+- `normalizeEventTitle(rawTitle, opts)`: Returns `{ normalizedTitle, tokens }`
+- `scoreTokenOverlap(tokensA, tokensB)`: Returns `{ overlap, coverage, jaccard }`
+- `tokensMatch(tokensA, tokensB, minOverlap, minCoverage)`: Boolean match check
+- `getTimeBucket(startTime, toleranceMs)`: Time bucket for grouping
+
+**Stopwords Removed:**
+- Sport keywords: `nba`, `nfl`, `nhl`, `mlb`, `cs2`, `dota`, `valorant`, etc.
+- Generic words: `vs`, `v`, `versus`, `at`, `game`, `match`, `live`, `today`, etc.
+- Betting terms: `moneyline`, `spread`, `total`, `over`, `under`, `prop`, etc.
+
+**Sport-Specific Stopwords (optional down-weighting):**
+- Soccer: `fc`, `sc`, `cf`, `afc`, `united`, `city`, `club`
+- College: `state`, `university`, `college`, `tech`
 
 ### 14.3 Key Types
 
@@ -682,13 +701,15 @@ interface VendorEvent {
   homeTeam?: string;
   awayTeam?: string;
   teams: string[];
+  normalizedTitle?: string;   // Fully normalized string
+  normalizedTokens?: string[]; // Tokenized title for matching
   startTime?: number;
   status: 'PRE' | 'LIVE' | 'ENDED';
   rawTitle: string;
 }
 
 interface MatchedEventGroup {
-  eventKey: string;        // Canonical ID
+  eventKey: string;        // e.g., "NHL:2024-12-01:detroit_red_boston_bruins"
   sport: Sport;
   homeTeam?: string;
   awayTeam?: string;
@@ -698,7 +719,13 @@ interface MatchedEventGroup {
     KALSHI?: VendorEvent[];
   };
   platformCount: number;
-  matchQuality: number;    // 0-1 confidence
+  matchQuality: number;    // 0-1 (avg coverage across component edges)
+}
+
+interface TokenMatchScore {
+  overlap: number;   // |A ∩ B|
+  coverage: number;  // overlap / min(|A|, |B|)
+  jaccard: number;   // overlap / |A ∪ B|
 }
 ```
 
@@ -834,6 +861,10 @@ LIVE_MAX_EVENT_WATCHERS=50
 # Minimum platforms for a match
 LIVE_MIN_PLATFORMS=2
 
+# Token matching thresholds (new)
+LIVE_MIN_TOKEN_OVERLAP=2       # At least 2 tokens must match
+LIVE_MIN_COVERAGE=0.6          # 60% coverage required
+
 # Refresh intervals
 LIVE_REGISTRY_REFRESH_MS=30000
 LIVE_MATCHER_INTERVAL_MS=10000
@@ -869,19 +900,92 @@ The `/live-arb` page displays:
   - Watcher performance (avg/max check time, checks/sec)
 - **Matched Events Table**: Cross-platform matches with sport, teams, platforms, quality
 
-### 14.11 Coexistence with HotMarketTracker
+### 14.11 Dynamic File Persistence
+
+Matched event groups are automatically persisted to a JSON file for debugging and cross-process visibility:
+
+**File Locations:**
+- Production/Vercel: `/tmp/live-event-groups.json`
+- Local development: `data/live-event-groups.json`
+
+**File Structure:**
+```typescript
+interface LiveEventGroupsFileData {
+  generatedAt: string;              // ISO timestamp
+  config: {
+    timeToleranceMs: number;
+    minPlatforms: number;
+    sportsOnly: boolean;
+    preGameWindowMs: number;
+    postGameWindowMs: number;
+  };
+  summary: {
+    totalGroups: number;
+    liveGroups: number;
+    preGroups: number;
+    threeWayMatches: number;
+    twoWayMatches: number;
+    bySport: Record<string, number>;
+    byPlatformCount: Record<string, number>;
+  };
+  groups: MatchedEventGroup[];
+}
+```
+
+**Key Functions (`lib/live-event-groups-store.ts`):**
+- `saveMatchedGroupsToFile(groups, config)`: Atomic write (temp file + rename)
+- `loadMatchedGroupsFromFile()`: Load groups array (returns null on error)
+- `loadMatchedGroupsFileData()`: Load full file including config and summary
+- `getMatchedGroupsFileInfo()`: Get file path, size, and modification time
+
+**Auto-persistence:**
+- The matcher automatically persists groups on each `updateMatches()` call
+- Rate-limited to avoid excessive I/O (default 5-second minimum interval)
+- `forcePersistGroupsToFile()` bypasses rate limiting for immediate writes
+- `setMatchedGroups(groups)` always persists immediately
+
+**Registry Methods:**
+- `markPlatformSnapshot(platform, events)`: Replace all events for a platform
+- `pruneEndedEvents(now)`: Remove stale/ended events
+- `setGroups(groups)`: Pass-through to matcher's setMatchedGroups
+
+### 14.12 Testing
+
+Run the live events test suite:
+```bash
+npm run test-live-events
+```
+
+Tests cover:
+- **Token normalization**: Stopword removal, sport keyword removal
+- **Token overlap scoring**: `overlap`, `coverage`, `jaccard` calculations
+- **Time bucketing**: Same bucket, adjacent buckets, far-apart times
+- **Vendor extractors**: SX.bet, Polymarket, Kalshi with `normalizedTokens`
+- **Registry operations**: Add, update, prune
+- **Matcher logic**: Token-based matching via connected components
+- **Negative tests**: Different games don't match, far-apart times don't match
+- **File persistence**: Save, load, atomic writes
+- **Legacy compatibility**: `normalizeTeamName`, `parseTeamsFromTitle` still work
+
+### 14.13 Coexistence with HotMarketTracker
 
 This system runs **alongside** (not replacing) the existing architecture:
 
 | System | Scope | Method |
 |--------|-------|--------|
 | HotMarketTracker | All markets | NLP + Gemini |
-| Rule-Based Matcher | Live sports only | Deterministic |
+| Rule-Based Matcher | Live sports only | Token overlap (CPU-only) |
 
 Both feed into the same:
 - `LivePriceCache` for prices
 - `executeOpportunityWithMode()` for execution
 - Dry-fire logging system
+
+**Key differences from previous alias-based approach:**
+- No giant `TEAM_ALIAS_MAP` structures to maintain
+- Scales to new sports/teams without code changes
+- Matching based on token overlap, not exact canonical names
+- Connected components algorithm for building groups
 
 ---
 
