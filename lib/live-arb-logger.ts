@@ -43,7 +43,7 @@ export function shouldLog(level: LiveArbLogLevel): boolean {
   return LEVEL_PRIORITY[level] <= LEVEL_PRIORITY[currentLevel];
 }
 
-type LoggableMeta = Record<string, unknown> | Error | undefined;
+type LoggableMeta = unknown;
 
 export function liveArbLog(
   level: LiveArbLogLevel,

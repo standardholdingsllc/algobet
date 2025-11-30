@@ -90,11 +90,11 @@ const marketIdToWatcher = new Map<string, string>();
 const FALLBACK_POLL_INTERVAL_MS = 5000;  // Safety net polling every 5s
 const DEBOUNCE_MS = 50;                   // Debounce rapid price updates
 const MIN_CHECK_INTERVAL_MS = 100;        // Minimum time between checks
-const watcherInfo = (message: string, meta?: Record<string, unknown>) =>
+const watcherInfo = (message: string, meta?: unknown) =>
   liveArbLog('info', WATCHER_LOG_TAG, message, meta);
-const watcherDebug = (message: string, meta?: Record<string, unknown>) =>
+const watcherDebug = (message: string, meta?: unknown) =>
   liveArbLog('debug', WATCHER_LOG_TAG, message, meta);
-const watcherWarn = (message: string, meta?: Record<string, unknown>) =>
+const watcherWarn = (message: string, meta?: unknown) =>
   liveArbLog('warn', WATCHER_LOG_TAG, message, meta);
 
 /** Platform adapters (set during initialization) */

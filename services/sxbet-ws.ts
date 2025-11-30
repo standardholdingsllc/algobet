@@ -53,13 +53,13 @@ import { liveArbLog } from '@/lib/live-arb-logger';
 const DEFAULT_SXBET_WS_URL = 'wss://api.sx.bet/ws';
 const WS_LOG_TAG = 'SXBET-WS';
 const RECONNECT_WARNING_MS = 15000;
-const wsInfo = (message: string, meta?: Record<string, unknown>) =>
+const wsInfo = (message: string, meta?: unknown) =>
   liveArbLog('info', WS_LOG_TAG, message, meta);
-const wsWarn = (message: string, meta?: Record<string, unknown>) =>
+const wsWarn = (message: string, meta?: unknown) =>
   liveArbLog('warn', WS_LOG_TAG, message, meta);
-const wsError = (message: string, meta?: Record<string, unknown>) =>
+const wsError = (message: string, meta?: unknown) =>
   liveArbLog('error', WS_LOG_TAG, message, meta);
-const wsDebug = (message: string, meta?: Record<string, unknown>) =>
+const wsDebug = (message: string, meta?: unknown) =>
   liveArbLog('debug', WS_LOG_TAG, message, meta);
 
 /** Alternative Ably-based URL pattern (if SX.bet uses Ably) */

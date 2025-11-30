@@ -283,6 +283,7 @@ export function getOrchestratorStatus(): LiveEventsApiResponse & {
   running: boolean;
   uptimeMs: number;
   rateLimiterStats: ReturnType<typeof getRateLimiterStats>;
+  watcherStats: ReturnType<typeof getWatcherStats>;
 } {
   const cfg = getConfig();
   const registrySnapshot = getSnapshot();
@@ -300,6 +301,7 @@ export function getOrchestratorStatus(): LiveEventsApiResponse & {
     registry: registrySnapshot,
     matchedGroups,
     watchers,
+    watcherStats,
     stats: {
       totalVendorEvents: registryStats.totalEvents,
       liveEvents: registryStats.byStatus.LIVE,

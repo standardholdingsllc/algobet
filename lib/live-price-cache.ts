@@ -70,7 +70,6 @@ import { liveArbLog, shouldLog } from './live-arb-logger';
 const LOG_TAG = 'LivePriceCache';
 const STATS_INTERVAL_MS = 10_000;
 const PRICE_LOG_SUPPRESSION_MS = 60_000;
-import { liveArbLog, shouldLog } from './live-arb-logger';
 
 // ============================================================================
 // Price Conversion Utilities

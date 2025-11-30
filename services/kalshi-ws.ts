@@ -23,6 +23,16 @@ import {
 import { LivePriceCache } from '@/lib/live-price-cache';
 import { liveArbLog } from '@/lib/live-arb-logger';
 
+const WS_LOG_TAG = 'KALSHI-WS';
+const RECONNECT_WARNING_MS = 15000;
+const wsInfo = (message: string, meta?: unknown) =>
+  liveArbLog('info', WS_LOG_TAG, message, meta);
+const wsWarn = (message: string, meta?: unknown) =>
+  liveArbLog('warn', WS_LOG_TAG, message, meta);
+const wsError = (message: string, meta?: unknown) =>
+  liveArbLog('error', WS_LOG_TAG, message, meta);
+
+
 // ============================================================================
 // Kalshi WebSocket Message Types
 // ============================================================================
@@ -102,15 +112,6 @@ export class KalshiWsClient {
   > = new Map();
 
   private readonly wsUrl: string;
-
-const WS_LOG_TAG = 'KALSHI-WS';
-const RECONNECT_WARNING_MS = 15000;
-const wsInfo = (message: string, meta?: Record<string, unknown>) =>
-  liveArbLog('info', WS_LOG_TAG, message, meta);
-const wsWarn = (message: string, meta?: Record<string, unknown>) =>
-  liveArbLog('warn', WS_LOG_TAG, message, meta);
-const wsError = (message: string, meta?: Record<string, unknown>) =>
-  liveArbLog('error', WS_LOG_TAG, message, meta);
 
   constructor(config?: Partial<WsClientConfig>) {
     this.config = { ...DEFAULT_WS_CONFIG, ...config };

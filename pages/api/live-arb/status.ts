@@ -143,7 +143,7 @@ export default async function handler(
           updatedAt: orchestratorStatus.registry.updatedAt,
         },
         stats: orchestratorStatus.stats,
-        watcherStats: orchestratorStatus.watchers.stats,
+        watcherStats: orchestratorStatus.watcherStats,
       },
       priceCacheStats: {
         totalEntries: cacheStats.priceCacheSize,
