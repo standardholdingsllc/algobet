@@ -26,10 +26,9 @@
  * Recommended deployment patterns:
  *
  * 1. SINGLE LIVE-ARB WORKER (Recommended for simplicity)
- *    - Run a dedicated process for live arbitrage with LIVE_ARB_WORKER=true
+ *    - Run a dedicated process for live arbitrage via `npm run live-arb-worker`
  *    - This process handles all WS connections and live arb detection
  *    - The cron bot continues to use snapshot-based arbitrage
- *    - Set up: npm run live-arb-worker (or similar script)
  *
  * 2. DISTRIBUTED CACHING (Future enhancement)
  *    - Would require Redis/Upstash for shared price state
@@ -41,12 +40,6 @@
  *    - Deploy with a single replica for the live-arb service
  *    - Use horizontal scaling only for the REST API / dashboard
  *    - Live arbitrage runs in one process only
- *
- * Environment variables:
- * - LIVE_ARB_WORKER: Set to "true" to designate this process as the
- *   dedicated live arb worker. When false/unset, live arb features
- *   are available but should only be used in single-process deployments.
- * - LIVE_ARB_ENABLED: Master switch to enable/disable live arb features.
  *
  * For now, the assumption is single-process deployment or a dedicated
  * live-arb worker process alongside the snapshot/cron-based bot.

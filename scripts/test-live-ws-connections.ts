@@ -345,7 +345,6 @@ async function main(): Promise<void> {
   checkEnvVar('KALSHI_API_KEY');
   checkEnvVar('KALSHI_PRIVATE_KEY');
   checkEnvVar('POLYMARKET_WS_URL');
-  checkEnvVar('LIVE_ARB_ENABLED');
 
   // Setup monitoring before connecting
   setupPriceCacheMonitoring();

@@ -141,9 +141,10 @@ export interface AccountBalance {
 }
 
 /**
- * Execution mode for live-arb system
+ * Execution mode for the live-arb system.
+ * Managed entirely via the KV-backed BotConfig.
  * - 'DRY_FIRE': Paper trading - detect opportunities but only log them
- * - 'LIVE': Execute real trades (only works if DRY_FIRE_MODE env is false)
+ * - 'LIVE': Execute real trades
  */
 export type ExecutionMode = 'DRY_FIRE' | 'LIVE';
 
@@ -166,7 +167,7 @@ export interface BotConfig {
   /**
    * Live arb execution mode (runtime toggle via dashboard)
    * - 'DRY_FIRE': Paper trading only (default)
-   * - 'LIVE': Real execution (only if DRY_FIRE_MODE env is false)
+   * - 'LIVE': Real execution
    */
   liveExecutionMode?: ExecutionMode;
 }

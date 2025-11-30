@@ -32,16 +32,7 @@ class LiveArbWorker {
   }
 
   async start(): Promise<void> {
-    if (process.env.LIVE_ARB_WORKER !== 'true') {
-      liveArbLog(
-        'info',
-        WORKER_TAG,
-        'LIVE_ARB_WORKER not set, exiting (this process is not designated as live-arb worker)'
-      );
-      return;
-    }
-
-    liveArbLog('info', WORKER_TAG, 'Starting live-arb worker', {
+    liveArbLog('info', WORKER_TAG, 'Starting live-arb worker (script-managed)', {
       pid: process.pid,
       nodeEnv: process.env.NODE_ENV || 'unknown',
     });
@@ -50,9 +41,9 @@ class LiveArbWorker {
       const runtimeConfig = await loadLiveArbRuntimeConfig();
       if (!runtimeConfig.liveArbEnabled) {
         liveArbLog(
-          'warn',
+          'info',
           WORKER_TAG,
-          'Live arb disabled via runtime config; worker will idle'
+          'liveArbEnabled=false in KV; not starting WS clients / orchestrator (run /api/live-arb/config to enable).'
         );
         return;
       }
@@ -147,8 +138,7 @@ class LiveArbWorker {
 
   private logExecutionMode(botConfig: BotConfig): void {
     liveArbLog('info', WORKER_TAG, 'Execution mode summary', {
-      dryFireEnv: process.env.DRY_FIRE_MODE === 'true',
-      configMode: botConfig.liveExecutionMode || 'DRY_FIRE',
+      executionMode: botConfig.liveExecutionMode || 'DRY_FIRE',
       minProfitBps: process.env.LIVE_ARB_MIN_PROFIT_BPS || '50',
       maxPriceAgeMs: process.env.LIVE_ARB_MAX_PRICE_AGE_MS || '2000',
       logLevel: process.env.LIVE_ARB_LOG_LEVEL || 'info',

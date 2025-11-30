@@ -488,8 +488,7 @@ interface CircuitBreaker {
 SXBET_WS_URL=wss://api.sx.bet
 POLYMARKET_WS_URL=wss://clob.polymarket.com
 
-# Live arb settings
-LIVE_ARB_ENABLED=true
+# Live arb numeric tuning (enablement now lives in /api/live-arb/config)
 LIVE_ARB_MIN_PROFIT_BPS=50  # 0.5% minimum
 LIVE_ARB_MAX_LATENCY_MS=2000
 LIVE_ARB_MAX_PRICE_AGE_MS=2000

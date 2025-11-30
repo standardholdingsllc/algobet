@@ -2,8 +2,8 @@
  * Dry-Fire (Paper Trading) Types
  *
  * These types define the structure for logging simulated trades
- * when DRY_FIRE_MODE is enabled. The system runs all pricing,
- * risk checks, and calculations but never sends real orders.
+ * when the KV-backed execution mode is set to DRY_FIRE. The system runs
+ * all pricing, risk checks, and calculations but never sends real orders.
  */
 
 import { MarketPlatform } from './index';
@@ -243,33 +243,15 @@ export const DEFAULT_DRY_FIRE_CONFIG: DryFireConfig = {
 };
 
 /**
- * Build dry-fire config from environment variables
+ * Build a dry-fire config object. The caller can optionally provide overrides
+ * (e.g., from KV) but by default we fall back to safe, verbose logging.
  */
-export function buildDryFireConfig(): DryFireConfig {
+export function buildDryFireConfig(
+  overrides: Partial<DryFireConfig> = {}
+): DryFireConfig {
   return {
-    enabled: process.env.DRY_FIRE_MODE === 'true',
-    logAllOpportunities: process.env.DRY_FIRE_LOG_OPPORTUNITIES !== 'false',
-    logRejectedReasons: process.env.DRY_FIRE_LOG_REJECTED_REASON !== 'false',
-    maxLogsToKeep: parseInt(process.env.DRY_FIRE_MAX_LOGS || '1000', 10),
+    ...DEFAULT_DRY_FIRE_CONFIG,
+    ...overrides,
   };
-}
-
-/**
- * Check if dry-fire mode is enabled (basic env check)
- * NOTE: For the full execution mode logic that includes KV config,
- * use getExecutionMode() / isDryFireModeActive() from lib/execution-wrapper.ts
- */
-export function isDryFireMode(): boolean {
-  // This is the basic env-only check
-  // The execution wrapper provides the full logic with KV config
-  return process.env.DRY_FIRE_MODE === 'true';
-}
-
-/**
- * Check if execution is forced to dry-fire by environment
- * When DRY_FIRE_MODE=true, no amount of config changes can enable live trading
- */
-export function isDryFireForcedByEnv(): boolean {
-  return process.env.DRY_FIRE_MODE === 'true';
 }
 

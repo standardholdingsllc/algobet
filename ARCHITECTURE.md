@@ -183,9 +183,9 @@ MatchGraph {
 - `calculateBetSizes` enforces per-platform `maxBetPercentage` and available cash, while execution code double-checks expiry windows before sending orders.
 
 ### Snapshot & live-arb feature flags
-- `SNAPSHOT_ARB_ENABLED` is now a no-op for the cron bot. `/api/bot/cron` always runs the full snapshot ingest + scan pipeline and ignores this env flag (kept only for backwards compatibility with older deployments).
-- `MATCH_GRAPH_ENABLED` (env, default `false`) + `BotConfig.matchGraphEnabled` still gate Gemini/MatchGraph usage and every HotMarketTracker log. When disabled, the cron bot still loads single-platform snapshots but skips cross-book tracking entirely.
-- The live-event arbitrage system (Section&nbsp;12) is now governed by a KV-backed runtime config (`/api/live-arb/config`) surfaced on the dashboard: `liveArbEnabled`, `ruleBasedMatcherEnabled`, `sportsOnly`, and `liveEventsOnly`. The legacy `LIVE_ARB_*` env vars only seed the very first defaults; once saved, the KV + UI settings are the source of truth. `DRY_FIRE_MODE=true` remains an optional master safety override layered on top of the Execution Mode UI toggle, and `LIVE_ARB_WORKER` is still available for deployments that dedicate a worker process.
+- Snapshot ingest is always on for the cron bot—there is no environment toggle. `/api/bot/cron` loads and persists snapshots on every invocation.
+- MatchGraph/Gemini usage is controlled entirely by `BotConfig.matchGraphEnabled`. When disabled, the bot still ingests single-platform snapshots but skips HotMarketTracker + Gemini workflows.
+- The live-event arbitrage system (Section&nbsp;12) is governed by the KV-backed runtime config (`/api/live-arb/config`) surfaced on the dashboard: `liveArbEnabled`, `ruleBasedMatcherEnabled`, `sportsOnly`, and `liveEventsOnly`. Running `npm run live-arb-worker` designates a process as the worker—no boolean envs are involved.
 
 ---
 
@@ -310,7 +310,7 @@ The live-event arbitrage subsystem provides real-time price streaming and low-la
   - `ruleBasedMatcherEnabled`: Controls the rule-based matcher + watcher orchestration.
   - `sportsOnly`: Filters registry inputs to sports markets only.
   - `liveEventsOnly`: Tells `LiveArbManager` to prefer live/in-play events for subscriptions.
-- Env vars such as `LIVE_ARB_ENABLED`/`LIVE_RULE_BASED_MATCHER_ENABLED` now **only seed the very first defaults**. After that, the KV value + UI toggle are the system of record.
+- Live-arb runtime toggles (`liveArbEnabled`, `ruleBasedMatcherEnabled`, `sportsOnly`, `liveEventsOnly`) are controlled exclusively via the KV config + dashboard (`/api/live-arb/config`).
 - `POST /api/live-arb/config` writes updates atomically; the API + UI reuse this endpoint.
 
 ### 12.2 LivePriceCache (`lib/live-price-cache.ts`)
@@ -319,7 +319,7 @@ The live-event arbitrage subsystem provides real-time price streaming and low-la
 - Stores prices by `{platform, marketId, outcomeId}` key
 - Automatically tracks price age for staleness detection
 - Separate storage for live scores (SX.bet only)
-- **Multi-process behavior**: Each process maintains its own cache and WS connections. For multi-container deployments, run a dedicated live-arb worker with `LIVE_ARB_WORKER=true`.
+- **Multi-process behavior**: Each process maintains its own cache and WS connections. For multi-container deployments, run a dedicated live-arb worker via `npm run live-arb-worker`.
 
 Key methods:
 - `updateLivePrice(update)`: Called by WS handlers to push new prices
@@ -454,7 +454,6 @@ Runtime toggles now live in KV/UI; the remaining env vars are optional tuning kn
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LIVE_ARB_WORKER` | `false` | Designate this process as the dedicated live-arb worker |
 | `LIVE_ARB_MIN_PROFIT_BPS` | `50` | Minimum profit (basis points) |
 | `LIVE_ARB_MAX_PRICE_AGE_MS` | `2000` | Max acceptable price age |
 | `LIVE_ARB_MAX_LATENCY_MS` | `2000` | Max execution latency |
@@ -490,21 +489,7 @@ The dry-fire mode allows the system to run all arbitrage detection, pricing, and
 
 ### 13.2 Configuration
 
-Primary environment variable:
-
-```
-DRY_FIRE_MODE=true          # Master switch - when true, NO real orders placed
-```
-
-When `DRY_FIRE_MODE` is unset (default), the `/live-arb` dashboard controls execution mode entirely via `/api/live-arb/execution-mode`. The UI writes `BotConfig.liveExecutionMode`, and the system will happily run in LIVE when the toggle is set accordingly. Setting `DRY_FIRE_MODE=true` still forces DRY_FIRE regardless of the UI and acts as the final safety override.
-
-Optional fine-grained flags:
-
-```
-DRY_FIRE_LOG_OPPORTUNITIES=true    # Log all eligible opportunities
-DRY_FIRE_LOG_REJECTED_REASON=true  # Include rejection reasons in logs
-DRY_FIRE_MAX_LOGS=1000             # Maximum logs to keep
-```
+Execution mode is stored in KV (`BotConfig.liveExecutionMode`) and managed via `/api/live-arb/execution-mode` (surfaced directly on the `/live-arb` dashboard). New installs default to `DRY_FIRE`, and operators can toggle to `LIVE` without redeploying or touching environment variables.
 
 ### 13.3 Execution Flow
 
@@ -543,7 +528,7 @@ checkDryFireMode()
 **Triple-layer protection ensures no orders are placed in dry-fire mode:**
 
 1. **Wrapper Layer** (`lib/execution-wrapper.ts`):
-   - `executeOpportunityWithMode()` checks `DRY_FIRE_MODE` first
+   - `executeOpportunityWithMode()` reads `BotConfig.liveExecutionMode` before routing
    - Routes to `executeOpportunityDryFire()` which never calls platform APIs
 
 2. **Guard Layer** (`lib/execution-wrapper.ts`):
@@ -649,12 +634,12 @@ interface DryFireStats {
 
 ### 13.10 Usage Workflow
 
-1. **Enable dry-fire mode**: Set `DRY_FIRE_MODE=true` in environment
+1. **Enable dry-fire mode**: Leave `BotConfig.liveExecutionMode` at its default (`DRY_FIRE`)
 2. **Start the bot**: Use dashboard or API
 3. **Monitor**: Watch `/live-arb` for simulated trades
 4. **Analyze**: Export CSV and review patterns
 5. **Tune**: Adjust thresholds based on data
-6. **Go live**: Set `DRY_FIRE_MODE=false` when confident
+6. **Go live**: Switch the execution mode to `LIVE` from the dashboard when confident
 
 ### 13.11 Runtime Execution Mode Toggle
 
@@ -666,11 +651,6 @@ The live arb system supports a **runtime execution mode toggle** that allows swi
 │                          EXECUTION MODE LOGIC                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│   DRY_FIRE_MODE env = 'true'?  ──YES──►  Mode = DRY_FIRE (hard lock)    │
-│              │                                                           │
-│              NO                                                          │
-│              │                                                           │
-│              ▼                                                           │
 │   BotConfig.liveExecutionMode from KV                                   │
 │              │                                                           │
 │              ├──'LIVE'────►  Mode = LIVE (real execution)               │
@@ -710,21 +690,18 @@ GET response:
 ```
 
 POST body: `{ "mode": "DRY_FIRE" | "LIVE" }`
-- Returns 400 if attempting to switch to LIVE when `DRY_FIRE_MODE=true`
+- Returns 400 if mode is invalid
 - Updates `BotConfig.liveExecutionMode` in KV storage
 
 **Dashboard UI (`/live-arb`):**
 - Execution Mode Card at the top of the page
 - Toggle buttons for Dry-Fire / Live
 - Clear status text explaining current mode
-- Live button disabled when forced by env
-- Warning banner when locked by `DRY_FIRE_MODE`
 
 **Safety Guarantees:**
-1. **Environment Override**: `DRY_FIRE_MODE=true` always forces DRY_FIRE regardless of config
-2. **Default Safe**: New installs default to DRY_FIRE
-3. **Triple-Layer Protection**: Wrapper → Guard → Platform checks still apply
-4. **Instant Effect**: Mode changes take effect immediately via cached config
+1. **Default Safe**: New installs default to DRY_FIRE
+2. **Triple-Layer Protection**: Wrapper → Guard → Platform checks still apply
+3. **Instant Effect**: Mode changes take effect immediately via cached config
 
 ---
 
@@ -868,8 +845,8 @@ Found opportunity!
         ▼
 executeOpportunityWithMode()
         │
-        ├── DRY_FIRE_MODE=true → Log only
-        └── DRY_FIRE_MODE=false → Execute trades
+        ├── Mode = DRY_FIRE → Log only
+        └── Mode = LIVE → Execute trades
 
 Fallback: 5s polling if WS is spotty
 ```
@@ -1077,8 +1054,8 @@ Both feed into the same:
 
 ### 14.14 Live-Arb Worker & Observability
 
-- **Entrypoint**: `workers/live-arb-worker.ts` (run via `npm run live-arb-worker` with `LIVE_ARB_WORKER=true`).
-- **Boot sequence**: loads KV `BotConfig` + live-arb runtime config, logs the effective execution mode (`DRY_FIRE_MODE`, KV `liveExecutionMode`, `LIVE_ARB_MIN_PROFIT_BPS`, `LIVE_ARB_MAX_PRICE_AGE_MS`, `LIVE_ARB_LOG_LEVEL`), starts `LiveArbManager`, spins up the rule-based matcher (`startOrchestrator`) with real platform adapters, and continuously refreshes the registry by fetching live markets via `MarketFeedService`.
+- **Entrypoint**: `workers/live-arb-worker.ts` (run via `npm run live-arb-worker`).
+- **Boot sequence**: loads KV `BotConfig` + live-arb runtime config, logs the effective execution mode (`BotConfig.liveExecutionMode`, `LIVE_ARB_MIN_PROFIT_BPS`, `LIVE_ARB_MAX_PRICE_AGE_MS`, `LIVE_ARB_LOG_LEVEL`), starts `LiveArbManager`, spins up the rule-based matcher (`startOrchestrator`) with real platform adapters, and continuously refreshes the registry by fetching live markets via `MarketFeedService`.
 - **WebSocket subscriptions**: whenever a `LiveEventWatcher` registers markets it now calls `LiveArbManager.subscribeToMarket`, so WS clients only stream the exact markets each watcher monitors.
 - **Logging tags**:
   - `[LiveArbWorker]` – startup banner, per-refresh summaries (per-platform market counts, zero-market warnings), shutdown.

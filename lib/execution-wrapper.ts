@@ -2,13 +2,13 @@
  * Execution Wrapper
  *
  * Provides a unified execution path for arbitrage opportunities that:
- * - Routes to dry-fire (paper trading) mode when DRY_FIRE_MODE=true
+ * - Routes to dry-fire (paper trading) mode when the KV-backed execution mode is DRY_FIRE
  * - Routes to real execution otherwise
  * - Ensures all orders go through a single, auditable path
  *
  * IMPORTANT: This is the ONLY path for executing opportunities.
  * All callers must use executeOpportunityWithMode() to ensure
- * dry-fire mode is respected.
+ * the runtime execution mode is respected.
  */
 
 import { ArbitrageOpportunity, Bet, ArbitrageGroup, MarketPlatform, ExecutionMode } from '@/types';
@@ -16,7 +16,6 @@ import {
   DryFireTradeLog,
   DryFireTradeStatus,
   SafetySnapshot,
-  isDryFireForcedByEnv,
 } from '@/types/dry-fire';
 import {
   createDryFireLog,
@@ -110,21 +109,18 @@ export interface PlatformAdapters {
 
 /**
  * Get the effective execution mode.
- * 
- * Priority:
- * 1. DRY_FIRE_MODE env = 'true' → always 'DRY_FIRE' (hard safety switch)
- * 2. BotConfig.liveExecutionMode from KV → 'DRY_FIRE' or 'LIVE'
- * 3. Default → 'DRY_FIRE'
+ * Driven entirely by BotConfig.liveExecutionMode (KV-backed).
+ * Defaults to DRY_FIRE when config has not been loaded yet.
  */
 export function getExecutionMode(): ExecutionMode {
-  // Hard safety: env DRY_FIRE_MODE=true always forces DRY_FIRE
-  if (isDryFireForcedByEnv()) {
+  const cfg = getCachedBotConfig();
+  if (!cfg) {
+    console.warn(
+      '[ExecutionWrapper] BotConfig cache is empty; defaulting to DRY_FIRE mode.'
+    );
     return 'DRY_FIRE';
   }
-
-  // Check KV config
-  const cfg = getCachedBotConfig();
-  return cfg?.liveExecutionMode ?? 'DRY_FIRE';
+  return cfg.liveExecutionMode ?? 'DRY_FIRE';
 }
 
 /**
@@ -148,7 +144,7 @@ export function checkDryFireMode(): boolean {
  */
 export function assertNotDryFire(operation: string): void {
   if (isDryFireMode()) {
-    const error = `[DRY-FIRE GUARD] Attempted ${operation} in DRY_FIRE_MODE - this should never happen!`;
+    const error = `[DRY-FIRE GUARD] Attempted ${operation} while dry-fire mode is active (live execution disabled).`;
     console.error(error);
     throw new Error(error);
   }

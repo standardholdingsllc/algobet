@@ -6,22 +6,17 @@
  *
  * The execution mode controls whether the live arb system:
  * - 'DRY_FIRE': Detects opportunities and logs them as paper trades
- * - 'LIVE': Executes real trades (only if DRY_FIRE_MODE env is false)
+ * - 'LIVE': Executes real trades
  */
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { KVStorage } from '@/lib/kv-storage';
 import { getExecutionMode, isDryFireMode } from '@/lib/execution-wrapper';
-import { isDryFireForcedByEnv } from '@/types/dry-fire';
 import { ExecutionMode } from '@/types';
 
 interface ExecutionModeResponse {
   /** Effective execution mode */
   mode: ExecutionMode;
-  /** Whether mode is locked by DRY_FIRE_MODE env */
-  forcedByEnv: boolean;
-  /** Raw value of DRY_FIRE_MODE env */
-  envDryFireMode: boolean;
   /** Config value from KV */
   configMode?: ExecutionMode;
   /** Whether dry-fire is active (same as mode === 'DRY_FIRE') */
@@ -36,12 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const config = await KVStorage.getConfig();
       const mode = getExecutionMode();
-      const forcedByEnv = isDryFireForcedByEnv();
       
       const response: ExecutionModeResponse = {
         mode,
-        forcedByEnv,
-        envDryFireMode: process.env.DRY_FIRE_MODE === 'true',
         configMode: config.liveExecutionMode || 'DRY_FIRE',
         isDryFire: isDryFireMode(),
       };
@@ -64,14 +56,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // Check if env locks us to DRY_FIRE
-      if (mode === 'LIVE' && isDryFireForcedByEnv()) {
-        return res.status(400).json({
-          error: 'Execution mode is locked to DRY_FIRE by DRY_FIRE_MODE env. Update your worker env to allow Live.',
-          forcedByEnv: true,
-        });
-      }
-
       // Update config in KV
       await KVStorage.updateConfig({ liveExecutionMode: mode });
 
@@ -85,7 +69,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: true,
         mode: effectiveMode,
         configMode: updatedConfig.liveExecutionMode,
-        forcedByEnv: isDryFireForcedByEnv(),
         isDryFire: isDryFireMode(),
       });
     } catch (error) {

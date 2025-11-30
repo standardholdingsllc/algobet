@@ -954,7 +954,8 @@ export class SXBetAPI {
   ): Promise<{ success: boolean; orderId?: string; error?: string }> {
     // DRY-FIRE GUARD: Never place real orders in dry-fire mode
     if (isDryFireMode()) {
-      const error = '[SX.bet DRY-FIRE GUARD] Attempted to place real order in DRY_FIRE_MODE!';
+      const error =
+        '[SX.bet DRY-FIRE GUARD] Attempted to place real order while dry-fire mode is active.';
       console.error(error);
       return { success: false, error };
     }

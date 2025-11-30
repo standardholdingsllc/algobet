@@ -1,9 +1,12 @@
 import nodemailer from 'nodemailer';
 
+const emailSecureFlag = (process.env.EMAIL_SECURE || '').trim().toLowerCase();
+const isEmailSecure = emailSecureFlag === 'true';
+
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT || '587'),
-  secure: process.env.EMAIL_SECURE === 'true' || false,
+  secure: isEmailSecure,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,

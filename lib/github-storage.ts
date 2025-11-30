@@ -91,10 +91,10 @@ export class GitHubStorage {
             sxbet: parseFloat(process.env.MIN_BALANCE_SXBET || '100'),
           },
           emailAlerts: {
-            enabled: process.env.EMAIL_ALERTS_ENABLED === 'true',
-            lowBalanceAlert: process.env.LOW_BALANCE_ALERT === 'true',
+            enabled: true,
+            lowBalanceAlert: true,
           },
-          simulationMode: process.env.SIMULATION_MODE === 'true',
+          simulationMode: false,
         },
       };
       await this.writeData('data/store.json', initialStore, 'Initialize data store');

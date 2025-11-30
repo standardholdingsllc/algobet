@@ -99,8 +99,6 @@ interface BotStatus {
 
 interface ExecutionModeData {
   mode: 'DRY_FIRE' | 'LIVE';
-  forcedByEnv: boolean;
-  envDryFireMode: boolean;
   configMode?: 'DRY_FIRE' | 'LIVE';
   isDryFire: boolean;
 }
@@ -702,7 +700,6 @@ function ExecutionModeCard({
   }
 
   const isDryFire = executionMode.mode === 'DRY_FIRE';
-  const isLocked = executionMode.forcedByEnv;
 
   return (
     <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
@@ -719,19 +716,6 @@ function ExecutionModeCard({
           {executionMode.mode}
         </span>
       </div>
-
-      {/* Lock warning */}
-      {isLocked && (
-        <div className="mb-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
-          <div className="flex items-center gap-2 text-amber-300 text-sm">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            <span>
-              Locked to Dry-Fire by <code className="bg-amber-900/50 px-1 rounded">DRY_FIRE_MODE</code> env.
-              Update your worker env to allow Live.
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Toggle buttons */}
       <div className="flex items-center gap-2">
@@ -750,14 +734,11 @@ function ExecutionModeCard({
 
         <button
           onClick={() => onToggle('LIVE')}
-          disabled={isLoading || !isDryFire || isLocked}
-          title={isLocked ? 'Locked by DRY_FIRE_MODE env' : undefined}
+          disabled={isLoading || !isDryFire}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
             !isDryFire
               ? 'bg-green-600 text-white cursor-default'
-              : isLocked
-                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                : 'bg-gray-700 text-gray-300 hover:bg-green-600 hover:text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-green-600 hover:text-white'
           }`}
         >
           <Zap className="w-4 h-4" />
@@ -999,11 +980,6 @@ export default function LiveArbPage() {
 
   // Toggle execution mode
   const toggleExecutionMode = useCallback(async (newMode: 'DRY_FIRE' | 'LIVE') => {
-    if (executionMode?.forcedByEnv && newMode === 'LIVE') {
-      alert('Execution mode is locked to Dry-Fire by DRY_FIRE_MODE env. Update your worker env to allow Live.');
-      return;
-    }
-
     setExecutionModeLoading(true);
     try {
       const res = await fetch('/api/live-arb/execution-mode', {
@@ -1024,7 +1000,7 @@ export default function LiveArbPage() {
     } finally {
       setExecutionModeLoading(false);
     }
-  }, [executionMode]);
+  }, []);
 
   // Start bot
   const startBot = async () => {

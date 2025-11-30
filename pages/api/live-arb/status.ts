@@ -21,7 +21,6 @@ import { getOrchestratorStatus } from '@/lib/live-sports-orchestrator';
 interface LiveArbStatusResponse {
   liveArbEnabled: boolean;
   liveArbReady: boolean;
-  liveArbWorkerConfigured: boolean;
   timestamp: string;
   platforms: {
     sxbet: PlatformStatus;
@@ -130,7 +129,6 @@ export default async function handler(
     const response: LiveArbStatusResponse = {
       liveArbEnabled: runtimeConfig.liveArbEnabled,
       liveArbReady: status.ready,
-      liveArbWorkerConfigured: process.env.LIVE_ARB_WORKER === 'true',
       timestamp: new Date().toISOString(),
       platforms,
       liveEvents: {

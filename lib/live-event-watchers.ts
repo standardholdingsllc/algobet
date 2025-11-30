@@ -38,14 +38,6 @@ const WATCHER_LOG_TAG = 'LiveWatcher';
 // Debug Configuration
 // ============================================================================
 
-const DEBUG_WATCHERS = process.env.DEBUG_LIVE_WATCHERS === 'true';
-
-function debugLog(...args: any[]): void {
-  if (DEBUG_WATCHERS) {
-    console.log('[Watcher:DEBUG]', ...args);
-  }
-}
-
 // ============================================================================
 // Watcher State
 // ============================================================================
@@ -169,9 +161,12 @@ function handlePriceUpdate(update: LivePriceUpdate): void {
     marketId,
   };
   
-  debugLog(
-    `Price update for ${eventKey}: ${update.key.platform}:${marketId} = ${update.price}`
-  );
+  watcherDebug('Route price update to watcher', {
+    eventKey,
+    platform: update.key.platform,
+    marketId,
+    price: update.price,
+  });
   
   // Debounced trigger
   triggerDebouncedCheck(eventKey);
@@ -314,9 +309,10 @@ function registerWatcherMarkets(watcher: ActiveWatcher): void {
     }
   }
   
-  debugLog(
-    `Registered ${watcher.marketIdToEventKey.size} markets for ${watcher.group.eventKey}`
-  );
+  watcherDebug('Registered watcher markets', {
+    eventKey: watcher.group.eventKey,
+    marketCount: watcher.marketIdToEventKey.size,
+  });
 }
 
 /**
@@ -341,7 +337,7 @@ export function startWatcher(group: MatchedEventGroup): boolean {
   
   // Check if already watching
   if (activeWatchers.has(group.eventKey)) {
-    debugLog(`Already watching ${group.eventKey}`);
+    watcherDebug('Already watching event', { eventKey: group.eventKey });
     return false;
   }
   
@@ -353,7 +349,11 @@ export function startWatcher(group: MatchedEventGroup): boolean {
   
   // Check platform count
   if (group.platformCount < config.minPlatforms) {
-    debugLog(`Not enough platforms (${group.platformCount}) for ${group.eventKey}`);
+    watcherDebug('Not enough platforms for watcher', {
+      eventKey: group.eventKey,
+      platformCount: group.platformCount,
+      minPlatforms: config.minPlatforms,
+    });
     return false;
   }
   
@@ -384,7 +384,7 @@ export function startWatcher(group: MatchedEventGroup): boolean {
     // Only run if no recent event-driven check
     const now = Date.now();
     if (!watcher.lastArbCheckAt || now - watcher.lastArbCheckAt > FALLBACK_POLL_INTERVAL_MS / 2) {
-      debugLog(`Fallback check for ${group.eventKey}`);
+      watcherDebug('Fallback arb check triggered', { eventKey: group.eventKey });
       runArbCheck(group.eventKey);
     }
   }, FALLBACK_POLL_INTERVAL_MS);
@@ -456,7 +456,6 @@ async function runArbCheck(eventKey: string): Promise<void> {
   // Prevent concurrent checks
   if (watcher.isChecking) {
     watcherDebug('Skipping arb check (already running)', { eventKey });
-    debugLog(`Skipping concurrent check for ${eventKey}`);
     return;
   }
   
@@ -494,10 +493,11 @@ async function runArbCheck(eventKey: string): Promise<void> {
     // Get ONLY markets for this group (not the entire universe)
     const markets = getMarketsForGroup(group);
     
-    debugLog(
-      `Checking ${eventKey}: ${markets.length} markets ` +
-      `[${markets.map(m => m.platform).join(', ')}]`
-    );
+    watcherDebug('Checking group markets for arb', {
+      eventKey,
+      marketCount: markets.length,
+      platforms: markets.map((m) => m.platform),
+    });
     
     if (markets.length < 2) {
       watcherDebug('Skip arb check (insufficient markets)', {
@@ -589,8 +589,8 @@ async function runArbCheck(eventKey: string): Promise<void> {
     watcher.timing.maxCheckTimeMs = Math.max(watcher.timing.maxCheckTimeMs, checkDuration);
     watcher.timing.minCheckTimeMs = Math.min(watcher.timing.minCheckTimeMs, checkDuration);
     
-    if (DEBUG_WATCHERS && checkDuration > 100) {
-      debugLog(`Check for ${eventKey} took ${checkDuration}ms`);
+    if (checkDuration > 100) {
+      watcherDebug('Arb check duration', { eventKey, checkDurationMs: checkDuration });
     }
   }
 }

@@ -9,13 +9,12 @@
  * Run with: npm run test-execution-mode
  */
 
-import { 
-  getExecutionMode, 
-  isDryFireMode, 
-  checkDryFireMode 
+import {
+  getExecutionMode,
+  isDryFireMode,
+  checkDryFireMode,
 } from '../lib/execution-wrapper';
-import { getCachedBotConfig } from '../lib/kv-storage';
-import { isDryFireForcedByEnv } from '../types/dry-fire';
+import { getCachedBotConfig, KVStorage } from '../lib/kv-storage';
 
 // Check if Redis is configured
 const hasRedis = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
@@ -56,51 +55,6 @@ function assertTrue(condition: boolean, message?: string): void {
 }
 
 // ============================================================================
-// Test: Environment-based Execution Mode
-// ============================================================================
-
-async function testEnvironmentBased() {
-  console.log('\n--- Environment-Based Execution Mode Tests ---\n');
-
-  await test('isDryFireForcedByEnv returns true when DRY_FIRE_MODE=true', () => {
-    // Check current env state
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'true';
-    
-    try {
-      const result = isDryFireForcedByEnv();
-      assertEqual(result, true, 'Should be forced by env');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-    }
-  });
-
-  await test('isDryFireForcedByEnv returns false when DRY_FIRE_MODE=false', () => {
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'false';
-    
-    try {
-      const result = isDryFireForcedByEnv();
-      assertEqual(result, false, 'Should not be forced by env');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-    }
-  });
-
-  await test('getExecutionMode returns DRY_FIRE when env forces it', () => {
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'true';
-    
-    try {
-      const mode = getExecutionMode();
-      assertEqual(mode, 'DRY_FIRE', 'Mode should be DRY_FIRE when env is set');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-    }
-  });
-}
-
-// ============================================================================
 // Test: Config-based Execution Mode (requires Redis)
 // ============================================================================
 
@@ -113,70 +67,25 @@ async function testConfigBased() {
     return;
   }
 
-  const { KVStorage } = await import('../lib/kv-storage');
-
   // Save original config
   const originalConfig = await KVStorage.getConfig();
 
-  await test('Config with liveExecutionMode=LIVE returns LIVE when env allows', async () => {
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'false';
-    
-    try {
-      await KVStorage.updateConfig({ liveExecutionMode: 'LIVE' });
-      
-      const mode = getExecutionMode();
-      assertEqual(mode, 'LIVE', 'Mode should be LIVE when config says LIVE and env allows');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-    }
-  });
-
-  await test('Config with liveExecutionMode=LIVE still returns DRY_FIRE when env forces it', async () => {
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'true';
-    
-    try {
-      await KVStorage.updateConfig({ liveExecutionMode: 'LIVE' });
-      
-      const mode = getExecutionMode();
-      assertEqual(mode, 'DRY_FIRE', 'Mode should be DRY_FIRE when env forces it, regardless of config');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-    }
-  });
-
-  await test('Config with liveExecutionMode=DRY_FIRE returns DRY_FIRE', async () => {
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'false';
-    
-    try {
-      await KVStorage.updateConfig({ liveExecutionMode: 'DRY_FIRE' });
-      
-      const mode = getExecutionMode();
-      assertEqual(mode, 'DRY_FIRE', 'Mode should be DRY_FIRE when config says DRY_FIRE');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-    }
+  await test('Config with liveExecutionMode=LIVE returns LIVE', async () => {
+    await KVStorage.updateConfig({ liveExecutionMode: 'LIVE' });
+    const mode = getExecutionMode();
+    assertEqual(mode, 'LIVE', 'Mode should be LIVE when config says LIVE');
   });
 
   await test('Missing config defaults to DRY_FIRE', async () => {
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'false';
-    
-    try {
-      // Set to undefined (will use default)
-      await KVStorage.updateConfig({ liveExecutionMode: undefined as any });
-      
-      // Need to re-fetch to update cache
-      await KVStorage.getConfig();
-      
-      const mode = getExecutionMode();
-      // Even if the field is missing, the default config has 'DRY_FIRE'
-      assertEqual(mode, 'DRY_FIRE', 'Should default to DRY_FIRE');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-    }
+    // Set to undefined (will fall back to default)
+    await KVStorage.updateConfig({ liveExecutionMode: undefined as any });
+
+    // Need to re-fetch to update cache
+    await KVStorage.getConfig();
+
+    const mode = getExecutionMode();
+    // Even if the field is missing, the default config has 'DRY_FIRE'
+    assertEqual(mode, 'DRY_FIRE', 'Should default to DRY_FIRE');
   });
 
   // Restore original config
@@ -191,15 +100,14 @@ async function testIsDryFireModeHelper() {
   console.log('\n--- isDryFireMode Helper Tests ---\n');
 
   await test('isDryFireMode returns true when mode is DRY_FIRE', async () => {
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'true';
-    
-    try {
-      const result = isDryFireMode();
-      assertTrue(result, 'isDryFireMode should return true');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
+    if (!hasRedis) {
+      console.log('   ⏭️  Skipped (no Redis)');
+      passCount++;
+      return;
     }
+    await KVStorage.updateConfig({ liveExecutionMode: 'DRY_FIRE' });
+    const result = isDryFireMode();
+    assertTrue(result, 'isDryFireMode should return true');
   });
 
   await test('isDryFireMode returns false when mode is LIVE (with Redis)', async () => {
@@ -209,19 +117,10 @@ async function testIsDryFireModeHelper() {
       return;
     }
 
-    const { KVStorage } = await import('../lib/kv-storage');
-    const originalEnv = process.env.DRY_FIRE_MODE;
-    process.env.DRY_FIRE_MODE = 'false';
-    
-    try {
-      await KVStorage.updateConfig({ liveExecutionMode: 'LIVE' });
-      
-      const result = isDryFireMode();
-      assertTrue(!result, 'isDryFireMode should return false when LIVE');
-    } finally {
-      process.env.DRY_FIRE_MODE = originalEnv;
-      await KVStorage.updateConfig({ liveExecutionMode: 'DRY_FIRE' });
-    }
+    await KVStorage.updateConfig({ liveExecutionMode: 'LIVE' });
+
+    const result = isDryFireMode();
+    assertTrue(!result, 'isDryFireMode should return false when LIVE');
   });
 
   await test('checkDryFireMode is alias for isDryFireMode', () => {
@@ -279,27 +178,18 @@ async function main() {
   console.log('╚════════════════════════════════════════════════════════════╝');
 
   if (!hasRedis) {
-    console.log('\n⚠️  Redis not configured - some tests will be skipped');
-    console.log('   Set KV_REST_API_URL and KV_REST_API_TOKEN for full coverage\n');
+    console.log('\n⚠️  Redis not configured - execution mode tests require KV access\n');
+    return;
   }
 
-  // Store original env for restoration
-  const originalEnv = process.env.DRY_FIRE_MODE;
+  const originalConfig = await KVStorage.getConfig();
 
   try {
-    await testEnvironmentBased();
     await testConfigBased();
     await testIsDryFireModeHelper();
     await testCachedConfig();
   } finally {
-    // Restore original env
-    process.env.DRY_FIRE_MODE = originalEnv;
-    
-    // Restore config to DRY_FIRE for safety (if Redis is available)
-    if (hasRedis) {
-      const { KVStorage } = await import('../lib/kv-storage');
-      await KVStorage.updateConfig({ liveExecutionMode: 'DRY_FIRE' });
-    }
+    await KVStorage.updateConfig(originalConfig);
   }
 
   console.log('\n════════════════════════════════════════════════════════════');

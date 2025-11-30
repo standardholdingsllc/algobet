@@ -77,7 +77,7 @@ function buildDefaultSafetyConfig(): LiveArbSafetyConfig {
     minLiquidityUsd: parseFloat(process.env.LIVE_ARB_MIN_LIQUIDITY_USD || '10'),
     maxPlatformSkewPct: parseFloat(process.env.LIVE_ARB_MAX_SKEW_PCT || '20'),
     skewWindowMs: parseInt(process.env.LIVE_ARB_SKEW_WINDOW_MS || '30000', 10),
-    enableConsistencyChecks: process.env.LIVE_ARB_CONSISTENCY_CHECKS !== 'false',
+    enableConsistencyChecks: true,
   };
 }
 

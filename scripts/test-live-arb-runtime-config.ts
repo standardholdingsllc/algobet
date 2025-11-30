@@ -11,19 +11,7 @@ async function run() {
   console.log('║ LIVE-ARB RUNTIME CONFIG TEST                         ║');
   console.log('╚══════════════════════════════════════════════════════╝\n');
 
-  delete process.env.LIVE_ARB_ENABLED;
-  delete process.env.LIVE_RULE_BASED_MATCHER_ENABLED;
-  delete process.env.LIVE_RULE_BASED_SPORTS_ONLY;
-  delete process.env.LIVE_ARB_LIVE_EVENTS_ONLY;
-
-  console.log('➡️  Default seed (no env overrides)');
-  console.log(previewLiveArbRuntimeSeed());
-
-  process.env.LIVE_ARB_ENABLED = 'false';
-  process.env.LIVE_RULE_BASED_MATCHER_ENABLED = 'false';
-  process.env.LIVE_RULE_BASED_SPORTS_ONLY = 'false';
-  process.env.LIVE_ARB_LIVE_EVENTS_ONLY = 'true';
-  console.log('\n➡️  Seed with env overrides');
+  console.log('➡️  Default seed (code-defined defaults only)');
   console.log(previewLiveArbRuntimeSeed());
 
   // Mock KV calls so this script does not require Upstash credentials.
