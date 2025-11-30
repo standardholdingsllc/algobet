@@ -20,7 +20,7 @@ I've updated all the code to use **Upstash Redis** instead of Vercel KV (which i
      ```
    - All methods now use `redis.get()` and `redis.set()`
 
-3. **`pages/api/bot/status.ts`**
+3. **`pages/api/live-arb/status.ts`**
    - Updated to use Upstash Redis client
    - Same initialization as kv-storage.ts
 

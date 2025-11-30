@@ -12,13 +12,21 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getLiveArbStatus, isLiveArbActive } from '@/lib/live-arb-integration';
+import { getLiveArbStatus } from '@/lib/live-arb-integration';
 import { loadLiveArbRuntimeConfig } from '@/lib/live-arb-runtime-config';
 import { LivePriceCache } from '@/lib/live-price-cache';
 import { LiveArbManager } from '@/lib/live-arb-manager';
 import { getOrchestratorStatus } from '@/lib/live-sports-orchestrator';
+import { getWorkerHeartbeat, LiveArbWorkerHeartbeat } from '@/lib/kv-storage';
+import { LiveArbRuntimeConfig } from '@/types/live-arb';
+
+const WORKER_HEARTBEAT_TTL_MS = 30000;
 
 interface LiveArbStatusResponse {
+  workerPresent: boolean;
+  workerState: LiveArbWorkerHeartbeat['state'] | null;
+  workerHeartbeatAt: string | null;
+  runtimeConfig: LiveArbRuntimeConfig | null;
   liveArbEnabled: boolean;
   liveArbReady: boolean;
   timestamp: string;
@@ -93,7 +101,16 @@ export default async function handler(
   }
 
   try {
-    const runtimeConfig = await loadLiveArbRuntimeConfig();
+    let runtimeConfig: LiveArbRuntimeConfig | null = null;
+    try {
+      runtimeConfig = await loadLiveArbRuntimeConfig();
+    } catch (configError) {
+      console.error('[API] /api/live-arb/status failed to load runtime config:', configError);
+    }
+
+    const heartbeat = await getWorkerHeartbeat();
+    const workerPresent = isHeartbeatFresh(heartbeat);
+
     // Get overall status
     const status = getLiveArbStatus();
     const wsStatuses = LiveArbManager.getWsStatuses();
@@ -127,7 +144,11 @@ export default async function handler(
     }
 
     const response: LiveArbStatusResponse = {
-      liveArbEnabled: runtimeConfig.liveArbEnabled,
+      workerPresent,
+      workerState: heartbeat?.state ?? null,
+      workerHeartbeatAt: heartbeat?.updatedAt ?? null,
+      runtimeConfig,
+      liveArbEnabled: runtimeConfig?.liveArbEnabled ?? false,
       liveArbReady: status.ready,
       timestamp: new Date().toISOString(),
       platforms,
@@ -189,5 +210,11 @@ function formatPlatformStatus(status: any): PlatformStatus {
     subscribedMarkets: status.subscribedMarkets || 0,
     errorMessage: status.errorMessage,
   };
+}
+
+function isHeartbeatFresh(heartbeat: LiveArbWorkerHeartbeat | null): boolean {
+  if (!heartbeat?.updatedAt) return false;
+  const age = Date.now() - new Date(heartbeat.updatedAt).getTime();
+  return age <= WORKER_HEARTBEAT_TTL_MS;
 }
 

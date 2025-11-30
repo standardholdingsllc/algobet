@@ -10,7 +10,7 @@
  */
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { KVStorage } from '@/lib/kv-storage';
+import { KVStorage, getOrSeedBotConfig } from '@/lib/kv-storage';
 import { getExecutionMode, isDryFireMode } from '@/lib/execution-wrapper';
 import { ExecutionMode } from '@/types';
 
@@ -25,11 +25,11 @@ interface ExecutionModeResponse {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Preload config to ensure cache is fresh
-  await KVStorage.getConfig();
+  await getOrSeedBotConfig();
 
   if (req.method === 'GET') {
     try {
-      const config = await KVStorage.getConfig();
+      const config = await getOrSeedBotConfig();
       const mode = getExecutionMode();
       
       const response: ExecutionModeResponse = {
@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await KVStorage.updateConfig({ liveExecutionMode: mode });
 
       // Get updated state
-      const updatedConfig = await KVStorage.getConfig();
+      const updatedConfig = await getOrSeedBotConfig();
       const effectiveMode = getExecutionMode();
 
       console.log(`[ExecutionMode API] Changed execution mode: ${mode} (effective: ${effectiveMode})`);

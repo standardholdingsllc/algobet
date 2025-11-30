@@ -185,8 +185,8 @@ View all bets with:
 
 ## API Endpoints
 
-- `POST /api/bot/control` - Start/stop bot
-- `GET /api/bot/status` - Get bot status
+- `POST /api/live-arb/config` - Toggle runtime flags (start/stop)
+- `GET /api/live-arb/status` - Live arb worker + runtime status
 - `GET /api/bets` - Get all bets
 - `GET /api/stats` - Get daily statistics
 - `GET /api/balances` - Get account balances

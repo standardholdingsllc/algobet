@@ -94,8 +94,8 @@ Or manually via Vercel:
    - Updated to use `KVStorage`
    - Balance updates no longer commit to GitHub
 
-4. **`pages/api/bot/status.ts`**
-   - Bot status now stored in KV instead of `data/bot-status.json`
+4. **`pages/api/live-arb/status.ts`**
+   - Live arb status now stored in KV instead of `data/bot-status.json`
 
 ### Files Unchanged
 

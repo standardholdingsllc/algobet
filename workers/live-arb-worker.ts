@@ -1,5 +1,5 @@
 import { LiveMarketFetcher } from '../lib/live-market-fetcher';
-import { KVStorage } from '../lib/kv-storage';
+import { KVStorage, getOrSeedBotConfig, updateWorkerHeartbeat, LiveArbWorkerHeartbeat } from '../lib/kv-storage';
 import { BotConfig, AccountBalance } from '@/types';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
 import { LiveArbManager } from '../lib/live-arb-manager';
@@ -41,6 +41,7 @@ class LiveArbWorker {
     try {
       const runtimeConfig = await loadLiveArbRuntimeConfig();
       if (!runtimeConfig.liveArbEnabled) {
+        await this.recordHeartbeat('IDLE', runtimeConfig);
         liveArbLog(
           'info',
           WORKER_TAG,
@@ -49,7 +50,7 @@ class LiveArbWorker {
         return;
       }
 
-      const botConfig = await KVStorage.getConfig();
+      const botConfig = await getOrSeedBotConfig();
       const liveArbConfig = buildLiveArbConfig(botConfig, runtimeConfig);
 
       await LiveArbManager.initialize(liveArbConfig);
@@ -60,10 +61,12 @@ class LiveArbWorker {
       this.logExecutionMode(botConfig);
 
       this.running = true;
+      await this.recordHeartbeat('RUNNING', runtimeConfig);
       await this.refreshMarkets(botConfig, runtimeConfig);
       this.scheduleLoop(botConfig, runtimeConfig);
     } catch (error) {
       liveArbLog('error', WORKER_TAG, 'Failed to start live-arb worker', error as Error);
+      await this.recordHeartbeat('STOPPED');
       await this.stop();
       process.exit(1);
     }
@@ -78,6 +81,7 @@ class LiveArbWorker {
     }
     await stopOrchestrator();
     await LiveArbManager.shutdown();
+    await this.recordHeartbeat('STOPPED');
     liveArbLog('info', WORKER_TAG, 'Stopped live-arb worker');
   }
 
@@ -124,8 +128,30 @@ class LiveArbWorker {
           'Registry refresh returned 0 markets – rule-based matcher will have nothing to process'
         );
       }
+      await this.recordHeartbeat('RUNNING', runtimeConfig, { totalMarkets: markets.length });
     } catch (error) {
       liveArbLog('error', WORKER_TAG, 'Registry refresh failed', error as Error);
+    }
+  }
+
+  private async recordHeartbeat(
+    state: LiveArbWorkerHeartbeat['state'],
+    runtimeConfig?: LiveArbRuntimeConfig,
+    meta?: { totalMarkets?: number }
+  ): Promise<void> {
+    try {
+      await updateWorkerHeartbeat({
+        updatedAt: new Date().toISOString(),
+        state,
+        liveArbEnabled: runtimeConfig?.liveArbEnabled,
+        ruleBasedMatcherEnabled: runtimeConfig?.ruleBasedMatcherEnabled,
+        liveEventsOnly: runtimeConfig?.liveEventsOnly,
+        sportsOnly: runtimeConfig?.sportsOnly,
+        refreshIntervalMs: this.refreshIntervalMs,
+        totalMarkets: meta?.totalMarkets,
+      });
+    } catch (error) {
+      liveArbLog('error', WORKER_TAG, 'Failed to write worker heartbeat', error as Error);
     }
   }
 

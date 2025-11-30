@@ -28,7 +28,7 @@ import { getMatchedEvents, getMatchedGroup } from './live-event-matcher';
 import { LivePriceCache } from './live-price-cache';
 import { scanArbitrageOpportunities } from './arbitrage';
 import { executeOpportunityWithMode, ExecutionOptions, PlatformAdapters, isDryFireMode } from './execution-wrapper';
-import { KVStorage } from './kv-storage';
+import { getOrSeedBotConfig } from './kv-storage';
 import { LiveArbManager } from './live-arb-manager';
 import { liveArbLog } from './live-arb-logger';
 
@@ -519,7 +519,7 @@ async function runArbCheck(eventKey: string): Promise<void> {
     }
     
     // Get config for min profit
-    const config = await KVStorage.getConfig();
+    const config = await getOrSeedBotConfig();
     const minProfitMargin = config.minProfitMargin;
     
     // Run arb scans ONLY between markets in this group

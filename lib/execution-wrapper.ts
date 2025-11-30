@@ -115,9 +115,6 @@ export interface PlatformAdapters {
 export function getExecutionMode(): ExecutionMode {
   const cfg = getCachedBotConfig();
   if (!cfg) {
-    console.warn(
-      '[ExecutionWrapper] BotConfig cache is empty; defaulting to DRY_FIRE mode.'
-    );
     return 'DRY_FIRE';
   }
   return cfg.liveExecutionMode ?? 'DRY_FIRE';

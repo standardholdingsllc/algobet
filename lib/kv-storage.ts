@@ -28,8 +28,15 @@ interface StorageData {
   liveArbRuntimeConfig?: LiveArbRuntimeConfig;
 }
 
-const DEFAULT_CONFIG: BotConfig = {
-  maxBetPercentage: 10,
+const DEFAULT_MARKET_FILTERS = {
+  sportsOnly: false,
+  categories: [] as string[],
+  eventTypes: [] as string[],
+  leagueTickers: [] as string[],
+};
+
+export const DEFAULT_BOT_CONFIG: BotConfig = {
+  maxBetPercentage: 4, // 4% position sizing to stay conservative by default
   maxDaysToExpiry: 10,
   minProfitMargin: 0.5,
   balanceThresholds: {
@@ -41,20 +48,15 @@ const DEFAULT_CONFIG: BotConfig = {
     enabled: true,
     lowBalanceAlert: true,
   },
-  simulationMode: false,
-  marketFilters: {
-    sportsOnly: false,
-    categories: [],
-    eventTypes: [],
-    leagueTickers: [],
-  },
+  simulationMode: true,
+  marketFilters: DEFAULT_MARKET_FILTERS,
   liveExecutionMode: 'DRY_FIRE', // Default to paper trading for safety
 };
 
 const DEFAULT_DATA: StorageData = {
   bets: [],
   arbitrageGroups: [],
-  config: DEFAULT_CONFIG,
+  config: DEFAULT_BOT_CONFIG,
   dailyStats: [],
   balances: [],
   opportunityLogs: [],
@@ -62,6 +64,18 @@ const DEFAULT_DATA: StorageData = {
 };
 
 const STORAGE_KEY = 'algobet:data';
+const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
+
+export interface LiveArbWorkerHeartbeat {
+  updatedAt: string;
+  state: 'RUNNING' | 'STOPPED' | 'IDLE';
+  liveArbEnabled?: boolean;
+  ruleBasedMatcherEnabled?: boolean;
+  liveEventsOnly?: boolean;
+  sportsOnly?: boolean;
+  refreshIntervalMs?: number;
+  totalMarkets?: number;
+}
 
 /**
  * In-memory cache for config (for synchronous access)
@@ -172,14 +186,7 @@ export class KVStorage {
    * Also updates the in-memory cache for synchronous access
    */
   static async getConfig(): Promise<BotConfig> {
-    const data = await this.getAllData();
-    const config = { ...DEFAULT_CONFIG, ...data.config };
-    
-    // Update cache
-    cachedConfig = config;
-    lastConfigFetchAt = Date.now();
-    
-    return config;
+    return getOrSeedBotConfig();
   }
 
   /**
@@ -188,7 +195,38 @@ export class KVStorage {
    */
   static async updateConfig(config: Partial<BotConfig>): Promise<void> {
     const data = await this.getAllData();
-    data.config = { ...DEFAULT_CONFIG, ...data.config, ...config };
+    data.config = {
+      ...DEFAULT_BOT_CONFIG,
+      ...data.config,
+      ...config,
+      balanceThresholds: {
+        ...DEFAULT_BOT_CONFIG.balanceThresholds,
+        ...(data.config?.balanceThresholds ?? {}),
+        ...(config.balanceThresholds ?? {}),
+      },
+      emailAlerts: {
+        ...DEFAULT_BOT_CONFIG.emailAlerts,
+        ...(data.config?.emailAlerts ?? {}),
+        ...(config.emailAlerts ?? {}),
+      },
+    marketFilters: {
+      ...DEFAULT_MARKET_FILTERS,
+      ...(data.config?.marketFilters ?? {}),
+      ...(config.marketFilters ?? {}),
+      categories:
+        config.marketFilters?.categories ??
+        data.config?.marketFilters?.categories ??
+        DEFAULT_MARKET_FILTERS.categories,
+      eventTypes:
+        config.marketFilters?.eventTypes ??
+        data.config?.marketFilters?.eventTypes ??
+        DEFAULT_MARKET_FILTERS.eventTypes,
+      leagueTickers:
+        config.marketFilters?.leagueTickers ??
+        data.config?.marketFilters?.leagueTickers ??
+        DEFAULT_MARKET_FILTERS.leagueTickers,
+    },
+    };
     await this.updateAllData(data);
     
     // Update cache
@@ -299,6 +337,101 @@ export class KVStorage {
     console.log('🔄 Migrating data from GitHub to Upstash Redis...');
     await this.updateAllData(githubData);
     console.log('✅ Migration complete!');
+  }
+}
+
+function cloneDefaultData(): StorageData {
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+
+function cloneDefaultBotConfig(): BotConfig {
+  return JSON.parse(JSON.stringify(DEFAULT_BOT_CONFIG));
+}
+
+function cacheBotConfig(config: BotConfig): void {
+  cachedConfig = config;
+  lastConfigFetchAt = Date.now();
+}
+
+function mergeBotConfigWithDefaults(config?: BotConfig): BotConfig {
+  return {
+    ...DEFAULT_BOT_CONFIG,
+    ...(config ?? {}),
+    balanceThresholds: {
+      ...DEFAULT_BOT_CONFIG.balanceThresholds,
+      ...(config?.balanceThresholds ?? {}),
+    },
+    emailAlerts: {
+      ...DEFAULT_BOT_CONFIG.emailAlerts,
+      ...(config?.emailAlerts ?? {}),
+    },
+    marketFilters: {
+      ...DEFAULT_MARKET_FILTERS,
+      ...(config?.marketFilters ?? {}),
+      categories: config?.marketFilters?.categories ?? DEFAULT_MARKET_FILTERS.categories,
+      eventTypes: config?.marketFilters?.eventTypes ?? DEFAULT_MARKET_FILTERS.eventTypes,
+      leagueTickers: config?.marketFilters?.leagueTickers ?? DEFAULT_MARKET_FILTERS.leagueTickers,
+    },
+  };
+}
+
+function configsEqual(a?: BotConfig, b?: BotConfig): boolean {
+  if (!a || !b) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export async function getOrSeedBotConfig(): Promise<BotConfig> {
+  try {
+    const rawData = await redis.get<StorageData>(STORAGE_KEY);
+
+    if (!rawData) {
+      const seededData = cloneDefaultData();
+      await redis.set(STORAGE_KEY, seededData);
+      cacheBotConfig(seededData.config);
+      console.info('[KVStorage] BotConfig missing; seeded safe DRY_FIRE defaults.');
+      return seededData.config;
+    }
+
+    const mergedConfig = mergeBotConfigWithDefaults(rawData.config);
+    const needsPersist = !rawData.config || !configsEqual(rawData.config, mergedConfig);
+
+    if (needsPersist) {
+      const nextData: StorageData = {
+        ...rawData,
+        config: mergedConfig,
+      };
+      await redis.set(STORAGE_KEY, nextData);
+      if (!rawData.config) {
+        console.info('[KVStorage] BotConfig missing; seeded safe DRY_FIRE defaults.');
+      }
+    }
+
+    cacheBotConfig(mergedConfig);
+    return mergedConfig;
+  } catch (error) {
+    console.error('[KVStorage] Failed to read BotConfig from KV; using safe defaults', error);
+    const fallback = cloneDefaultBotConfig();
+    cacheBotConfig(fallback);
+    return fallback;
+  }
+}
+
+export async function updateWorkerHeartbeat(
+  heartbeat: LiveArbWorkerHeartbeat
+): Promise<void> {
+  try {
+    await redis.set(WORKER_HEARTBEAT_KEY, heartbeat);
+  } catch (error) {
+    console.error('[KVStorage] Failed to update worker heartbeat', error);
+  }
+}
+
+export async function getWorkerHeartbeat(): Promise<LiveArbWorkerHeartbeat | null> {
+  try {
+    return (await redis.get<LiveArbWorkerHeartbeat>(WORKER_HEARTBEAT_KEY)) ?? null;
+  } catch (error) {
+    console.error('[KVStorage] Failed to read worker heartbeat', error);
+    return null;
   }
 }
 

@@ -28,6 +28,10 @@ interface PlatformStatus {
 }
 
 interface LiveArbStatus {
+  workerPresent: boolean;
+  workerState: WorkerState;
+  workerHeartbeatAt: string | null;
+  runtimeConfig: LiveArbRuntimeConfigData | null;
   liveArbEnabled: boolean;
   liveArbReady: boolean;
   timestamp: string;
@@ -88,13 +92,6 @@ interface LiveMarketsResponse {
   markets: LiveMarket[];
   totalCount: number;
   filteredCount: number;
-}
-
-interface BotStatus {
-  isRunning: boolean;
-  lastScanAt?: string;
-  opportunitiesFound?: number;
-  mode: 'DRY_FIRE' | 'LIVE' | 'SIMULATION';
 }
 
 interface ExecutionModeData {
@@ -302,21 +299,39 @@ function DryFireStatsCard({ stats }: { stats: DryFireStats }) {
 }
 
 // Bot Control Panel
+type WorkerState = 'RUNNING' | 'STOPPED' | 'IDLE' | null;
+
 function BotControlPanel({
-  botStatus,
+  liveArbEnabled,
+  workerPresent,
+  workerState,
+  workerHeartbeatAt,
   executionMode,
   onStart,
   onStop,
   isLoading,
 }: {
-  botStatus: BotStatus | null;
+  liveArbEnabled: boolean;
+  workerPresent: boolean;
+  workerState: WorkerState;
+  workerHeartbeatAt: string | null;
   executionMode: ExecutionModeData | null;
   onStart: () => void;
   onStop: () => void;
   isLoading: boolean;
 }) {
-  const isDryFire = executionMode?.isDryFire ?? botStatus?.mode === 'DRY_FIRE';
-  
+  const isDryFire = executionMode?.isDryFire ?? true;
+  const statusLabel = liveArbEnabled
+    ? workerPresent
+      ? 'RUNNING'
+      : 'ENABLED (NO HEARTBEAT)'
+    : 'STOPPED';
+  const statusStyle = liveArbEnabled
+    ? workerPresent
+      ? 'bg-green-900/30 text-green-300 border border-green-700/50'
+      : 'bg-yellow-900/30 text-yellow-300 border border-yellow-700/50'
+    : 'bg-gray-700 text-gray-400';
+
   return (
     <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
       <div className="flex items-center justify-between mb-4">
@@ -324,15 +339,9 @@ function BotControlPanel({
           <Activity className="w-5 h-5 text-blue-400" />
           Live Betting Bot
         </h3>
-        {botStatus && (
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            botStatus.isRunning 
-              ? 'bg-green-900/30 text-green-300 border border-green-700/50' 
-              : 'bg-gray-700 text-gray-400'
-          }`}>
-            {botStatus.isRunning ? 'RUNNING' : 'STOPPED'}
-          </span>
-        )}
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusStyle}`}>
+          {statusLabel}
+        </span>
       </div>
 
       {isDryFire && (
@@ -344,12 +353,19 @@ function BotControlPanel({
         </div>
       )}
 
+      {liveArbEnabled && !workerPresent && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-sm text-red-200">
+          Live Arb is enabled in KV, but no worker heartbeat has been detected. Make sure
+          `npm run live-arb-worker` is running.
+        </div>
+      )}
+
       <div className="flex items-center gap-4">
         <button
           onClick={onStart}
-          disabled={isLoading || botStatus?.isRunning}
+          disabled={isLoading || liveArbEnabled}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            botStatus?.isRunning
+            liveArbEnabled
               ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
               : isDryFire
                 ? 'bg-amber-600 hover:bg-amber-700 text-white'
@@ -362,9 +378,9 @@ function BotControlPanel({
 
         <button
           onClick={onStop}
-          disabled={isLoading || !botStatus?.isRunning}
+          disabled={isLoading || !liveArbEnabled}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            !botStatus?.isRunning
+            !liveArbEnabled
               ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
               : 'bg-red-600 hover:bg-red-700 text-white'
           }`}
@@ -374,16 +390,18 @@ function BotControlPanel({
         </button>
       </div>
 
-      {botStatus?.lastScanAt && (
+      {(workerHeartbeatAt || workerState) && (
         <div className="mt-4 pt-4 border-t border-gray-700 text-sm text-gray-400">
-          <div className="flex justify-between">
-            <span>Last Scan</span>
-            <span>{formatTimeAgo(botStatus.lastScanAt)}</span>
-          </div>
-          {botStatus.opportunitiesFound !== undefined && (
+          {workerHeartbeatAt && (
+            <div className="flex justify-between">
+              <span>Last Heartbeat</span>
+              <span>{formatTimeAgo(workerHeartbeatAt)}</span>
+            </div>
+          )}
+          {workerState && (
             <div className="flex justify-between mt-1">
-              <span>Opportunities Found</span>
-              <span className="text-green-400">{botStatus.opportunitiesFound}</span>
+              <span>Worker State</span>
+              <span className="text-gray-200">{workerState}</span>
             </div>
           )}
         </div>
@@ -840,9 +858,8 @@ function ExportPanel() {
 
 // Main component
 export default function LiveArbPage() {
-  const [status, setStatus] = useState<LiveArbStatus | null>(null);
+  const [liveArbStatus, setLiveArbStatus] = useState<LiveArbStatus | null>(null);
   const [dryFireStats, setDryFireStats] = useState<DryFireStats | null>(null);
-  const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
   const [markets, setMarkets] = useState<LiveMarket[]>([]);
   const [liveEventsData, setLiveEventsData] = useState<LiveEventsData | null>(null);
   const [executionMode, setExecutionMode] = useState<ExecutionModeData | null>(null);
@@ -854,18 +871,21 @@ export default function LiveArbPage() {
   const [executionModeLoading, setExecutionModeLoading] = useState(false);
   const [runtimeConfigLoading, setRuntimeConfigLoading] = useState(false);
 
-  // Fetch status
-  const fetchStatus = async () => {
+  // Fetch /api/live-arb/status snapshot (worker + runtime info)
+  const fetchLiveArbStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/live-arb/status');
-      if (!res.ok) throw new Error('Failed to fetch status');
+      if (!res.ok) throw new Error('Failed to fetch live-arb status');
       const data = await res.json();
-      setStatus(data);
+      setLiveArbStatus(data);
+      if (data.runtimeConfig) {
+        setRuntimeConfig(data.runtimeConfig);
+      }
       setError(null);
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.message || 'Failed to fetch live-arb status');
     }
-  };
+  }, []);
 
   // Fetch dry-fire stats
   const fetchDryFireStats = async () => {
@@ -876,29 +896,6 @@ export default function LiveArbPage() {
       setDryFireStats(data);
     } catch (err: any) {
       console.error('Failed to fetch dry-fire stats:', err);
-    }
-  };
-
-  // Fetch bot status
-  const fetchBotStatus = async () => {
-    try {
-      const res = await fetch('/api/bot/status');
-      if (!res.ok) throw new Error('Failed to fetch bot status');
-      const data = await res.json();
-      setBotStatus({
-        isRunning: Boolean(
-          data.running ??
-            data.isScanning ??
-            (typeof data.status === 'string'
-              ? data.status === 'running'
-              : data.status?.running)
-        ),
-        lastScanAt: data.lastScan || data.lastSuccessfulScan || data.lastUpdated,
-        opportunitiesFound: data.lastScanOpportunities ?? data.opportunitiesFound,
-        mode: data.simulationMode ? 'SIMULATION' : 'LIVE',
-      });
-    } catch (err: any) {
-      console.error('Failed to fetch bot status:', err);
     }
   };
 
@@ -949,27 +946,43 @@ export default function LiveArbPage() {
     }
   };
 
+  const updateLiveArbConfig = useCallback(
+    async (patch: Partial<LiveArbRuntimeConfigData>) => {
+      const res = await fetch('/api/live-arb/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || 'Failed to update live-arb config');
+      }
+
+      const data = await res.json();
+      setRuntimeConfig(data);
+      setLiveArbStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              runtimeConfig: data,
+              liveArbEnabled: data.liveArbEnabled,
+            }
+          : prev
+      );
+      return data;
+    },
+    []
+  );
+
   const handleRuntimeToggle = async (
     field: keyof LiveArbRuntimeConfigData,
     nextValue: boolean
   ) => {
     setRuntimeConfigLoading(true);
     try {
-      const res = await fetch('/api/live-arb/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: nextValue }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to update config');
-      }
-
-      const data = await res.json();
-      setRuntimeConfig(data);
-      // Refresh dependent panels
-      await Promise.all([fetchStatus(), fetchLiveEvents()]);
+      await updateLiveArbConfig({ [field]: nextValue });
+      await Promise.all([fetchLiveArbStatus(), fetchLiveEvents()]);
     } catch (err: any) {
       console.error('Failed to update live-arb config:', err);
       alert('Failed to update live-arb config: ' + err.message);
@@ -1006,13 +1019,11 @@ export default function LiveArbPage() {
   const startBot = async () => {
     setBotActionLoading(true);
     try {
-      const res = await fetch('/api/bot/control', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' }),
+      await updateLiveArbConfig({
+        liveArbEnabled: true,
+        ruleBasedMatcherEnabled: true,
       });
-      if (!res.ok) throw new Error('Failed to start bot');
-      await fetchBotStatus();
+      await fetchLiveArbStatus();
     } catch (err: any) {
       console.error('Failed to start bot:', err);
       alert('Failed to start bot: ' + err.message);
@@ -1025,13 +1036,8 @@ export default function LiveArbPage() {
   const stopBot = async () => {
     setBotActionLoading(true);
     try {
-      const res = await fetch('/api/bot/control', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop' }),
-      });
-      if (!res.ok) throw new Error('Failed to stop bot');
-      await fetchBotStatus();
+      await updateLiveArbConfig({ liveArbEnabled: false });
+      await fetchLiveArbStatus();
     } catch (err: any) {
       console.error('Failed to stop bot:', err);
       alert('Failed to stop bot: ' + err.message);
@@ -1044,10 +1050,9 @@ export default function LiveArbPage() {
   const refresh = async () => {
     setIsLoading(true);
     await Promise.all([
-      fetchStatus(), 
+      fetchLiveArbStatus(), 
       fetchMarkets(),
       fetchDryFireStats(),
-      fetchBotStatus(),
       fetchLiveEvents(),
       fetchExecutionMode(),
       fetchRuntimeConfig(),
@@ -1064,6 +1069,14 @@ export default function LiveArbPage() {
     const interval = setInterval(refresh, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const liveArbEnabledFlag =
+    runtimeConfig?.liveArbEnabled ??
+    liveArbStatus?.runtimeConfig?.liveArbEnabled ??
+    false;
+  const workerPresent = liveArbStatus?.workerPresent ?? false;
+  const workerState = liveArbStatus?.workerState ?? null;
+  const workerHeartbeatAt = liveArbStatus?.workerHeartbeatAt ?? null;
 
   return (
     <DashboardLayout>
@@ -1125,7 +1138,10 @@ export default function LiveArbPage() {
         {/* Bot Control + Export Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <BotControlPanel
-            botStatus={botStatus}
+            liveArbEnabled={liveArbEnabledFlag}
+            workerPresent={workerPresent}
+            workerState={workerState}
+            workerHeartbeatAt={workerHeartbeatAt}
             executionMode={executionMode}
             onStart={startBot}
             onStop={stopBot}
@@ -1146,14 +1162,14 @@ export default function LiveArbPage() {
         </div>
 
         {/* Overall Status */}
-        {status && (
+        {liveArbStatus && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {/* System Status Card */}
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <h3 className="text-sm font-medium text-gray-400 mb-2">System Status</h3>
               <div className="flex items-center gap-3">
-                {status.liveArbEnabled ? (
-                  status.liveArbReady ? (
+                {liveArbStatus.liveArbEnabled ? (
+                  liveArbStatus.liveArbReady ? (
                     <>
                       <CheckCircle className="w-8 h-8 text-green-400" />
                       <div>
@@ -1186,24 +1202,24 @@ export default function LiveArbPage() {
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <h3 className="text-sm font-medium text-gray-400 mb-2">Price Cache</h3>
               <div className="text-2xl font-bold text-white">
-                {status.priceCacheStats.totalEntries}
+                {liveArbStatus.priceCacheStats.totalEntries}
               </div>
               <div className="text-sm text-gray-400">cached prices</div>
               <div className="mt-2 text-xs text-gray-500">
-                {status.priceCacheStats.totalPriceUpdates.toLocaleString()} total updates
+                {liveArbStatus.priceCacheStats.totalPriceUpdates.toLocaleString()} total updates
               </div>
             </div>
 
             {/* Circuit Breaker Card */}
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <h3 className="text-sm font-medium text-gray-400 mb-2">Circuit Breaker</h3>
-              {status.circuitBreaker.isOpen ? (
+              {liveArbStatus.circuitBreaker.isOpen ? (
                 <div className="flex items-center gap-2 text-red-400">
                   <AlertTriangle className="w-6 h-6" />
                   <div>
                     <div className="font-semibold">OPEN</div>
                     <div className="text-xs text-gray-400">
-                      {status.circuitBreaker.openReason}
+                      {liveArbStatus.circuitBreaker.openReason}
                     </div>
                   </div>
                 </div>
@@ -1213,7 +1229,7 @@ export default function LiveArbPage() {
                   <div>
                     <div className="font-semibold">Closed</div>
                     <div className="text-xs text-gray-400">
-                      {status.circuitBreaker.consecutiveFailures} recent failures
+                      {liveArbStatus.circuitBreaker.consecutiveFailures} recent failures
                     </div>
                   </div>
                 </div>
@@ -1223,13 +1239,13 @@ export default function LiveArbPage() {
         )}
 
         {/* Platform Status Cards */}
-        {status && (
+        {liveArbStatus && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-white mb-3">Platform Connections</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <PlatformCard name="SX.bet" status={status.platforms.sxbet} />
-              <PlatformCard name="Polymarket" status={status.platforms.polymarket} />
-              <PlatformCard name="Kalshi" status={status.platforms.kalshi} />
+              <PlatformCard name="SX.bet" status={liveArbStatus.platforms.sxbet} />
+              <PlatformCard name="Polymarket" status={liveArbStatus.platforms.polymarket} />
+              <PlatformCard name="Kalshi" status={liveArbStatus.platforms.kalshi} />
             </div>
           </div>
         )}
@@ -1328,13 +1344,13 @@ export default function LiveArbPage() {
         )}
 
         {/* Blocked Opportunities Stats */}
-        {status && status.subscriptionStats.blockedOpportunities > 0 && (
+        {liveArbStatus && liveArbStatus.subscriptionStats.blockedOpportunities > 0 && (
           <div className="mt-6 bg-gray-800 rounded-lg p-4 border border-gray-700">
             <h3 className="text-sm font-medium text-gray-400 mb-3">
-              Blocked Opportunities ({status.subscriptionStats.blockedOpportunities})
+              Blocked Opportunities ({liveArbStatus.subscriptionStats.blockedOpportunities})
             </h3>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(status.subscriptionStats.blockedReasons).map(([reason, count]) => (
+              {Object.entries(liveArbStatus.subscriptionStats.blockedReasons).map(([reason, count]) => (
                 <span key={reason} className="px-3 py-1 bg-red-900/20 border border-red-700/50 
                                                rounded text-sm text-red-300">
                   {reason}: {count}

@@ -51,7 +51,7 @@ But since you're using the Vercel integration, you get the `KV_*` variables inst
 ## Files Updated
 
 1. ✅ `lib/kv-storage.ts` - Fixed Redis initialization
-2. ✅ `pages/api/bot/status.ts` - Fixed Redis initialization
+2. ✅ `pages/api/live-arb/status.ts` - Fixed Redis initialization
 3. ✅ `UPSTASH_MIGRATION_COMPLETE.md` - Updated env var names
 4. ✅ `SETUP_VERCEL_KV.md` - Updated env var names
 5. ✅ `REBUILD_FIX_SUMMARY.md` - Updated env var names

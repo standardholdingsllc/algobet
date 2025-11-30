@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { KVStorage } from '@/lib/kv-storage';
+import { KVStorage, getOrSeedBotConfig } from '@/lib/kv-storage';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // No auth required
 
   if (req.method === 'GET') {
     try {
-      const config = await KVStorage.getConfig();
+      const config = await getOrSeedBotConfig();
       return res.status(200).json({ config });
     } catch (error) {
       console.error('Error fetching config:', error);

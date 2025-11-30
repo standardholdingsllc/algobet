@@ -254,6 +254,7 @@ All runtime configuration is managed via KV storage (no boolean env flags):
 - `simulationMode`
 - `liveExecutionMode` (DRY_FIRE | LIVE)
 - `marketFilters` (sports-only, categories, etc.)
+- Auto-seeded via `getOrSeedBotConfig()` when missing, which writes a conservative DRY_FIRE configuration (simulation mode on, small bet sizing) into KV so every process has safe defaults without noisy warnings.
 
 **LiveArbRuntimeConfig** (`/api/live-arb/config`):
 - `liveArbEnabled`: Master switch for WebSocket ingestion + execution
@@ -281,6 +282,8 @@ All runtime configuration is managed via KV storage (no boolean env flags):
 | `GET /api/live-arb/dry-fire-stats` | Aggregated dry-fire statistics |
 | `GET /api/live-arb/dry-fire-export` | CSV export of dry-fire logs |
 
+`/live-arb` UI actions only call these endpoints. The Start/Stop buttons POST to `/api/live-arb/config` to flip `liveArbEnabled`/`ruleBasedMatcherEnabled`, and the dashboard polls `/api/live-arb/status`, which now includes the KV-backed worker heartbeat (`workerPresent`, `workerState`, `runtimeConfig`) so the UI never shells out to legacy `/api/bot/*` routes.
+
 ### 8.2 Dashboard Endpoints
 
 | Endpoint | Purpose |
@@ -304,6 +307,7 @@ All runtime configuration is managed via KV storage (no boolean env flags):
 ### 9.2 Live Arb Dashboard (`/live-arb`)
 - **Runtime Config Panel**: Enable/disable live-arb, matcher, sports-only, live-events-only
 - **Execution Mode Toggle**: DRY_FIRE / LIVE
+- **Start/Stop Controls**: POST to `/api/live-arb/config` to flip KV flags (`liveArbEnabled`, `ruleBasedMatcherEnabled`) instead of spawning processes; worker presence is derived from `/api/live-arb/status`.
 - **System Status**: WS connections, price cache stats, circuit breaker state
 - **Matched Events Table**: Cross-platform matches with sport, teams, platforms, quality
 - **Dry-Fire Statistics**: Simulated vs rejected trades, potential profit
@@ -330,6 +334,9 @@ Each refresh cycle (default every 15s):
 3. Fetch from all platforms with filtering applied
 4. Update registry via `refreshRegistry()`
 5. If `liveEventsOnly=true`, matcher only considers `LIVE` status events
+
+**Heartbeat Reporting:**
+- After startup, each refresh, and shutdown the worker calls `updateWorkerHeartbeat()` (KV), recording `state`, `updatedAt`, and summary metadata so `/api/live-arb/status` can expose `workerPresent`/`workerState` to the dashboard.
 
 **Logging tags:**
 - `[LiveArbWorker]`: Startup, refresh summaries, shutdown
