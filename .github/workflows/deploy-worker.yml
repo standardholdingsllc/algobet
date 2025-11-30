@@ -7,6 +7,7 @@ on:
     paths:
       - "workers/**"
       - "scripts/**"
+      - "lib/**"
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
@@ -30,8 +31,7 @@ jobs:
             echo "[deploy] Pulling latest code..."
             git pull
 
-            echo "[deploy] Installing dependencies..."
-            npm ci --omit=dev || npm install --omit=dev
+            echo "[deploy] Skipping npm install (using existing node_modules)..."
 
             echo "[deploy] Restarting PM2 worker..."
             pm2 restart live-arb-worker || pm2 start npm --name live-arb-worker -- run live-arb-worker
