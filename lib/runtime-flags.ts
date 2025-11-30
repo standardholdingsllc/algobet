@@ -1,8 +1,9 @@
 import { BotConfig } from '@/types';
 
 /**
- * Environment-level switch for the legacy snapshot arbitrage system.
- * Defaults to true so existing deployments keep scanning unless explicitly disabled.
+ * @deprecated Snapshot arbitration now always runs; this flag is ignored by
+ * the cron bot and is retained only for backwards compatibility with legacy
+ * deployments that still set the env.
  */
 export const SNAPSHOT_ARB_ENABLED =
   process.env.SNAPSHOT_ARB_ENABLED !== 'false';
@@ -13,22 +14,6 @@ export const SNAPSHOT_ARB_ENABLED =
  */
 export const MATCH_GRAPH_ENABLED =
   process.env.MATCH_GRAPH_ENABLED === 'true';
-
-/**
- * Resolve whether snapshot arbitrage should run for the current process,
- * combining env flags with optional BotConfig overrides.
- */
-export function resolveSnapshotArbEnabled(
-  config?: BotConfig | null
-): boolean {
-  if (!SNAPSHOT_ARB_ENABLED) {
-    return false;
-  }
-  if (typeof config?.snapshotArbEnabled === 'boolean') {
-    return config.snapshotArbEnabled;
-  }
-  return SNAPSHOT_ARB_ENABLED;
-}
 
 /**
  * Resolve whether match-graph-enabled workflows (Gemini, HotMarketTracker)

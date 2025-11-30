@@ -1,45 +1,36 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { ArbitrageBotEngine } from '@/lib/bot';
-import { SNAPSHOT_ARB_ENABLED } from '@/lib/runtime-flags';
 import { getBotStatus, updateBotHealth } from './status';
 
 /**
  * Cron endpoint that runs every minute to scan for arbitrage opportunities
  * This is triggered by Vercel Cron and performs ONE scan per invocation
- * 
+ *
  * Features:
  * - Health tracking (last scan, error count)
  * - Graceful error recovery (continues running even if scan fails)
  * - Auto-restart capability (resets error count on success)
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   // Verify this is a cron job (Vercel sets this header)
   const authHeader = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET || 'default-secret';
-  
+
   // Allow both Vercel's cron and external cron services
   const isVercelCron = authHeader === `Bearer ${cronSecret}`;
-  const isExternalCron = req.headers['user-agent']?.includes('cron') || req.query.secret === cronSecret;
-  
+  const isExternalCron =
+    req.headers['user-agent']?.includes('cron') || req.query.secret === cronSecret;
+
   if (!isVercelCron && !isExternalCron) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  if (!SNAPSHOT_ARB_ENABLED) {
-    console.info(
-      '[CronBot] Snapshot arb disabled by config (SNAPSHOT_ARB_ENABLED=false); exiting early.'
-    );
-    return res.status(200).json({
-      ok: true,
-      snapshotArbEnabled: false,
-      message: 'Snapshot arb disabled by config',
-      timestamp: new Date().toISOString(),
-    });
-  }
-
   try {
     const botEnabled = await getBotStatus();
-    
+
     if (!botEnabled) {
       // Bot is disabled, skip scanning
       return res.status(200).json({
@@ -51,20 +42,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Bot is enabled - perform a single scan with error recovery
     console.log(`[${new Date().toISOString()}] Cron scan starting...`);
-    
+
     let scanSuccess = false;
     let errorMessage = '';
     const scanStartTime = Date.now();
-    
+
     try {
       const bot = new ArbitrageBotEngine();
       await bot.scanOnce();
       scanSuccess = true;
       const scanDuration = Date.now() - scanStartTime;
-      console.log(`[${new Date().toISOString()}] Cron scan completed successfully in ${scanDuration}ms`);
+      console.log(
+        `[${new Date().toISOString()}] Cron scan completed successfully in ${scanDuration}ms`
+      );
     } catch (scanError: any) {
       // Log the error but don't throw - we want to continue running
-      console.error(`[${new Date().toISOString()}] Scan error (will retry next cycle):`, scanError.message);
+      console.error(
+        `[${new Date().toISOString()}] Scan error (will retry next cycle):`,
+        scanError.message
+      );
       errorMessage = scanError.message;
       scanSuccess = false;
     }
@@ -94,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Critical error (e.g., can't read bot status) - update health and return error
     console.error('Critical error in cron handler:', error);
     await updateBotHealth(false);
-    
+
     // Still return 200 to prevent cron from stopping
     return res.status(200).json({
       message: 'Critical error but bot will retry',

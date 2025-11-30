@@ -183,9 +183,8 @@ MatchGraph {
 - `calculateBetSizes` enforces per-platform `maxBetPercentage` and available cash, while execution code double-checks expiry windows before sending orders.
 
 ### Snapshot & live-arb feature flags
-- `SNAPSHOT_ARB_ENABLED` (env, default `true`) wraps the entire cron path. When set to `false`, `/api/bot/cron` returns immediately without touching `MarketFeedService`, Kalshi/Polymarket/SX.bet adapters, or HotMarketTracker so SX.bet pagination jobs are never triggered.
-- `BotConfig.snapshotArbEnabled` (default `false`) mirrors the env flag for KV-backed control; both must be `true` for the snapshot scanner to run, so new live-only environments stay quiet unless explicitly re-enabled.
-- `MATCH_GRAPH_ENABLED` (env, default `false`) + `BotConfig.matchGraphEnabled` gate Gemini/MatchGraph usage and every HotMarketTracker log. When disabled, the cron bot still loads single-platform snapshots if snapshot arb is enabled, but it skips cross-book tracking entirely.
+- `SNAPSHOT_ARB_ENABLED` is now a no-op for the cron bot. `/api/bot/cron` always runs the full snapshot ingest + scan pipeline and ignores this env flag (kept only for backwards compatibility with older deployments).
+- `MATCH_GRAPH_ENABLED` (env, default `false`) + `BotConfig.matchGraphEnabled` still gate Gemini/MatchGraph usage and every HotMarketTracker log. When disabled, the cron bot still loads single-platform snapshots but skips cross-book tracking entirely.
 - The live-event arbitrage system (Section&nbsp;12) is now governed by a KV-backed runtime config (`/api/live-arb/config`) surfaced on the dashboard: `liveArbEnabled`, `ruleBasedMatcherEnabled`, `sportsOnly`, and `liveEventsOnly`. The legacy `LIVE_ARB_*` env vars only seed the very first defaults; once saved, the KV + UI settings are the source of truth. `DRY_FIRE_MODE=true` remains an optional master safety override layered on top of the Execution Mode UI toggle, and `LIVE_ARB_WORKER` is still available for deployments that dedicate a worker process.
 
 ---

@@ -162,11 +162,6 @@ export interface BotConfig {
   };
   simulationMode: boolean;   // When true, logs opportunities without placing bets (default: false)
   marketFilters?: MarketFilterPreferences;
-  /**
-   * Feature flags for snapshot arbitrage + match graph pipelines.
-   * Defaults are false so live-only environments do not run them accidentally.
-   */
-  snapshotArbEnabled?: boolean;
   matchGraphEnabled?: boolean;
   /**
    * Live arb execution mode (runtime toggle via dashboard)

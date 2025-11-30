@@ -8,10 +8,7 @@ import { KVStorage } from './kv-storage';
 import { MarketFeedService } from './market-feed-service';
 import { MARKET_SNAPSHOT_TTL_SECONDS } from './constants';
 import { sendBalanceAlert } from './email';
-import {
-  resolveMatchGraphEnabled,
-  resolveSnapshotArbEnabled,
-} from './runtime-flags';
+import { resolveMatchGraphEnabled } from './runtime-flags';
 import { Bet, ArbitrageGroup, ArbitrageOpportunity, Market, OpportunityLog, BotConfig, TrackedMarket, MarketFilterInput } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -112,15 +109,7 @@ export class ArbitrageBotEngine {
 
     // Get configuration
     const config = await KVStorage.getConfig();
-    const snapshotArbEnabled = resolveSnapshotArbEnabled(config);
     const matchGraphEnabled = resolveMatchGraphEnabled(config);
-
-    if (!snapshotArbEnabled) {
-      console.info(
-        '[CronBot] Snapshot arbitrage disabled by config; skipping scan cycle.'
-      );
-      return;
-    }
 
     // Get detailed balance information (total value, available cash, positions)
     const kalshiBalances = await this.kalshi.getTotalBalance();
