@@ -171,8 +171,28 @@ interface LiveArbRuntimeConfigData {
 }
 
 // Status indicator component
-function StatusIndicator({ connected }: { connected: boolean }) {
-  return connected ? (
+function StatusIndicator({ status }: { status: PlatformStatus }) {
+  // Handle disabled state (e.g., missing env var)
+  if (status.state === 'disabled') {
+    return (
+      <div className="flex items-center gap-2 text-yellow-400">
+        <AlertTriangle className="w-4 h-4" />
+        <span>Disabled</span>
+      </div>
+    );
+  }
+
+  // Handle no_worker state (no heartbeat from worker)
+  if (status.state === 'no_worker') {
+    return (
+      <div className="flex items-center gap-2 text-gray-400">
+        <WifiOff className="w-4 h-4" />
+        <span>No Worker</span>
+      </div>
+    );
+  }
+
+  return status.connected ? (
     <div className="flex items-center gap-2 text-green-400">
       <Wifi className="w-4 h-4" />
       <span>Connected</span>
@@ -193,22 +213,33 @@ function PlatformCard({
   name: string;
   status: PlatformStatus;
 }) {
+  const isDisabled = status.state === 'disabled';
+  const borderClass = isDisabled 
+    ? 'border-yellow-700/50' 
+    : status.connected 
+      ? 'border-green-700/50' 
+      : 'border-gray-700';
+
   return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+    <div className={`bg-gray-800 rounded-lg p-4 border ${borderClass}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-white capitalize">{name}</h3>
-        <StatusIndicator connected={status.connected} />
+        <StatusIndicator status={status} />
       </div>
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-400">State</span>
-          <span className="text-gray-200">{status.state}</span>
+          <span className={`${isDisabled ? 'text-yellow-300' : 'text-gray-200'}`}>
+            {formatStateLabel(status.state)}
+          </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Subscribed Markets</span>
-          <span className="text-gray-200">{status.subscribedMarkets}</span>
-        </div>
+        {!isDisabled && (
+          <div className="flex justify-between">
+            <span className="text-gray-400">Subscribed Markets</span>
+            <span className="text-gray-200">{status.subscribedMarkets}</span>
+          </div>
+        )}
         {status.lastMessageAt && (
           <div className="flex justify-between">
             <span className="text-gray-400">Last Message</span>
@@ -218,13 +249,32 @@ function PlatformCard({
           </div>
         )}
         {status.errorMessage && (
-          <div className="mt-2 p-2 bg-red-900/20 border border-red-700/50 rounded text-red-300 text-xs">
+          <div className={`mt-2 p-2 rounded text-xs ${
+            isDisabled 
+              ? 'bg-yellow-900/20 border border-yellow-700/50 text-yellow-300'
+              : 'bg-red-900/20 border border-red-700/50 text-red-300'
+          }`}>
             {status.errorMessage}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+// Format state label for better readability
+function formatStateLabel(state: string): string {
+  switch (state) {
+    case 'disabled': return 'Disabled (Config)';
+    case 'no_worker': return 'No Worker';
+    case 'not_initialized': return 'Not Initialized';
+    case 'connecting': return 'Connecting...';
+    case 'connected': return 'Connected';
+    case 'disconnected': return 'Disconnected';
+    case 'reconnecting': return 'Reconnecting...';
+    case 'error': return 'Error';
+    default: return state;
+  }
 }
 
 // Format time ago

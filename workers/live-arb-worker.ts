@@ -1,10 +1,17 @@
 import { LiveMarketFetcher } from '../lib/live-market-fetcher';
-import { KVStorage, getOrSeedBotConfig, updateWorkerHeartbeat, LiveArbWorkerHeartbeat } from '../lib/kv-storage';
+import {
+  KVStorage,
+  getOrSeedBotConfig,
+  updateWorkerHeartbeat,
+  LiveArbWorkerHeartbeat,
+  WorkerPlatformStatus,
+  WorkerPriceCacheStats,
+} from '../lib/kv-storage';
 import { BotConfig, AccountBalance } from '@/types';
-import { LiveArbRuntimeConfig } from '@/types/live-arb';
+import { LiveArbRuntimeConfig, WsClientStatus } from '@/types/live-arb';
 import { LiveArbManager } from '../lib/live-arb-manager';
 import { loadLiveArbRuntimeConfig } from '../lib/live-arb-runtime-config';
-import { buildLiveArbConfig } from '../lib/live-arb-integration';
+import { buildLiveArbConfig, getLiveArbStatus } from '../lib/live-arb-integration';
 import {
   startOrchestrator,
   stopOrchestrator,
@@ -15,6 +22,11 @@ import { PlatformAdapters, ExecutionOptions } from '../lib/execution-wrapper';
 import { KalshiAPI } from '../lib/markets/kalshi';
 import { PolymarketAPI } from '../lib/markets/polymarket';
 import { SXBetAPI } from '../lib/markets/sxbet';
+import { LivePriceCache } from '../lib/live-price-cache';
+
+// Environment validation for clear error messaging
+const SXBET_WS_URL = (process.env.SXBET_WS_URL || '').trim();
+const SXBET_WS_DISABLED = !SXBET_WS_URL;
 
 const WORKER_TAG = 'LiveArbWorker';
 const DEFAULT_REFRESH_INTERVAL_MS = parseInt(
@@ -195,6 +207,53 @@ class LiveArbWorker {
     meta?: { totalMarkets?: number }
   ): Promise<void> {
     try {
+      // Collect platform statuses from LiveArbManager (source of truth when worker is running)
+      const wsStatuses = LiveArbManager.getWsStatuses();
+      const platforms = {
+        sxbet: this.formatPlatformStatusForKV(wsStatuses.sxbet, 'sxbet'),
+        polymarket: this.formatPlatformStatusForKV(wsStatuses.polymarket, 'polymarket'),
+        kalshi: this.formatPlatformStatusForKV(wsStatuses.kalshi, 'kalshi'),
+      };
+
+      // Collect price cache stats
+      const cacheStats = LivePriceCache.getStats();
+      const pricesByPlatform = LivePriceCache.getPriceCountByPlatform();
+      const allPrices = LivePriceCache.getAllPrices();
+
+      // Calculate age range
+      let oldestUpdateMs: number | undefined;
+      let newestUpdateMs: number | undefined;
+      let lastPriceUpdateAt: string | undefined;
+
+      for (const price of allPrices) {
+        const ageMs = price.ageMs ?? 0;
+        if (oldestUpdateMs === undefined || ageMs > oldestUpdateMs) {
+          oldestUpdateMs = ageMs;
+        }
+        if (newestUpdateMs === undefined || ageMs < newestUpdateMs) {
+          newestUpdateMs = ageMs;
+          lastPriceUpdateAt = price.updatedAt;
+        }
+      }
+
+      const priceCacheStats: WorkerPriceCacheStats = {
+        totalEntries: cacheStats.priceCacheSize,
+        entriesByPlatform: pricesByPlatform,
+        totalPriceUpdates: cacheStats.totalPriceUpdates,
+        oldestUpdateMs,
+        newestUpdateMs,
+        lastPriceUpdateAt,
+      };
+
+      // Get circuit breaker state
+      const status = getLiveArbStatus();
+      const circuitBreaker = {
+        isOpen: status.safetyStatus.circuitBreakerOpen,
+        consecutiveFailures: status.safetyStatus.circuitBreakerState.consecutiveFailures,
+        openReason: status.safetyStatus.circuitBreakerState.openReason,
+        openedAt: status.safetyStatus.circuitBreakerState.openedAt,
+      };
+
       await updateWorkerHeartbeat({
         updatedAt: new Date().toISOString(),
         state,
@@ -204,10 +263,51 @@ class LiveArbWorker {
         sportsOnly: runtimeConfig?.sportsOnly,
         refreshIntervalMs: this.refreshIntervalMs,
         totalMarkets: meta?.totalMarkets,
+        platforms,
+        priceCacheStats,
+        circuitBreaker,
       });
     } catch (error) {
       liveArbLog('error', WORKER_TAG, 'Failed to write worker heartbeat', error as Error);
     }
+  }
+
+  /**
+   * Convert WsClientStatus to WorkerPlatformStatus for KV storage.
+   * Handles null/undefined status and adds disabled state detection.
+   */
+  private formatPlatformStatusForKV(
+    status: WsClientStatus | null,
+    platform: 'sxbet' | 'polymarket' | 'kalshi'
+  ): WorkerPlatformStatus {
+    // Check for disabled platforms (missing env vars)
+    if (platform === 'sxbet' && SXBET_WS_DISABLED) {
+      return {
+        connected: false,
+        state: 'disabled',
+        lastMessageAt: null,
+        subscribedMarkets: 0,
+        disabled: true,
+        disabledReason: 'SXBET_WS_URL environment variable not configured',
+      };
+    }
+
+    if (!status) {
+      return {
+        connected: false,
+        state: this.arbActive ? 'connecting' : 'not_initialized',
+        lastMessageAt: null,
+        subscribedMarkets: 0,
+      };
+    }
+
+    return {
+      connected: status.state === 'connected',
+      state: status.state,
+      lastMessageAt: status.lastMessageAt || null,
+      subscribedMarkets: status.subscribedMarkets || 0,
+      errorMessage: status.errorMessage,
+    };
   }
 
   private async buildExecutionOptions(

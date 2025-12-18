@@ -179,6 +179,30 @@ MIN_PROFIT_MARGIN=0.5
 # CRON (Optional - for securing cron endpoint)
 # ===================================
 CRON_SECRET=<openssl rand -hex 32>
+
+# ===================================
+# LIVE ARB WORKER (Optional - for live betting)
+# ===================================
+# SX.bet WebSocket URL (leave empty to disable SX.bet WS)
+SXBET_WS_URL=wss://ably.sx.bet/...
+
+# Worker refresh interval in milliseconds (default: 15000)
+LIVE_ARB_WORKER_REFRESH_MS=15000
+
+# Idle polling interval when bot is stopped (default: 5000)
+LIVE_ARB_IDLE_POLL_MS=5000
+
+# How long before a heartbeat is considered stale (default: 60000)
+WORKER_HEARTBEAT_STALE_MS=60000
+
+# Minimum profit in basis points (default: 50)
+LIVE_ARB_MIN_PROFIT_BPS=50
+
+# Max price age in milliseconds (default: 2000)
+LIVE_ARB_MAX_PRICE_AGE_MS=2000
+
+# Log level: 'info' or 'debug' (default: info)
+LIVE_ARB_LOG_LEVEL=info
 ```
 
 ## Vercel Environment Variables

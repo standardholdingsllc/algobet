@@ -77,6 +77,37 @@ function enforceLiveArbAlwaysOn(
 const STORAGE_KEY = 'algobet:data';
 const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
 
+/**
+ * Platform connection status as reported by the worker.
+ * This is persisted to KV so the serverless status API can read it.
+ */
+export interface WorkerPlatformStatus {
+  connected: boolean;
+  state: string;
+  lastMessageAt: string | null;
+  subscribedMarkets: number;
+  errorMessage?: string;
+  /** If the platform is disabled due to missing config */
+  disabled?: boolean;
+  disabledReason?: string;
+}
+
+/**
+ * Price cache stats as reported by the worker.
+ */
+export interface WorkerPriceCacheStats {
+  totalEntries: number;
+  entriesByPlatform: Record<string, number>;
+  totalPriceUpdates: number;
+  oldestUpdateMs?: number;
+  newestUpdateMs?: number;
+  lastPriceUpdateAt?: string;
+}
+
+/**
+ * Comprehensive worker heartbeat persisted to KV.
+ * This is the source of truth for the serverless status API.
+ */
 export interface LiveArbWorkerHeartbeat {
   updatedAt: string;
   state: 'RUNNING' | 'STOPPED' | 'IDLE';
@@ -86,6 +117,21 @@ export interface LiveArbWorkerHeartbeat {
   sportsOnly?: boolean;
   refreshIntervalMs?: number;
   totalMarkets?: number;
+  /** Platform connection statuses - source of truth for dashboard */
+  platforms?: {
+    sxbet: WorkerPlatformStatus;
+    polymarket: WorkerPlatformStatus;
+    kalshi: WorkerPlatformStatus;
+  };
+  /** Price cache stats - source of truth for dashboard */
+  priceCacheStats?: WorkerPriceCacheStats;
+  /** Circuit breaker state */
+  circuitBreaker?: {
+    isOpen: boolean;
+    consecutiveFailures: number;
+    openReason?: string;
+    openedAt?: string;
+  };
 }
 
 /**

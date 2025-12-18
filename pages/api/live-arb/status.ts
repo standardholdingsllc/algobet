@@ -3,24 +3,35 @@
  *
  * GET /api/live-arb/status
  *
- * Returns comprehensive status of the live arbitrage system including:
- * - Overall enabled/ready state
- * - Per-platform WebSocket connection status
- * - Price cache statistics
- * - Circuit breaker state
- * - Blocked opportunity counts
+ * Returns comprehensive status of the live arbitrage system.
+ * 
+ * IMPORTANT: This serverless endpoint reads ALL status from KV storage,
+ * NOT from in-memory state. The worker process writes its state to KV
+ * periodically, and this endpoint reads it back.
+ * 
+ * This design ensures the Vercel serverless function can accurately
+ * display worker status even though it cannot access the worker's
+ * in-process WebSocket connections or price cache.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getLiveArbStatus } from '@/lib/live-arb-integration';
 import { loadLiveArbRuntimeConfig } from '@/lib/live-arb-runtime-config';
-import { LivePriceCache } from '@/lib/live-price-cache';
-import { LiveArbManager } from '@/lib/live-arb-manager';
-import { getOrchestratorStatus } from '@/lib/live-sports-orchestrator';
-import { getWorkerHeartbeat, LiveArbWorkerHeartbeat } from '@/lib/kv-storage';
+import {
+  getWorkerHeartbeat,
+  LiveArbWorkerHeartbeat,
+  WorkerPlatformStatus,
+} from '@/lib/kv-storage';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
 
-const WORKER_HEARTBEAT_TTL_MS = 30000;
+/**
+ * Heartbeat TTL - worker is considered "present" if heartbeat is fresher than this.
+ * Set to 60s to allow for network hiccups when worker writes every 10-15s.
+ * Can be overridden via WORKER_HEARTBEAT_STALE_MS env var.
+ */
+const WORKER_HEARTBEAT_TTL_MS = parseInt(
+  process.env.WORKER_HEARTBEAT_STALE_MS || '60000',
+  10
+);
 
 interface LiveArbStatusResponse {
   workerPresent: boolean;
@@ -101,6 +112,7 @@ export default async function handler(
   }
 
   try {
+    // Load runtime config from KV
     let runtimeConfig: LiveArbRuntimeConfig | null = null;
     try {
       runtimeConfig = await loadLiveArbRuntimeConfig();
@@ -108,40 +120,39 @@ export default async function handler(
       console.error('[API] /api/live-arb/status failed to load runtime config:', configError);
     }
 
+    // Load worker heartbeat from KV - this is the SOURCE OF TRUTH for:
+    // - Worker presence
+    // - Platform connection statuses
+    // - Price cache stats
+    // - Circuit breaker state
     const heartbeat = await getWorkerHeartbeat();
     const workerPresent = isHeartbeatFresh(heartbeat);
 
-    // Get overall status
-    const status = getLiveArbStatus();
-    const wsStatuses = LiveArbManager.getWsStatuses();
-    const subscriptionStats = LiveArbManager.getSubscriptionStats();
-    const orchestratorStatus = getOrchestratorStatus();
-
-    // Build platform status
+    // Extract platform statuses from KV heartbeat (NOT in-memory)
     const platforms: LiveArbStatusResponse['platforms'] = {
-      sxbet: formatPlatformStatus(wsStatuses.sxbet),
-      polymarket: formatPlatformStatus(wsStatuses.polymarket),
-      kalshi: formatPlatformStatus(wsStatuses.kalshi),
+      sxbet: heartbeat?.platforms?.sxbet ?? getDefaultPlatformStatus('sxbet'),
+      polymarket: heartbeat?.platforms?.polymarket ?? getDefaultPlatformStatus('polymarket'),
+      kalshi: heartbeat?.platforms?.kalshi ?? getDefaultPlatformStatus('kalshi'),
     };
 
-    // Get price cache stats
-    const cacheStats = LivePriceCache.getStats();
-    const pricesByPlatform = LivePriceCache.getPriceCountByPlatform();
-    const allPrices = LivePriceCache.getAllPrices();
+    // Extract price cache stats from KV heartbeat (NOT in-memory)
+    const priceCacheStats: LiveArbStatusResponse['priceCacheStats'] = heartbeat?.priceCacheStats ?? {
+      totalEntries: 0,
+      entriesByPlatform: { kalshi: 0, polymarket: 0, sxbet: 0 },
+      totalPriceUpdates: 0,
+    };
 
-    // Calculate age range
-    let oldestUpdateMs: number | undefined;
-    let newestUpdateMs: number | undefined;
-    
-    for (const price of allPrices) {
-      const ageMs = price.ageMs ?? 0;
-      if (oldestUpdateMs === undefined || ageMs > oldestUpdateMs) {
-        oldestUpdateMs = ageMs;
-      }
-      if (newestUpdateMs === undefined || ageMs < newestUpdateMs) {
-        newestUpdateMs = ageMs;
-      }
-    }
+    // Extract circuit breaker state from KV heartbeat
+    const circuitBreaker: LiveArbStatusResponse['circuitBreaker'] = heartbeat?.circuitBreaker ?? {
+      isOpen: false,
+      consecutiveFailures: 0,
+    };
+
+    // Determine if system is ready based on heartbeat data
+    const liveArbReady = workerPresent && 
+      heartbeat?.state === 'RUNNING' &&
+      !circuitBreaker.isOpen &&
+      (platforms.sxbet.connected || platforms.polymarket.connected || platforms.kalshi.connected);
 
     const response: LiveArbStatusResponse = {
       workerPresent,
@@ -149,40 +160,44 @@ export default async function handler(
       workerHeartbeatAt: heartbeat?.updatedAt ?? null,
       runtimeConfig,
       liveArbEnabled: runtimeConfig?.liveArbEnabled ?? false,
-      liveArbReady: status.ready,
+      liveArbReady,
       timestamp: new Date().toISOString(),
       platforms,
+      // Live events data - defaults when no heartbeat
       liveEvents: {
-        enabled: orchestratorStatus.enabled,
-        running: orchestratorStatus.running,
-        uptimeMs: orchestratorStatus.uptimeMs,
+        enabled: runtimeConfig?.ruleBasedMatcherEnabled ?? false,
+        running: workerPresent && heartbeat?.state === 'RUNNING',
+        uptimeMs: 0,
         registry: {
-          countByPlatform: orchestratorStatus.registry.countByPlatform,
-          countByStatus: orchestratorStatus.registry.countByStatus,
-          updatedAt: orchestratorStatus.registry.updatedAt,
+          countByPlatform: {},
+          countByStatus: {},
+          updatedAt: 0,
         },
-        stats: orchestratorStatus.stats,
-        watcherStats: orchestratorStatus.watcherStats,
+        stats: {
+          totalVendorEvents: heartbeat?.totalMarkets ?? 0,
+          liveEvents: 0,
+          preEvents: 0,
+          matchedGroups: 0,
+          activeWatchers: 0,
+          arbChecksTotal: 0,
+          opportunitiesTotal: 0,
+        },
+        watcherStats: {
+          totalArbChecks: 0,
+          totalOpportunities: 0,
+          avgChecksPerSecond: 0,
+          avgCheckTimeMs: 0,
+          maxCheckTimeMs: 0,
+          totalMarketsWatched: 0,
+        },
       },
-      priceCacheStats: {
-        totalEntries: cacheStats.priceCacheSize,
-        entriesByPlatform: pricesByPlatform,
-        totalPriceUpdates: cacheStats.totalPriceUpdates,
-        oldestUpdateMs,
-        newestUpdateMs,
-      },
-      circuitBreaker: {
-        isOpen: status.safetyStatus.circuitBreakerOpen,
-        consecutiveFailures: status.safetyStatus.circuitBreakerState.consecutiveFailures,
-        openReason: status.safetyStatus.circuitBreakerState.openReason,
-        openedAt: status.safetyStatus.circuitBreakerState.openedAt,
-      },
+      priceCacheStats,
+      circuitBreaker,
       subscriptionStats: {
-        lastUpdateAt: subscriptionStats.lastUpdateAt,
-        updateCount: subscriptionStats.updateCount,
-        currentSubscriptions: subscriptionStats.currentSubscriptions,
-        blockedOpportunities: subscriptionStats.blockedOpportunities,
-        blockedReasons: subscriptionStats.blockedReasons,
+        updateCount: 0,
+        currentSubscriptions: {},
+        blockedOpportunities: 0,
+        blockedReasons: {},
       },
     };
 
@@ -193,25 +208,35 @@ export default async function handler(
   }
 }
 
-function formatPlatformStatus(status: any): PlatformStatus {
-  if (!status) {
+/**
+ * Get default platform status when no heartbeat data exists.
+ * Shows appropriate messaging for each platform.
+ */
+function getDefaultPlatformStatus(platform: 'sxbet' | 'polymarket' | 'kalshi'): PlatformStatus {
+  // Check if SX.bet is disabled due to missing env var
+  if (platform === 'sxbet' && !process.env.SXBET_WS_URL) {
     return {
       connected: false,
-      state: 'not_initialized',
+      state: 'disabled',
       lastMessageAt: null,
       subscribedMarkets: 0,
+      errorMessage: 'SXBET_WS_URL not configured',
     };
   }
 
   return {
-    connected: status.state === 'connected',
-    state: status.state,
-    lastMessageAt: status.lastMessageAt || null,
-    subscribedMarkets: status.subscribedMarkets || 0,
-    errorMessage: status.errorMessage,
+    connected: false,
+    state: 'no_worker',
+    lastMessageAt: null,
+    subscribedMarkets: 0,
+    errorMessage: 'Worker not running or no heartbeat received',
   };
 }
 
+/**
+ * Check if worker heartbeat is fresh (within TTL).
+ * Returns true if worker is considered "present".
+ */
 function isHeartbeatFresh(heartbeat: LiveArbWorkerHeartbeat | null): boolean {
   if (!heartbeat?.updatedAt) return false;
   const age = Date.now() - new Date(heartbeat.updatedAt).getTime();
