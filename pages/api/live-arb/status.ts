@@ -212,6 +212,8 @@ export default async function handler(
         rawItemsCount: 0,
         parsedEventsCount: 0,
         filteredOut: {},
+        filteredToCloseWindowCount: 0,
+        queryApplied: undefined,
         sampleRawItems: [],
       },
     };

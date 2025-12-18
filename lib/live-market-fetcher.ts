@@ -9,7 +9,12 @@
 
 import { Market, MarketPlatform, BotConfig, MarketFilterInput } from '@/types';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
-import { KalshiAPI } from './markets/kalshi';
+import {
+  KalshiAPI,
+  DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS,
+  DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES,
+  DEFAULT_KALSHI_SPORTS_SERIES_TICKER,
+} from './markets/kalshi';
 import { PolymarketAPI } from './markets/polymarket';
 import { SXBetAPI } from './markets/sxbet';
 
@@ -168,11 +173,22 @@ export class LiveMarketFetcher {
 
   private async fetchKalshiMarkets(filters: MarketFilterInput): Promise<Market[]> {
     const windowEnd = filters.windowEnd ? new Date(filters.windowEnd) : undefined;
-    const maxDays = windowEnd 
-      ? Math.ceil((windowEnd.getTime() - Date.now()) / DAY_MS)
-      : 10;
-    
-    return this.kalshiApi.getOpenMarkets(maxDays);
+    const now = Date.now();
+    const windowMinutesFromFilter = windowEnd
+      ? Math.max(1, Math.ceil((windowEnd.getTime() - now) / 60000))
+      : DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES;
+
+    const maxCloseMinutes = Math.min(windowMinutesFromFilter, DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES);
+    const sportsOnly = filters.sportsOnly ?? true;
+
+    return this.kalshiApi.getOpenMarkets({
+      maxCloseMinutes,
+      minCloseMinutes: 120, // include markets that just went live
+      status: 'open',
+      seriesTicker: sportsOnly ? DEFAULT_KALSHI_SPORTS_SERIES_TICKER : undefined,
+      sportsOnly,
+      allowFallbackAllMarkets: DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS,
+    });
   }
 
   private async fetchPolymarketMarkets(filters: MarketFilterInput): Promise<Market[]> {

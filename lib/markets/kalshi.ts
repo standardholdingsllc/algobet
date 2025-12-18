@@ -5,9 +5,9 @@ import { isDryFireMode } from '../execution-wrapper';
 import {
   recordKalshiFetchAttempted,
   recordKalshiFetchFailed,
-  recordKalshiFiltered,
+  recordKalshiFilteredToCloseWindow,
   recordKalshiHttpStatus,
-  recordKalshiParsedEvent,
+  recordKalshiQueryApplied,
   recordKalshiRawItems,
 } from '../live-events-debug';
 
@@ -18,6 +18,19 @@ export const DEFAULT_KALSHI_WS_URL = 'wss://api.elections.kalshi.com/trade-api/w
 const KALSHI_PAGE_LIMIT = 200;
 const KALSHI_MAX_PAGES = 8;
 const KALSHI_TARGET_MARKETS = 150;
+const parsedCloseWindowMinutes = parseInt(
+  process.env.KALSHI_LIVE_CLOSE_WINDOW_MINUTES || '',
+  10
+);
+export const DEFAULT_KALSHI_SPORTS_SERIES_TICKER =
+  (process.env.KALSHI_SPORTS_SERIES_TICKER || 'SPORTS').trim();
+export const DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES = Math.max(
+  1,
+  Number.isFinite(parsedCloseWindowMinutes) ? parsedCloseWindowMinutes : 360
+);
+export const DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS =
+  (process.env.KALSHI_ALLOW_FALLBACK_ALL_MARKETS || 'false').toLowerCase() === 'true';
+const KALSHI_MIN_CLOSE_LOOKBACK_MINUTES = 120;
 
 interface KalshiMarket {
   ticker: string;
@@ -53,6 +66,23 @@ interface KalshiMarketsResponse {
   };
   next_cursor?: string;
   cursor?: string;
+}
+
+interface KalshiMarketQueryParams {
+  minCloseTs: number;
+  maxCloseTs: number;
+  status?: string;
+  seriesTicker?: string;
+}
+
+interface GetOpenMarketsOptions {
+  maxDaysToExpiry?: number;
+  maxCloseMinutes?: number;
+  minCloseMinutes?: number;
+  status?: string;
+  seriesTicker?: string;
+  sportsOnly?: boolean;
+  allowFallbackAllMarkets?: boolean;
 }
 
 const KALSHI_EVENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -385,110 +415,174 @@ export class KalshiAPI {
     return buildKalshiAuthHeaders(method, path, body);
   }
 
-  async getOpenMarkets(maxDaysToExpiry: number): Promise<Market[]> {
-    const now = new Date();
-    const maxDate = new Date(now);
-    maxDate.setDate(maxDate.getDate() + maxDaysToExpiry);
-    const window = {
-      startISO: now.toISOString(),
-      endISO: maxDate.toISOString(),
-    };
+  async getOpenMarkets(options?: number | GetOpenMarketsOptions): Promise<Market[]> {
+    const opts: GetOpenMarketsOptions =
+      typeof options === 'number' ? { maxDaysToExpiry: options } : options ?? {};
 
-    recordKalshiFetchAttempted();
-    const rawSamples: KalshiMarket[] = [];
-    let rawSeenCount = 0;
+    const closeWindowMinutes = Math.max(
+      1,
+      opts.maxCloseMinutes ??
+        (opts.maxDaysToExpiry ? opts.maxDaysToExpiry * 24 * 60 : DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES)
+    );
+    const minCloseMinutes = opts.minCloseMinutes ?? KALSHI_MIN_CLOSE_LOOKBACK_MINUTES;
+    const status = opts.status ?? 'open';
+    const sportsOnly = opts.sportsOnly ?? true;
+    const seriesTicker = sportsOnly
+      ? opts.seriesTicker?.trim() || DEFAULT_KALSHI_SPORTS_SERIES_TICKER
+      : undefined;
+    const allowFallbackAllMarkets =
+      opts.allowFallbackAllMarkets ?? DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS;
 
-    try {
+    const nowMs = Date.now();
+    const buildQuery = (override?: Partial<KalshiMarketQueryParams>): KalshiMarketQueryParams => ({
+      minCloseTs: Math.floor((nowMs - minCloseMinutes * 60_000) / 1000),
+      maxCloseTs: Math.floor((nowMs + closeWindowMinutes * 60_000) / 1000),
+      status,
+      seriesTicker,
+      ...override,
+    });
+
+    const fetchWithQuery = async (
+      query: KalshiMarketQueryParams,
+      context?: { fallbackUsed?: boolean; fallbackReason?: string }
+    ): Promise<Market[]> => {
+      recordKalshiFetchAttempted();
+      recordKalshiQueryApplied({
+        seriesTicker: query.seriesTicker,
+        maxCloseTs: query.maxCloseTs,
+        minCloseTs: query.minCloseTs,
+        status: query.status,
+        allowFallbackAllMarkets,
+        fallbackUsed: context?.fallbackUsed,
+        fallbackReason: context?.fallbackReason,
+      });
+
+      const rawSamples: KalshiMarket[] = [];
       const rawMarkets: KalshiMarket[] = [];
       const sportsEventTickers = new Set<string>();
+      let rawSeenCount = 0;
+      let filteredToCloseWindow = 0;
       let cursor: string | undefined;
       let page = 0;
 
-      while (page < KALSHI_MAX_PAGES) {
-        const { entries, nextCursor, status } = await this.fetchMarketsPage(cursor, window);
-        recordKalshiHttpStatus(status);
-        page += 1;
-
-        if (!entries.length) {
-          console.info(`[Kalshi] Markets page ${page} returned 0 entries; stopping pagination.`);
-          break;
-        }
-
-        rawSeenCount += entries.length;
-        if (rawSamples.length < 3) {
-          rawSamples.push(...entries.slice(0, 3 - rawSamples.length));
-        }
-
-        for (const market of entries) {
-          const expiryDate = new Date(market.close_time);
-          if (
-            Number.isNaN(expiryDate.getTime()) ||
-            expiryDate > maxDate ||
-            expiryDate < now
-          ) {
-            continue;
-          }
-
-          rawMarkets.push(market);
-
-          if (this.isLikelySportsTicker(market.event_ticker)) {
-            sportsEventTickers.add(market.event_ticker);
-          }
-        }
-
-        console.info(
-          `[Kalshi] Processed Kalshi page ${page} (${entries.length} raw within <=${maxDaysToExpiry}d, ${rawMarkets.length} total tradable so far).`
-        );
-
-        if (!nextCursor) {
-          break;
-        }
-
-        if (rawMarkets.length >= KALSHI_TARGET_MARKETS) {
-          console.info(
-            `[Kalshi] Reached target tradable market count (${rawMarkets.length}); stopping pagination early.`
+      try {
+        while (page < KALSHI_MAX_PAGES) {
+          const { entries, nextCursor, status: httpStatus } = await this.fetchMarketsPage(
+            cursor,
+            query
           );
-          break;
+          recordKalshiHttpStatus(httpStatus);
+          page += 1;
+
+          if (!entries.length) {
+            console.info(
+              `[Kalshi] Markets page ${page} returned 0 entries; stopping pagination (series=${query.seriesTicker ?? 'ALL'}, status=${query.status ?? 'any'}).`
+            );
+            break;
+          }
+
+          rawSeenCount += entries.length;
+          if (rawSamples.length < 3) {
+            rawSamples.push(...entries.slice(0, 3 - rawSamples.length));
+          }
+
+          for (const market of entries) {
+            const closeTs = Math.floor(new Date(market.close_time).getTime() / 1000);
+            if (
+              Number.isNaN(closeTs) ||
+              closeTs > query.maxCloseTs ||
+              closeTs < query.minCloseTs
+            ) {
+              filteredToCloseWindow += 1;
+              continue;
+            }
+
+            rawMarkets.push(market);
+
+            if (this.isLikelySportsTicker(market.event_ticker)) {
+              sportsEventTickers.add(market.event_ticker);
+            }
+          }
+
+          console.info(
+            `[Kalshi] Processed Kalshi page ${page} (${entries.length} raw, ${rawMarkets.length} within close window so far).`
+          );
+
+          if (!nextCursor) {
+            break;
+          }
+
+          if (rawMarkets.length >= KALSHI_TARGET_MARKETS) {
+            console.info(
+              `[Kalshi] Reached target tradable market count (${rawMarkets.length}); stopping pagination early.`
+            );
+            break;
+          }
+
+          cursor = nextCursor;
         }
 
-        cursor = nextCursor;
+        if (rawMarkets.length === 0) {
+          console.warn(
+            `[Kalshi] No markets matched filters series=${query.seriesTicker ?? 'ALL'}, status=${
+              query.status ?? 'any'
+            }, window=${closeWindowMinutes}m.`
+          );
+        }
+
+        recordKalshiRawItems(rawSeenCount, rawSamples);
+        recordKalshiFilteredToCloseWindow(filteredToCloseWindow);
+
+        if (sportsEventTickers.size > 0) {
+          await this.prefetchEventDetails(Array.from(sportsEventTickers));
+        }
+
+        return rawMarkets.map((market) => this.mapKalshiMarket(market));
+      } catch (error: any) {
+        console.error('Error fetching Kalshi markets:', error.response?.status || error.message);
+        recordKalshiFetchFailed(error.response?.status, error.message);
+        return [];
       }
+    };
 
-      if (rawMarkets.length === 0) {
-        console.warn(
-          `[Kalshi] No markets matched the expiry filter (<= ${maxDaysToExpiry}d) across ${page} page(s).`
-        );
+    const primaryQuery = buildQuery();
+    const primaryResults = await fetchWithQuery(primaryQuery);
+
+    if (primaryResults.length === 0 && seriesTicker) {
+      const fallbackReason = 'series_ticker_returned_zero';
+      console.warn(
+        `[Kalshi] series_ticker=${seriesTicker} returned 0 markets; ` +
+          (allowFallbackAllMarkets
+            ? 'falling back to all markets (env flag enabled).'
+            : 'fallback disabled (KALSHI_ALLOW_FALLBACK_ALL_MARKETS=false).')
+      );
+
+      if (allowFallbackAllMarkets) {
+        const fallbackQuery = buildQuery({ seriesTicker: undefined });
+        return fetchWithQuery(fallbackQuery, { fallbackUsed: true, fallbackReason });
       }
-
-      recordKalshiRawItems(rawSeenCount, rawSamples);
-
-      if (sportsEventTickers.size > 0) {
-        await this.prefetchEventDetails(Array.from(sportsEventTickers));
-      }
-
-      const markets: Market[] = rawMarkets.map((market) => this.mapKalshiMarket(market));
-      return markets;
-    } catch (error: any) {
-      console.error('Error fetching Kalshi markets:', error.response?.status || error.message);
-      recordKalshiFetchFailed(error.response?.status, error.message);
-      return [];
     }
+
+    return primaryResults;
   }
 
   private async fetchMarketsPage(
     cursor: string | undefined,
-    window: { startISO: string; endISO: string }
+    query: KalshiMarketQueryParams
   ): Promise<{ entries: KalshiMarket[]; nextCursor?: string; status: number }> {
-    const startDate = new Date(window.startISO);
-    const endDate = new Date(window.endISO);
-    const startUnix = Math.floor(startDate.getTime() / 1000);
-    const endUnix = Math.floor(endDate.getTime() / 1000);
-
     const params: Record<string, string | number> = {
       limit: KALSHI_PAGE_LIMIT,
-      min_close_ts: startUnix,
-      max_close_ts: endUnix,
+      min_close_ts: query.minCloseTs,
+      max_close_ts: query.maxCloseTs,
     };
+
+    if (query.status) {
+      params.status = query.status;
+    }
+
+    if (query.seriesTicker) {
+      params.series_ticker = query.seriesTicker;
+    }
 
     if (cursor) {
       params.cursor = cursor;

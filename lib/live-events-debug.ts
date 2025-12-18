@@ -21,6 +21,16 @@ export interface LiveEventsDebugCounters {
     rawItemsCount: number;
     parsedEventsCount: number;
     filteredOut: Record<string, number>;
+    filteredToCloseWindowCount?: number;
+    queryApplied?: {
+      seriesTicker?: string;
+      maxCloseTs?: number;
+      minCloseTs?: number;
+      status?: string;
+      allowFallbackAllMarkets?: boolean;
+      fallbackUsed?: boolean;
+      fallbackReason?: string;
+    };
     sampleRawItems: Array<{
       ticker?: string;
       title?: string;
@@ -58,6 +68,8 @@ let counters: LiveEventsDebugCounters = {
     rawItemsCount: 0,
     parsedEventsCount: 0,
     filteredOut: {},
+    filteredToCloseWindowCount: 0,
+    queryApplied: undefined,
     sampleRawItems: [],
   },
 };
@@ -86,6 +98,8 @@ export function resetLiveEventsDebug(): void {
       rawItemsCount: 0,
       parsedEventsCount: 0,
       filteredOut: {},
+      filteredToCloseWindowCount: 0,
+      queryApplied: undefined,
       sampleRawItems: [],
     },
   };
@@ -185,6 +199,24 @@ export function recordKalshiParsedEvent(): void {
 
 export function recordKalshiFiltered(reason: string): void {
   bump(counters.kalshi.filteredOut, reason);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiFilteredToCloseWindow(count: number): void {
+  counters.kalshi.filteredToCloseWindowCount = count;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiQueryApplied(query: {
+  seriesTicker?: string;
+  maxCloseTs?: number;
+  minCloseTs?: number;
+  status?: string;
+  allowFallbackAllMarkets?: boolean;
+  fallbackUsed?: boolean;
+  fallbackReason?: string;
+}): void {
+  counters.kalshi.queryApplied = query;
   counters.lastUpdatedAt = new Date().toISOString();
 }
 

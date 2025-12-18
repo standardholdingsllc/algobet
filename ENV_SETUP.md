@@ -49,6 +49,11 @@ openssl rand -hex 32
 
 **Documentation**: https://docs.kalshi.com/getting_started/authentication
 
+Additional Kalshi discovery controls:
+- `KALSHI_SPORTS_SERIES_TICKER` (default: `SPORTS`) — restricts market discovery to Kalshi's sports series.
+- `KALSHI_LIVE_CLOSE_WINDOW_MINUTES` (default: `360`) — only fetch markets closing within the next N minutes (with a small lookback for recently started games).
+- `KALSHI_ALLOW_FALLBACK_ALL_MARKETS` (default: `false`) — if the sports series query returns 0, allow a fallback to all markets. Keep `false` to avoid non-sports noise.
+
 ### Polymarket API
 
 1. Log in to [Polymarket](https://polymarket.com)
@@ -144,6 +149,9 @@ ADMIN_PASSWORD_HASH=<from generate-password-hash.js>
 KALSHI_API_KEY=your-kalshi-api-key
 KALSHI_PRIVATE_KEY=your-kalshi-private-key
 KALSHI_EMAIL=your-kalshi-account@email.com
+KALSHI_SPORTS_SERIES_TICKER=SPORTS
+KALSHI_LIVE_CLOSE_WINDOW_MINUTES=360
+KALSHI_ALLOW_FALLBACK_ALL_MARKETS=false
 
 # ===================================
 # POLYMARKET API
