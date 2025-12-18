@@ -232,7 +232,7 @@ class LiveArbWorker {
         }
         if (newestUpdateMs === undefined || ageMs < newestUpdateMs) {
           newestUpdateMs = ageMs;
-          lastPriceUpdateAt = price.updatedAt;
+          lastPriceUpdateAt = price.lastUpdatedAt;
         }
       }
 
