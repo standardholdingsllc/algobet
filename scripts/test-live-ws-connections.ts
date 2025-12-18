@@ -12,6 +12,7 @@
  *
  * Environment variables required:
  *   - SXBET_API_KEY (for SX.bet)
+ *   - SXBET_WS_URL (for SX.bet WS; see expected format below)
  *   - KALSHI_API_KEY, KALSHI_PRIVATE_KEY (for Kalshi)
  *   - POLYMARKET_API_KEY (optional for Polymarket)
  *
@@ -25,6 +26,7 @@
 
 import { resolve } from 'path';
 import { existsSync, readFileSync } from 'fs';
+import axios from 'axios';
 
 function loadEnvFile(relativePath: string): void {
   const filePath = resolve(__dirname, relativePath);
@@ -69,12 +71,16 @@ import { getPolymarketWsClient, resetPolymarketWsClient } from '../services/poly
 import { getKalshiWsClient, resetKalshiWsClient } from '../services/kalshi-ws';
 import { LivePriceCache } from '../lib/live-price-cache';
 
-// ============================================================================
+// ==========================================================================
 // Configuration
-// ============================================================================
+// ==========================================================================
 
-const TEST_DURATION_MS = 30000; // Run for 30 seconds by default
+const TEST_DURATION_MS = Math.max(
+  5000,
+  (Number(process.env.TEST_DURATION_SECONDS) || 30) * 1000
+); // Default 30s, min 5s
 const MAX_MESSAGES_TO_LOG = 10; // Log first N messages per platform
+const INVALID_PRICE_WARN_LIMIT = 3; // Limit noisy invalid price logs per platform
 
 interface PlatformStats {
   connected: boolean;
@@ -83,6 +89,7 @@ interface PlatformStats {
   lastMessageAt?: Date;
   errors: string[];
   subscriptions: number;
+  disabled?: boolean;
 }
 
 const stats: Record<string, PlatformStats> = {
@@ -94,9 +101,9 @@ const stats: Record<string, PlatformStats> = {
 // Track shutdown state
 let isShuttingDown = false;
 
-// ============================================================================
+// ==========================================================================
 // Helper Functions
-// ============================================================================
+// ==========================================================================
 
 function log(message: string): void {
   const timestamp = new Date().toISOString();
@@ -125,14 +132,41 @@ function checkEnvVar(name: string, required: boolean = false): string | undefine
   return value;
 }
 
-// ============================================================================
+function computeSuccess(): boolean {
+  // Success means: every enabled platform (not explicitly disabled) connected AND received >=1 message
+  for (const [platform, platformStats] of Object.entries(stats)) {
+    if (platformStats.disabled) {
+      continue; // explicitly disabled; do not fail overall test
+    }
+    if (!platformStats.connected) {
+      logError(`[${platform}] did not connect`);
+      return false;
+    }
+    if (platformStats.messagesReceived < 1) {
+      logError(`[${platform}] received no messages`);
+      return false;
+    }
+  }
+  return true;
+}
+
+// ==========================================================================
 // Platform Connection Tests
-// ============================================================================
+// ==========================================================================
 
 async function testSxBetConnection(): Promise<void> {
   log('\n📡 Testing SX.bet WebSocket connection...');
 
   const apiKey = checkEnvVar('SXBET_API_KEY', true);
+  const wsUrl = (process.env.SXBET_WS_URL || '').trim(); // Expected: wss://<host>/ws (see SX.bet WS / Ably docs)
+
+  if (!wsUrl) {
+    log('[SX.bet] WebSocket disabled (SXBET_WS_URL not set). Expected format: wss://<host>/ws (see SX.bet WS docs / Ably endpoint).');
+    stats.sxbet.disabled = true;
+    stats.sxbet.errors.push('SXBET_WS_URL not set (WS disabled)');
+    return;
+  }
+
   if (!apiKey) {
     stats.sxbet.errors.push('Missing API key');
     return;
@@ -189,9 +223,14 @@ async function testPolymarketConnection(): Promise<void> {
 
     await client.connect();
 
-    // Note: Polymarket needs specific market IDs to subscribe
-    // For testing, we can try subscribing to any known active market
-    log('[Polymarket] Connection test complete (no test markets subscribed)');
+    const assetIds = await fetchPolymarketAssetIds();
+    if (assetIds.length > 0) {
+      client.subscribeToMarkets(assetIds);
+      stats.polymarket.subscriptions = assetIds.length;
+      log(`[Polymarket] Subscribed to ${assetIds.length} markets`);
+    } else {
+      log('[Polymarket] No markets found to subscribe');
+    }
   } catch (error: any) {
     stats.polymarket.errors.push(error.message);
     logError(`Polymarket connection failed: ${error.message}`);
@@ -226,31 +265,59 @@ async function testKalshiConnection(): Promise<void> {
     });
 
     await client.connect();
-    log('[Kalshi] Connection test complete');
+
+    const tickers = await fetchKalshiTickers();
+    if (tickers.length > 0) {
+      client.subscribeToMarkets(tickers);
+      stats.kalshi.subscriptions = tickers.length;
+      log(`[Kalshi] Subscribed to ${tickers.length} markets`);
+    } else {
+      log('[Kalshi] No markets found to subscribe');
+    }
   } catch (error: any) {
     stats.kalshi.errors.push(error.message);
     logError(`Kalshi connection failed: ${error.message}`);
   }
 }
 
-// ============================================================================
+// ==========================================================================
 // Price Cache Monitoring
-// ============================================================================
+// ==========================================================================
 
 function setupPriceCacheMonitoring(): void {
   log('\n📊 Setting up price cache monitoring...');
+
+  const invalidPriceCounts: Record<string, number> = {
+    sxbet: 0,
+    polymarket: 0,
+    kalshi: 0,
+  };
 
   LivePriceCache.onPriceUpdate((update) => {
     const platform = update.key.platform;
     stats[platform].messagesReceived++;
     stats[platform].lastMessageAt = new Date();
 
+    const price = update.price;
+    if (!Number.isFinite(price)) {
+      invalidPriceCounts[platform] += 1;
+      if (invalidPriceCounts[platform] <= INVALID_PRICE_WARN_LIMIT) {
+        log(
+          `[${platform}] Skipping invalid price update (count=${invalidPriceCounts[platform]}): market=${update.key.marketId}, outcome=${update.key.outcomeId}, raw=${price}`
+        );
+        if (invalidPriceCounts[platform] === INVALID_PRICE_WARN_LIMIT) {
+          log(`[${platform}] Suppressing further invalid price warnings`);
+        }
+      }
+      return;
+    }
+
     // Log first N messages per platform
     if (stats[platform].messagesReceived <= MAX_MESSAGES_TO_LOG) {
       log(
         `[${platform}] Price update #${stats[platform].messagesReceived}: ` +
           `market=${update.key.marketId.substring(0, 16)}..., ` +
-          `outcome=${update.key.outcomeId}, price=${update.price.toFixed(2)}`
+          `outcome=${update.key.outcomeId}, price=${price.toFixed(2)}`
       );
     } else if (stats[platform].messagesReceived === MAX_MESSAGES_TO_LOG + 1) {
       log(`[${platform}] (Suppressing further price logs...)`);
@@ -265,9 +332,9 @@ function setupPriceCacheMonitoring(): void {
   });
 }
 
-// ============================================================================
+// ==========================================================================
 // Cleanup and Summary
-// ============================================================================
+// ==========================================================================
 
 function printSummary(): void {
   log('\n' + '='.repeat(60));
@@ -275,7 +342,11 @@ function printSummary(): void {
   log('='.repeat(60));
 
   for (const [platform, platformStats] of Object.entries(stats)) {
-    const status = platformStats.connected ? '✅ CONNECTED' : '❌ NOT CONNECTED';
+    const status = platformStats.disabled
+      ? '⚪ DISABLED'
+      : platformStats.connected
+        ? '✅ CONNECTED'
+        : '❌ NOT CONNECTED';
     const connectTimeStr = platformStats.connectTime
       ? `(${platformStats.connectTime}ms)`
       : '';
@@ -320,12 +391,13 @@ async function shutdown(): Promise<void> {
   }
 
   printSummary();
-  process.exit(0);
+  const success = computeSuccess();
+  process.exit(success ? 0 : 1);
 }
 
-// ============================================================================
+// ==========================================================================
 // Main Entry Point
-// ============================================================================
+// ==========================================================================
 
 async function main(): Promise<void> {
   console.log('\n' + '='.repeat(60));
@@ -372,3 +444,47 @@ main().catch((error) => {
   process.exit(1);
 });
 
+// ==========================================================================
+// Market discovery helpers
+// ==========================================================================
+
+async function fetchPolymarketAssetIds(limit = 5): Promise<string[]> {
+  try {
+    const response = await axios.get('https://gamma-api.polymarket.com/markets', {
+      params: { limit, resolved: false, closed: false },
+    });
+    const markets = response.data ?? [];
+    const assetIds = markets
+      .map((m: any) => m.token_id || m.asset_id || m.id)
+      .filter(Boolean)
+      .slice(0, limit);
+    if (assetIds.length === 0) {
+      log('[Polymarket] No asset IDs found in API response');
+    }
+    return assetIds;
+  } catch (error: any) {
+    logError(`[Polymarket] Failed to fetch markets for subscription: ${error.message}`);
+    return [];
+  }
+}
+
+async function fetchKalshiTickers(limit = 5): Promise<string[]> {
+  try {
+    const response = await axios.get(
+      'https://api.elections.kalshi.com/trade-api/v2/markets',
+      { params: { limit } }
+    );
+    const markets = response.data?.markets ?? [];
+    const tickers = markets
+      .map((m: any) => m.ticker || m.id || m.market_ticker)
+      .filter(Boolean)
+      .slice(0, limit);
+    if (tickers.length === 0) {
+      log('[Kalshi] No tickers found in API response');
+    }
+    return tickers;
+  } catch (error: any) {
+    logError(`[Kalshi] Failed to fetch markets for subscription: ${error.message}`);
+    return [];
+  }
+}
