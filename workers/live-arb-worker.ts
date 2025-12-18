@@ -17,6 +17,7 @@ import {
   startOrchestrator,
   stopOrchestrator,
   refreshRegistry,
+  getLiveEventsDebugSnapshot,
 } from '../lib/live-sports-orchestrator';
 import { liveArbLog } from '../lib/live-arb-logger';
 import { PlatformAdapters, ExecutionOptions } from '../lib/execution-wrapper';
@@ -351,6 +352,8 @@ class LiveArbWorker {
       openedAt: status.safetyStatus.circuitBreakerState.openedAt,
     };
 
+    const liveEventsSnapshot = getLiveEventsDebugSnapshot();
+
     return {
       updatedAt: new Date().toISOString(),
       state,
@@ -377,6 +380,12 @@ class LiveArbWorker {
       platforms,
       priceCacheStats,
       circuitBreaker,
+      liveEventsStats: {
+        registry: liveEventsSnapshot.registry,
+        matcher: liveEventsSnapshot.matcher,
+        watcher: liveEventsSnapshot.watcher,
+      },
+      liveEventsDebug: liveEventsSnapshot.debug,
     };
   }
 

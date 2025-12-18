@@ -9,6 +9,8 @@ import {
   LiveArbRuntimeConfig,
 } from '@/types';
 import { DEFAULT_LIVE_ARB_RUNTIME_CONFIG } from '@/types/live-arb';
+import { LiveEventPlatform, VendorEventStatus } from '@/types/live-events';
+import { LiveEventsDebugCounters } from './live-events-debug';
 import { buildLiveArbRuntimeSeed } from './live-arb-runtime-seed';
 
 // Initialize Upstash Redis client
@@ -171,6 +173,37 @@ export interface LiveArbWorkerHeartbeat {
     openReason?: string;
     openedAt?: string;
   };
+  /** Live events pipeline statistics and debug counters */
+  liveEventsStats?: {
+    registry: {
+      totalEvents: number;
+      byPlatform: Record<LiveEventPlatform, number>;
+      byStatus: Record<VendorEventStatus, number>;
+      bySport: Record<string, number>;
+      totalAdded: number;
+      totalUpdated: number;
+      totalRemoved: number;
+    };
+    matcher: {
+      totalGroups: number;
+      liveGroups: number;
+      preGroups: number;
+      by3Platforms: number;
+      by2Platforms: number;
+      bySport: Record<string, number>;
+      lastRunAt: number;
+    };
+    watcher: {
+      activeWatchers: number;
+      totalArbChecks: number;
+      totalOpportunities: number;
+      avgChecksPerSecond: number;
+      avgCheckTimeMs: number;
+      maxCheckTimeMs: number;
+      totalMarketsWatched: number;
+    };
+  };
+  liveEventsDebug?: LiveEventsDebugCounters;
 }
 
 /** All valid worker states */

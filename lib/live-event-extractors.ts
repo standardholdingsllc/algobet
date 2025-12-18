@@ -23,6 +23,11 @@ import { Market } from '@/types';
 import { parseTeamsFromTitle, normalizeTeamName } from './live-event-matcher';
 import { normalizeEventTitle } from './text-normalizer';
 import { addOrUpdateEvent, markEventEnded } from './live-event-registry';
+import {
+  recordClassification,
+  recordVendorEventFiltered,
+  recordVendorEventsFetched,
+} from './live-events-debug';
 
 // ============================================================================
 // Sport Detection
@@ -311,6 +316,7 @@ export function extractSxBetEvent(
  */
 export function processSxBetMarkets(markets: Market[]): number {
   let added = 0;
+  recordVendorEventsFetched('SXBET', markets.length);
   
   for (const market of markets) {
     if (market.platform !== 'sxbet') continue;
@@ -326,10 +332,19 @@ export function processSxBetMarkets(markets: Market[]): number {
     
     const event = extractSxBetEvent(market.id, market.title, metadata);
     
-    if (event && event.teams.length >= 2) {
-      addOrUpdateEvent(event);
-      added++;
+    if (!event) {
+      recordVendorEventFiltered('sxbet_not_sports_or_parse_failed');
+      continue;
     }
+    
+    if (event.teams.length < 2) {
+      recordVendorEventFiltered('sxbet_missing_teams');
+      continue;
+    }
+    
+    recordClassification(event.status);
+    addOrUpdateEvent(event);
+    added++;
   }
   
   return added;
@@ -443,6 +458,7 @@ export function extractPolymarketEvent(
  */
 export function processPolymarketMarkets(markets: Market[]): number {
   let added = 0;
+  recordVendorEventsFetched('POLYMARKET', markets.length);
   
   for (const market of markets) {
     if (market.platform !== 'polymarket') continue;
@@ -453,10 +469,19 @@ export function processPolymarketMarkets(markets: Market[]): number {
     
     const event = extractPolymarketEvent(market.id, market.title, metadata);
     
-    if (event && event.teams.length >= 2) {
-      addOrUpdateEvent(event);
-      added++;
+    if (!event) {
+      recordVendorEventFiltered('polymarket_not_sports_or_low_confidence');
+      continue;
     }
+    
+    if (event.teams.length < 2) {
+      recordVendorEventFiltered('polymarket_missing_teams');
+      continue;
+    }
+    
+    recordClassification(event.status);
+    addOrUpdateEvent(event);
+    added++;
   }
   
   return added;
@@ -655,27 +680,38 @@ export function processKalshiMarkets(markets: Market[]): number {
   let metadataMisses = 0;
   const sampleEvents: VendorEvent[] = [];
   
+  recordVendorEventsFetched('KALSHI', markets.length);
+  
   for (const market of markets) {
     if (market.platform !== 'kalshi') continue;
     const looksSports = looksLikeKalshiSportsMarket(market);
 
     if (isKalshiMultiEventTicker(market.eventTicker)) {
       combosSkipped++;
+      recordVendorEventFiltered('kalshi_multi_event_ticker');
       continue;
     }
 
     const event = createKalshiVendorEvent(market);
 
-    if (event && event.teams.length >= 2) {
-      addOrUpdateEvent(event);
-      added++;
-      if (sampleEvents.length < 5) {
-        sampleEvents.push(event);
-      }
-    } else {
+    if (!event) {
       if (looksSports) {
         metadataMisses++;
+        recordVendorEventFiltered('kalshi_missing_metadata_or_parse_failed');
       }
+      continue;
+    }
+
+    if (event.teams.length < 2) {
+      recordVendorEventFiltered('kalshi_missing_teams');
+      continue;
+    }
+
+    recordClassification(event.status);
+    addOrUpdateEvent(event);
+    added++;
+    if (sampleEvents.length < 5) {
+      sampleEvents.push(event);
     }
   }
 

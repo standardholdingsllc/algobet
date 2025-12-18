@@ -24,6 +24,7 @@ import {
   isHeartbeatFresh,
 } from '@/lib/kv-storage';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
+import { LiveEventsDebugCounters } from '@/lib/live-events-debug';
 
 /**
  * Heartbeat TTL - worker is considered "present" if heartbeat is fresher than this.
@@ -116,6 +117,7 @@ interface LiveArbStatusResponse {
       avgCheckTimeMs: number;
       maxCheckTimeMs: number;
       totalMarketsWatched: number;
+      activeWatchers?: number;
     };
   };
   
@@ -126,6 +128,7 @@ interface LiveArbStatusResponse {
     blockedOpportunities: number;
     blockedReasons: Record<string, number>;
   };
+  liveEventsDebug: LiveEventsDebugCounters;
 }
 
 interface PlatformStatus {
@@ -190,6 +193,27 @@ export default async function handler(
       consecutiveFailures: 0,
     };
 
+    const defaultDebugCounters: LiveEventsDebugCounters = {
+      lastUpdatedAt: '',
+      vendorEventsFetched: 0,
+      vendorEventsByPlatform: { SXBET: 0, POLYMARKET: 0, KALSHI: 0 },
+      vendorEventsFilteredOut: {},
+      liveClassifiedCount: 0,
+      preClassifiedCount: 0,
+      matchCandidatesConsidered: 0,
+      matchRejectReasons: {},
+      watchersCreated: 0,
+      watchersSkipped: {},
+      subscriptionsAttempted: 0,
+      subscriptionsFailed: {},
+    };
+
+    const liveEventsStats = heartbeat?.liveEventsStats;
+    const liveEventsDebug = heartbeat?.liveEventsDebug ?? defaultDebugCounters;
+    const registryStats = liveEventsStats?.registry;
+    const watcherStats = liveEventsStats?.watcher;
+    const matcherStats = liveEventsStats?.matcher;
+
     // Check if worker is stopping/starting
     const isShuttingDown = heartbeat?.state === 'STOPPING';
     const isStarting = heartbeat?.state === 'STARTING';
@@ -241,20 +265,20 @@ export default async function handler(
         running: workerPresent && heartbeat?.state === 'RUNNING',
         uptimeMs: 0,
         registry: {
-          countByPlatform: {},
-          countByStatus: {},
+          countByPlatform: registryStats?.byPlatform ?? {},
+          countByStatus: registryStats?.byStatus ?? {},
           updatedAt: 0,
         },
         stats: {
-          totalVendorEvents: heartbeat?.totalMarkets ?? 0,
-          liveEvents: 0,
-          preEvents: 0,
-          matchedGroups: 0,
-          activeWatchers: 0,
-          arbChecksTotal: 0,
-          opportunitiesTotal: 0,
+          totalVendorEvents: registryStats?.totalEvents ?? heartbeat?.totalMarkets ?? 0,
+          liveEvents: registryStats?.byStatus?.LIVE ?? 0,
+          preEvents: registryStats?.byStatus?.PRE ?? 0,
+          matchedGroups: matcherStats?.totalGroups ?? 0,
+          activeWatchers: watcherStats?.activeWatchers ?? 0,
+          arbChecksTotal: watcherStats?.totalArbChecks ?? 0,
+          opportunitiesTotal: watcherStats?.totalOpportunities ?? 0,
         },
-        watcherStats: {
+        watcherStats: watcherStats ?? {
           totalArbChecks: 0,
           totalOpportunities: 0,
           avgChecksPerSecond: 0,
@@ -270,6 +294,7 @@ export default async function handler(
         blockedOpportunities: 0,
         blockedReasons: {},
       },
+      liveEventsDebug,
     };
 
     return res.status(200).json(response);

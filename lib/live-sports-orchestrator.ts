@@ -33,6 +33,10 @@ import {
 import { processAllMarkets } from './live-event-extractors';
 import { ExecutionOptions, PlatformAdapters } from './execution-wrapper';
 import { getRateLimiterStats, logRateLimiterStatus } from './rate-limiter';
+import {
+  getLiveEventsDebug,
+  resetLiveEventsDebug,
+} from './live-events-debug';
 
 // ============================================================================
 // State
@@ -193,6 +197,7 @@ export async function refreshRegistry(markets?: Market[]): Promise<void> {
   if (!config) config = getConfig();
 
   try {
+    resetLiveEventsDebug();
     // Load runtime config for liveEventsOnly filter
     const runtimeConfig = await loadLiveArbRuntimeConfig();
     
@@ -345,6 +350,15 @@ export function getOrchestratorStatus(): LiveEventsApiResponse & {
     },
     rateLimiterStats,
     generatedAt: Date.now(),
+  };
+}
+
+export function getLiveEventsDebugSnapshot() {
+  return {
+    registry: getRegistryStats(),
+    matcher: getMatcherStats(),
+    watcher: getWatcherStats(),
+    debug: getLiveEventsDebug(),
   };
 }
 
