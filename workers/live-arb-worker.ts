@@ -21,36 +21,58 @@ const DEFAULT_REFRESH_INTERVAL_MS = parseInt(
   process.env.LIVE_ARB_WORKER_REFRESH_MS || '15000',
   10
 );
+// Polling interval when idle (waiting for dashboard to enable)
+const IDLE_POLL_INTERVAL_MS = parseInt(
+  process.env.LIVE_ARB_IDLE_POLL_MS || '5000',
+  10
+);
 
 class LiveArbWorker {
   private marketFetcher = new LiveMarketFetcher();
-  private running = false;
+  private arbActive = false; // Whether WS clients and orchestrator are running
+  private processRunning = true; // Whether the worker process should keep polling
   private refreshTimer: NodeJS.Timeout | null = null;
   private adapters: PlatformAdapters;
+  private cachedBotConfig: BotConfig | null = null;
 
   constructor(private refreshIntervalMs: number) {
     this.adapters = buildPlatformAdapters();
   }
 
+  /**
+   * Main entry point - starts the worker process and begins polling for config changes.
+   * The worker stays alive and responds to liveArbEnabled toggle from the dashboard.
+   */
   async start(): Promise<void> {
     liveArbLog('info', WORKER_TAG, 'Starting live-arb worker (script-managed)', {
       pid: process.pid,
       nodeEnv: process.env.NODE_ENV || 'unknown',
     });
 
-    try {
-      const runtimeConfig = await loadLiveArbRuntimeConfig();
-      if (!runtimeConfig.liveArbEnabled) {
-        await this.recordHeartbeat('IDLE', runtimeConfig);
-        liveArbLog(
-          'info',
-          WORKER_TAG,
-          'liveArbEnabled=false in KV; not starting WS clients / orchestrator (run /api/live-arb/config to enable).'
-        );
-        return;
-      }
+    // Cache bot config once at startup
+    this.cachedBotConfig = await getOrSeedBotConfig();
 
-      const botConfig = await getOrSeedBotConfig();
+    // Start the main loop that checks config and manages arb state
+    this.scheduleMainLoop();
+  }
+
+  /**
+   * Gracefully shutdown the entire worker process
+   */
+  async shutdown(): Promise<void> {
+    this.processRunning = false;
+    await this.stopArb();
+    liveArbLog('info', WORKER_TAG, 'Worker process shutdown complete');
+  }
+
+  /**
+   * Start the arbitrage system (WS clients, orchestrator, market refresh)
+   */
+  private async startArb(runtimeConfig: LiveArbRuntimeConfig): Promise<void> {
+    if (this.arbActive) return;
+
+    try {
+      const botConfig = this.cachedBotConfig!;
       const liveArbConfig = buildLiveArbConfig(botConfig, runtimeConfig);
 
       await LiveArbManager.initialize(liveArbConfig);
@@ -59,22 +81,27 @@ class LiveArbWorker {
       await startOrchestrator(this.adapters, executionOptions);
 
       this.logExecutionMode(botConfig);
+      this.arbActive = true;
 
-      this.running = true;
+      liveArbLog('info', WORKER_TAG, 'Arbitrage system started');
       await this.recordHeartbeat('RUNNING', runtimeConfig);
+
+      // Do initial market refresh
       await this.refreshMarkets(botConfig, runtimeConfig);
-      this.scheduleLoop(botConfig, runtimeConfig);
     } catch (error) {
-      liveArbLog('error', WORKER_TAG, 'Failed to start live-arb worker', error as Error);
+      liveArbLog('error', WORKER_TAG, 'Failed to start arbitrage system', error as Error);
       await this.recordHeartbeat('STOPPED');
-      await this.stop();
-      process.exit(1);
+      throw error;
     }
   }
 
-  async stop(): Promise<void> {
-    if (!this.running) return;
-    this.running = false;
+  /**
+   * Stop the arbitrage system (WS clients, orchestrator)
+   */
+  private async stopArb(): Promise<void> {
+    if (!this.arbActive) return;
+
+    this.arbActive = false;
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
@@ -82,19 +109,47 @@ class LiveArbWorker {
     await stopOrchestrator();
     await LiveArbManager.shutdown();
     await this.recordHeartbeat('STOPPED');
-    liveArbLog('info', WORKER_TAG, 'Stopped live-arb worker');
+    liveArbLog('info', WORKER_TAG, 'Arbitrage system stopped');
   }
 
-  private scheduleLoop(botConfig: BotConfig, runtimeConfig: LiveArbRuntimeConfig): void {
+  /**
+   * Main loop that polls config and manages arb state based on liveArbEnabled flag.
+   * This keeps the worker process alive and responsive to dashboard controls.
+   */
+  private scheduleMainLoop(): void {
     const loop = async () => {
-      if (!this.running) return;
-      // Reload runtime config each cycle to pick up changes
-      const latestRuntimeConfig = await loadLiveArbRuntimeConfig();
-      await this.refreshMarkets(botConfig, latestRuntimeConfig);
-      this.refreshTimer = setTimeout(loop, this.refreshIntervalMs);
+      if (!this.processRunning) return;
+
+      try {
+        const runtimeConfig = await loadLiveArbRuntimeConfig();
+        const shouldBeActive = runtimeConfig.liveArbEnabled;
+
+        if (shouldBeActive && !this.arbActive) {
+          // Dashboard enabled arb - start it
+          liveArbLog('info', WORKER_TAG, 'liveArbEnabled toggled to true – starting arbitrage system');
+          await this.startArb(runtimeConfig);
+        } else if (!shouldBeActive && this.arbActive) {
+          // Dashboard disabled arb - stop it
+          liveArbLog('info', WORKER_TAG, 'liveArbEnabled toggled to false – stopping arbitrage system');
+          await this.stopArb();
+        } else if (this.arbActive) {
+          // Already running - do market refresh
+          await this.refreshMarkets(this.cachedBotConfig!, runtimeConfig);
+        } else {
+          // Idle - just record heartbeat
+          await this.recordHeartbeat('IDLE', runtimeConfig);
+        }
+      } catch (error) {
+        liveArbLog('error', WORKER_TAG, 'Error in main loop', error as Error);
+      }
+
+      // Schedule next iteration
+      const interval = this.arbActive ? this.refreshIntervalMs : IDLE_POLL_INTERVAL_MS;
+      this.refreshTimer = setTimeout(loop, interval);
     };
 
-    this.refreshTimer = setTimeout(loop, this.refreshIntervalMs);
+    // Start immediately
+    loop();
   }
 
   private async refreshMarkets(
@@ -237,9 +292,11 @@ worker.start().catch((error) => {
 });
 
 process.on('SIGINT', () => {
-  worker.stop().finally(() => process.exit(0));
+  liveArbLog('info', WORKER_TAG, 'Received SIGINT, shutting down...');
+  worker.shutdown().finally(() => process.exit(0));
 });
 
 process.on('SIGTERM', () => {
-  worker.stop().finally(() => process.exit(0));
+  liveArbLog('info', WORKER_TAG, 'Received SIGTERM, shutting down...');
+  worker.shutdown().finally(() => process.exit(0));
 });
