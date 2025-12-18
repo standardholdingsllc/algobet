@@ -1,5 +1,25 @@
 import { LiveEventPlatform, VendorEventStatus } from '@/types/live-events';
 
+export interface KalshiRateLimitDebug {
+  backoff: {
+    backoffUntilMs: number | null;
+    consecutive429: number;
+    last429AtMs: number | null;
+    lastRetryAfterSec: number | null;
+    active: boolean;
+  };
+  gate: {
+    minIntervalMs: number;
+    lastAtMs: number;
+  };
+  cache: {
+    seriesSize: number;
+    marketsSize: number;
+    marketsTtlMs: number;
+    seriesTtlMs: number;
+  };
+}
+
 export interface LiveEventsDebugCounters {
   lastUpdatedAt: string;
   vendorEventsFetched: number;
@@ -20,6 +40,19 @@ export interface LiveEventsDebugCounters {
       skipped: number;
       skipReasons: Record<string, number>;
       lastError?: string;
+      cache?: {
+        seriesHit: number;
+        seriesMiss: number;
+        marketsHit: number;
+        marketsMiss: number;
+      };
+      rateLimit?: KalshiRateLimitDebug;
+      last429?: {
+        retryAfterSec?: number | null;
+        backoffUntilMs?: number | null;
+        consecutive429?: number;
+        last429AtMs?: number | null;
+      };
     }
   >;
   kalshi: {
@@ -45,6 +78,9 @@ export interface LiveEventsDebugCounters {
       totalPagesFetched?: number;
       cappedByMaxTotalMarkets?: boolean;
       discoveryFailedReason?: string | null;
+      seriesTickersTotal?: number;
+      seriesTickersChosen?: string[];
+      maxSeriesPerRefresh?: number;
     };
     sampleRawItems: Array<{
       ticker?: string;
@@ -78,7 +114,17 @@ let counters: LiveEventsDebugCounters = {
   subscriptionsAttempted: 0,
   subscriptionsFailed: {},
   platformFetch: {
-    kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+    kalshi: {
+      attempted: 0,
+      skipped: 0,
+      skipReasons: {},
+      cache: {
+        seriesHit: 0,
+        seriesMiss: 0,
+        marketsHit: 0,
+        marketsMiss: 0,
+      },
+    },
     polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
     sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
   },
@@ -113,7 +159,17 @@ export function resetLiveEventsDebug(): void {
     subscriptionsAttempted: 0,
     subscriptionsFailed: {},
     platformFetch: {
-      kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+    kalshi: {
+      attempted: 0,
+      skipped: 0,
+      skipReasons: {},
+      cache: {
+        seriesHit: 0,
+        seriesMiss: 0,
+        marketsHit: 0,
+        marketsMiss: 0,
+      },
+    },
       polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
       sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
     },
@@ -180,6 +236,42 @@ export function recordPlatformFetchError(
   error: string
 ): void {
   counters.platformFetch[platform].lastError = error.slice(0, 200);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiCacheEvent(
+  type: 'series' | 'markets',
+  hit: boolean
+): void {
+  const cache = counters.platformFetch.kalshi.cache;
+  if (!cache) return;
+
+  const key =
+    type === 'series'
+      ? hit
+        ? 'seriesHit'
+        : 'seriesMiss'
+      : hit
+      ? 'marketsHit'
+      : 'marketsMiss';
+
+  cache[key] += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiRateLimitState(state: KalshiRateLimitDebug): void {
+  counters.platformFetch.kalshi.rateLimit = state;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshi429(details: {
+  retryAfterSec?: number | null;
+  backoffUntilMs?: number | null;
+  consecutive429?: number;
+  last429AtMs?: number | null;
+}): void {
+  counters.platformFetch.kalshi.last429 = details;
+  counters.platformFetch.kalshi.lastError = '429';
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
@@ -268,6 +360,9 @@ export function recordKalshiQueryApplied(query: {
   totalPagesFetched?: number;
   cappedByMaxTotalMarkets?: boolean;
   discoveryFailedReason?: string | null;
+  seriesTickersTotal?: number;
+  seriesTickersChosen?: string[];
+  maxSeriesPerRefresh?: number;
 }): void {
   counters.kalshi.queryApplied = query;
   counters.lastUpdatedAt = new Date().toISOString();
@@ -285,6 +380,15 @@ export function getLiveEventsDebug(): LiveEventsDebugCounters {
       kalshi: {
         ...counters.platformFetch.kalshi,
         skipReasons: { ...counters.platformFetch.kalshi.skipReasons },
+        cache: counters.platformFetch.kalshi.cache
+          ? { ...counters.platformFetch.kalshi.cache }
+          : undefined,
+        rateLimit: counters.platformFetch.kalshi.rateLimit
+          ? { ...counters.platformFetch.kalshi.rateLimit }
+          : undefined,
+        last429: counters.platformFetch.kalshi.last429
+          ? { ...counters.platformFetch.kalshi.last429 }
+          : undefined,
       },
       polymarket: {
         ...counters.platformFetch.polymarket,
