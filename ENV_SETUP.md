@@ -50,9 +50,12 @@ openssl rand -hex 32
 **Documentation**: https://docs.kalshi.com/getting_started/authentication
 
 Additional Kalshi discovery controls:
-- `KALSHI_SPORTS_SERIES_TICKER` (default: `SPORTS`) — restricts market discovery to Kalshi's sports series.
-- `KALSHI_LIVE_CLOSE_WINDOW_MINUTES` (default: `360`) — only fetch markets closing within the next N minutes (with a small lookback for recently started games).
-- `KALSHI_ALLOW_FALLBACK_ALL_MARKETS` (default: `false`) — if the sports series query returns 0, allow a fallback to all markets. Keep `false` to avoid non-sports noise.
+- `KALSHI_LIVE_CLOSE_WINDOW_MINUTES` (default: `360`) — only fetch markets closing within the next N minutes.
+- `KALSHI_MIN_CLOSE_WINDOW_MINUTES` (default: `120`) — include markets that closed/started recently (lookback).
+- `KALSHI_MAX_PAGES_PER_SERIES` (default: `2`) — pagination cap per series ticker to avoid crawling thousands of pages.
+- `KALSHI_MAX_TOTAL_MARKETS` (default: `2000`) — hard cap per refresh across all series.
+- `KALSHI_SERIES_CACHE_TTL_MS` (default: `3600000`) — cache sports series discovery.
+- `KALSHI_SPORTS_SERIES_TICKERS_OVERRIDE` — optional comma-separated fallback list if discovery fails.
 
 ### Polymarket API
 
@@ -149,9 +152,14 @@ ADMIN_PASSWORD_HASH=<from generate-password-hash.js>
 KALSHI_API_KEY=your-kalshi-api-key
 KALSHI_PRIVATE_KEY=your-kalshi-private-key
 KALSHI_EMAIL=your-kalshi-account@email.com
-KALSHI_SPORTS_SERIES_TICKER=SPORTS
+# Sports series discovery + fetch bounds
 KALSHI_LIVE_CLOSE_WINDOW_MINUTES=360
-KALSHI_ALLOW_FALLBACK_ALL_MARKETS=false
+KALSHI_MIN_CLOSE_WINDOW_MINUTES=120
+KALSHI_MAX_PAGES_PER_SERIES=2
+KALSHI_MAX_TOTAL_MARKETS=2000
+KALSHI_SERIES_CACHE_TTL_MS=3600000
+# Optional fallback list if discovery fails (comma separated)
+KALSHI_SPORTS_SERIES_TICKERS_OVERRIDE=
 
 # ===================================
 # POLYMARKET API

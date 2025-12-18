@@ -30,6 +30,12 @@ export interface LiveEventsDebugCounters {
       allowFallbackAllMarkets?: boolean;
       fallbackUsed?: boolean;
       fallbackReason?: string;
+      discoveredSeriesTickersCount?: number;
+      seriesTickersUsed?: string[];
+      marketsFetchedBySeries?: Record<string, number>;
+      totalPagesFetched?: number;
+      cappedByMaxTotalMarkets?: boolean;
+      discoveryFailedReason?: string | null;
     };
     sampleRawItems: Array<{
       ticker?: string;
@@ -215,6 +221,12 @@ export function recordKalshiQueryApplied(query: {
   allowFallbackAllMarkets?: boolean;
   fallbackUsed?: boolean;
   fallbackReason?: string;
+  discoveredSeriesTickersCount?: number;
+  seriesTickersUsed?: string[];
+  marketsFetchedBySeries?: Record<string, number>;
+  totalPagesFetched?: number;
+  cappedByMaxTotalMarkets?: boolean;
+  discoveryFailedReason?: string | null;
 }): void {
   counters.kalshi.queryApplied = query;
   counters.lastUpdatedAt = new Date().toISOString();

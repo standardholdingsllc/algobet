@@ -11,9 +11,10 @@ import { Market, MarketPlatform, BotConfig, MarketFilterInput } from '@/types';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
 import {
   KalshiAPI,
-  DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS,
   DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES,
-  DEFAULT_KALSHI_SPORTS_SERIES_TICKER,
+  DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES,
+  DEFAULT_KALSHI_MAX_PAGES_PER_SERIES,
+  DEFAULT_KALSHI_MAX_TOTAL_MARKETS,
 } from './markets/kalshi';
 import { PolymarketAPI } from './markets/polymarket';
 import { SXBetAPI } from './markets/sxbet';
@@ -183,11 +184,11 @@ export class LiveMarketFetcher {
 
     return this.kalshiApi.getOpenMarkets({
       maxCloseMinutes,
-      minCloseMinutes: 120, // include markets that just went live
+      minCloseMinutes: DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES,
       status: 'open',
-      seriesTicker: sportsOnly ? DEFAULT_KALSHI_SPORTS_SERIES_TICKER : undefined,
       sportsOnly,
-      allowFallbackAllMarkets: DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS,
+      maxPagesPerSeries: DEFAULT_KALSHI_MAX_PAGES_PER_SERIES,
+      maxTotalMarkets: DEFAULT_KALSHI_MAX_TOTAL_MARKETS,
     });
   }
 

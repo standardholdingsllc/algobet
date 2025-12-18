@@ -15,22 +15,36 @@ const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';
 export const KALSHI_WS_SIGNATURE_PATH = '/trade-api/ws/v2';
 export const DEFAULT_KALSHI_WS_URL = 'wss://api.elections.kalshi.com/trade-api/ws/v2';
-const KALSHI_PAGE_LIMIT = 200;
-const KALSHI_MAX_PAGES = 8;
-const KALSHI_TARGET_MARKETS = 150;
-const parsedCloseWindowMinutes = parseInt(
-  process.env.KALSHI_LIVE_CLOSE_WINDOW_MINUTES || '',
+const KALSHI_PAGE_LIMIT = 1000;
+const parsedCloseWindowMinutes = parseInt(process.env.KALSHI_LIVE_CLOSE_WINDOW_MINUTES || '', 10);
+const parsedMinCloseWindowMinutes = parseInt(
+  process.env.KALSHI_MIN_CLOSE_WINDOW_MINUTES || '',
   10
 );
-export const DEFAULT_KALSHI_SPORTS_SERIES_TICKER =
-  (process.env.KALSHI_SPORTS_SERIES_TICKER || 'SPORTS').trim();
+const parsedMaxPagesPerSeries = parseInt(process.env.KALSHI_MAX_PAGES_PER_SERIES || '', 10);
+const parsedMaxTotalMarkets = parseInt(process.env.KALSHI_MAX_TOTAL_MARKETS || '', 10);
+const parsedSeriesCacheTtlMs = parseInt(process.env.KALSHI_SERIES_CACHE_TTL_MS || '', 10);
 export const DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES = Math.max(
   1,
   Number.isFinite(parsedCloseWindowMinutes) ? parsedCloseWindowMinutes : 360
 );
-export const DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS =
-  (process.env.KALSHI_ALLOW_FALLBACK_ALL_MARKETS || 'false').toLowerCase() === 'true';
-const KALSHI_MIN_CLOSE_LOOKBACK_MINUTES = 120;
+export const DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES = Math.max(
+  1,
+  Number.isFinite(parsedMinCloseWindowMinutes) ? parsedMinCloseWindowMinutes : 120
+);
+export const DEFAULT_KALSHI_MAX_PAGES_PER_SERIES = Math.max(
+  1,
+  Number.isFinite(parsedMaxPagesPerSeries) ? parsedMaxPagesPerSeries : 2
+);
+export const DEFAULT_KALSHI_MAX_TOTAL_MARKETS = Math.max(
+  100,
+  Number.isFinite(parsedMaxTotalMarkets) ? parsedMaxTotalMarkets : 2000
+);
+export const DEFAULT_KALSHI_SERIES_CACHE_TTL_MS = Math.max(
+  60_000,
+  Number.isFinite(parsedSeriesCacheTtlMs) ? parsedSeriesCacheTtlMs : 3_600_000
+);
+const DEFAULT_SPORTS_CATEGORY = 'Sports';
 
 interface KalshiMarket {
   ticker: string;
@@ -76,17 +90,33 @@ interface KalshiMarketQueryParams {
 }
 
 interface GetOpenMarketsOptions {
-  maxDaysToExpiry?: number;
   maxCloseMinutes?: number;
   minCloseMinutes?: number;
   status?: string;
-  seriesTicker?: string;
   sportsOnly?: boolean;
-  allowFallbackAllMarkets?: boolean;
+  seriesTickersOverride?: string[];
+  maxPagesPerSeries?: number;
+  maxTotalMarkets?: number;
+}
+
+interface KalshiSeries {
+  ticker: string;
+  title?: string;
+  category?: string;
+}
+
+interface KalshiSeriesResponse {
+  series?: KalshiSeries[];
+  meta?: {
+    next_cursor?: string;
+  };
+  cursor?: string;
+  next_cursor?: string;
 }
 
 const KALSHI_EVENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const KALSHI_EVENT_PREFETCH_BATCH = 8;
+const SERIES_DISCOVERY_MAX_PAGES = 5;
 
 const KALSHI_SPORT_PREFIX_MAP: Record<string, string> = {
   KXNFL: 'NFL',
@@ -240,6 +270,11 @@ export class KalshiAPI {
   private privateKey: string;
   private email: string;
   private eventCache: Map<string, KalshiEventCacheEntry> = new Map();
+  private sportsSeriesCache: {
+    tickers: string[];
+    fetchedAt: number;
+    failedReason?: string | null;
+  } | null = null;
 
   constructor() {
     this.apiKey = process.env.KALSHI_API_KEY || '';
@@ -312,6 +347,92 @@ export class KalshiAPI {
       const batch = toFetch.slice(i, i + KALSHI_EVENT_PREFETCH_BATCH);
       await Promise.all(batch.map((ticker) => this.fetchEventDetails(ticker)));
     }
+  }
+
+  private parseSeriesOverride(): string[] {
+    const override = process.env.KALSHI_SPORTS_SERIES_TICKERS_OVERRIDE || '';
+    return override
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  private isSeriesCacheFresh(): boolean {
+    if (!this.sportsSeriesCache) return false;
+    return Date.now() - this.sportsSeriesCache.fetchedAt < DEFAULT_KALSHI_SERIES_CACHE_TTL_MS;
+  }
+
+  private setSeriesCache(tickers: string[], failedReason?: string | null): void {
+    this.sportsSeriesCache = {
+      tickers,
+      failedReason: failedReason ?? null,
+      fetchedAt: Date.now(),
+    };
+  }
+
+  async fetchSportsSeriesTickers(): Promise<{ tickers: string[]; failedReason?: string | null }> {
+    if (this.isSeriesCacheFresh() && this.sportsSeriesCache) {
+      return {
+        tickers: this.sportsSeriesCache.tickers,
+        failedReason: this.sportsSeriesCache.failedReason,
+      };
+    }
+
+    const overrideTickers = this.parseSeriesOverride();
+    let tickers: string[] = [];
+    let failedReason: string | null = null;
+
+    try {
+      let cursor: string | undefined;
+      let page = 0;
+      const discovered = new Set<string>();
+
+      while (page < SERIES_DISCOVERY_MAX_PAGES) {
+        const response = await axios.get<KalshiSeriesResponse>(`${BASE_URL}/series`, {
+          params: {
+            category: DEFAULT_SPORTS_CATEGORY,
+            limit: 200,
+            cursor,
+          },
+        });
+
+        const series = response.data.series || [];
+        series
+          .map((s) => s.ticker?.trim())
+          .filter(Boolean)
+          .forEach((ticker) => discovered.add(ticker!));
+
+        const nextCursor =
+          response.data.meta?.next_cursor ??
+          response.data.next_cursor ??
+          response.data.cursor ??
+          undefined;
+
+        page += 1;
+        if (!nextCursor) break;
+        cursor = nextCursor;
+      }
+
+      tickers = Array.from(discovered);
+
+      if (!tickers.length && overrideTickers.length) {
+        failedReason = 'discovery_empty_using_override';
+        tickers = overrideTickers;
+      } else if (!tickers.length) {
+        failedReason = 'discovery_empty_no_override';
+      }
+    } catch (error: any) {
+      failedReason = error?.message || 'series_discovery_failed';
+      if (overrideTickers.length) {
+        tickers = overrideTickers;
+      } else {
+        tickers = [];
+      }
+      console.error('[Kalshi] Failed to discover sports series:', error?.message || error);
+    }
+
+    this.setSeriesCache(tickers, failedReason);
+    return { tickers, failedReason };
   }
 
   private mapKalshiMarket(market: KalshiMarket): Market {
@@ -415,155 +536,143 @@ export class KalshiAPI {
     return buildKalshiAuthHeaders(method, path, body);
   }
 
-  async getOpenMarkets(options?: number | GetOpenMarketsOptions): Promise<Market[]> {
-    const opts: GetOpenMarketsOptions =
-      typeof options === 'number' ? { maxDaysToExpiry: options } : options ?? {};
-
-    const closeWindowMinutes = Math.max(
+  async getOpenMarkets(options?: GetOpenMarketsOptions): Promise<Market[]> {
+    const opts: GetOpenMarketsOptions = options ?? {};
+    const closeWindowMinutes = Math.max(1, opts.maxCloseMinutes ?? DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES);
+    const minCloseMinutes = Math.max(
       1,
-      opts.maxCloseMinutes ??
-        (opts.maxDaysToExpiry ? opts.maxDaysToExpiry * 24 * 60 : DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES)
+      opts.minCloseMinutes ?? DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES
     );
-    const minCloseMinutes = opts.minCloseMinutes ?? KALSHI_MIN_CLOSE_LOOKBACK_MINUTES;
     const status = opts.status ?? 'open';
     const sportsOnly = opts.sportsOnly ?? true;
-    const seriesTicker = sportsOnly
-      ? opts.seriesTicker?.trim() || DEFAULT_KALSHI_SPORTS_SERIES_TICKER
-      : undefined;
-    const allowFallbackAllMarkets =
-      opts.allowFallbackAllMarkets ?? DEFAULT_KALSHI_ALLOW_FALLBACK_ALL_MARKETS;
+    const maxPagesPerSeries = Math.max(
+      1,
+      opts.maxPagesPerSeries ?? DEFAULT_KALSHI_MAX_PAGES_PER_SERIES
+    );
+    const maxTotalMarkets = Math.max(
+      1,
+      opts.maxTotalMarkets ?? DEFAULT_KALSHI_MAX_TOTAL_MARKETS
+    );
 
-    const nowMs = Date.now();
-    const buildQuery = (override?: Partial<KalshiMarketQueryParams>): KalshiMarketQueryParams => ({
-      minCloseTs: Math.floor((nowMs - minCloseMinutes * 60_000) / 1000),
-      maxCloseTs: Math.floor((nowMs + closeWindowMinutes * 60_000) / 1000),
+    const nowTs = Math.floor(Date.now() / 1000);
+    const queryWindow: KalshiMarketQueryParams = {
+      minCloseTs: nowTs - minCloseMinutes * 60,
+      maxCloseTs: nowTs + closeWindowMinutes * 60,
       status,
-      seriesTicker,
-      ...override,
-    });
-
-    const fetchWithQuery = async (
-      query: KalshiMarketQueryParams,
-      context?: { fallbackUsed?: boolean; fallbackReason?: string }
-    ): Promise<Market[]> => {
-      recordKalshiFetchAttempted();
-      recordKalshiQueryApplied({
-        seriesTicker: query.seriesTicker,
-        maxCloseTs: query.maxCloseTs,
-        minCloseTs: query.minCloseTs,
-        status: query.status,
-        allowFallbackAllMarkets,
-        fallbackUsed: context?.fallbackUsed,
-        fallbackReason: context?.fallbackReason,
-      });
-
-      const rawSamples: KalshiMarket[] = [];
-      const rawMarkets: KalshiMarket[] = [];
-      const sportsEventTickers = new Set<string>();
-      let rawSeenCount = 0;
-      let filteredToCloseWindow = 0;
-      let cursor: string | undefined;
-      let page = 0;
-
-      try {
-        while (page < KALSHI_MAX_PAGES) {
-          const { entries, nextCursor, status: httpStatus } = await this.fetchMarketsPage(
-            cursor,
-            query
-          );
-          recordKalshiHttpStatus(httpStatus);
-          page += 1;
-
-          if (!entries.length) {
-            console.info(
-              `[Kalshi] Markets page ${page} returned 0 entries; stopping pagination (series=${query.seriesTicker ?? 'ALL'}, status=${query.status ?? 'any'}).`
-            );
-            break;
-          }
-
-          rawSeenCount += entries.length;
-          if (rawSamples.length < 3) {
-            rawSamples.push(...entries.slice(0, 3 - rawSamples.length));
-          }
-
-          for (const market of entries) {
-            const closeTs = Math.floor(new Date(market.close_time).getTime() / 1000);
-            if (
-              Number.isNaN(closeTs) ||
-              closeTs > query.maxCloseTs ||
-              closeTs < query.minCloseTs
-            ) {
-              filteredToCloseWindow += 1;
-              continue;
-            }
-
-            rawMarkets.push(market);
-
-            if (this.isLikelySportsTicker(market.event_ticker)) {
-              sportsEventTickers.add(market.event_ticker);
-            }
-          }
-
-          console.info(
-            `[Kalshi] Processed Kalshi page ${page} (${entries.length} raw, ${rawMarkets.length} within close window so far).`
-          );
-
-          if (!nextCursor) {
-            break;
-          }
-
-          if (rawMarkets.length >= KALSHI_TARGET_MARKETS) {
-            console.info(
-              `[Kalshi] Reached target tradable market count (${rawMarkets.length}); stopping pagination early.`
-            );
-            break;
-          }
-
-          cursor = nextCursor;
-        }
-
-        if (rawMarkets.length === 0) {
-          console.warn(
-            `[Kalshi] No markets matched filters series=${query.seriesTicker ?? 'ALL'}, status=${
-              query.status ?? 'any'
-            }, window=${closeWindowMinutes}m.`
-          );
-        }
-
-        recordKalshiRawItems(rawSeenCount, rawSamples);
-        recordKalshiFilteredToCloseWindow(filteredToCloseWindow);
-
-        if (sportsEventTickers.size > 0) {
-          await this.prefetchEventDetails(Array.from(sportsEventTickers));
-        }
-
-        return rawMarkets.map((market) => this.mapKalshiMarket(market));
-      } catch (error: any) {
-        console.error('Error fetching Kalshi markets:', error.response?.status || error.message);
-        recordKalshiFetchFailed(error.response?.status, error.message);
-        return [];
-      }
     };
 
-    const primaryQuery = buildQuery();
-    const primaryResults = await fetchWithQuery(primaryQuery);
+    recordKalshiFetchAttempted();
 
-    if (primaryResults.length === 0 && seriesTicker) {
-      const fallbackReason = 'series_ticker_returned_zero';
-      console.warn(
-        `[Kalshi] series_ticker=${seriesTicker} returned 0 markets; ` +
-          (allowFallbackAllMarkets
-            ? 'falling back to all markets (env flag enabled).'
-            : 'fallback disabled (KALSHI_ALLOW_FALLBACK_ALL_MARKETS=false).')
-      );
+    const marketsFetchedBySeries: Record<string, number> = {};
+    const allMarkets: KalshiMarket[] = [];
+    const rawSamples: KalshiMarket[] = [];
+    const sportsEventTickers = new Set<string>();
+    let totalPagesFetched = 0;
+    let filteredToCloseWindow = 0;
+    let discoveryFailedReason: string | null | undefined;
 
-      if (allowFallbackAllMarkets) {
-        const fallbackQuery = buildQuery({ seriesTicker: undefined });
-        return fetchWithQuery(fallbackQuery, { fallbackUsed: true, fallbackReason });
+    let seriesTickers: Array<string | undefined> = [];
+    if (sportsOnly) {
+      const { tickers, failedReason } = await this.fetchSportsSeriesTickers();
+      seriesTickers = tickers;
+      discoveryFailedReason = failedReason;
+    }
+
+    if (!sportsOnly) {
+      seriesTickers = [undefined];
+    }
+
+    if (opts.seriesTickersOverride?.length) {
+      seriesTickers = opts.seriesTickersOverride;
+    }
+
+    if (!seriesTickers.length) {
+      recordKalshiQueryApplied({
+        ...queryWindow,
+        discoveryFailedReason: discoveryFailedReason ?? 'no_series_available',
+        discoveredSeriesTickersCount: 0,
+        seriesTickersUsed: [],
+      });
+      console.warn('[Kalshi] No series tickers available for fetching markets.');
+      return [];
+    }
+
+    for (const ticker of seriesTickers) {
+      if (allMarkets.length >= maxTotalMarkets) break;
+
+      let cursor: string | undefined;
+      let page = 0;
+      const seriesKey = ticker || 'ALL';
+      marketsFetchedBySeries[seriesKey] = 0;
+
+      while (page < maxPagesPerSeries && allMarkets.length < maxTotalMarkets) {
+        const { entries, nextCursor, status: httpStatus } = await this.fetchMarketsPage(cursor, {
+          ...queryWindow,
+          seriesTicker: ticker || undefined,
+        });
+        recordKalshiHttpStatus(httpStatus);
+        page += 1;
+        totalPagesFetched += 1;
+
+        if (!entries.length) {
+          break;
+        }
+
+        if (rawSamples.length < 3) {
+          rawSamples.push(...entries.slice(0, 3 - rawSamples.length));
+        }
+
+        for (const market of entries) {
+          const closeTs = Math.floor(new Date(market.close_time).getTime() / 1000);
+          if (
+            Number.isNaN(closeTs) ||
+            closeTs > queryWindow.maxCloseTs ||
+            closeTs < queryWindow.minCloseTs
+          ) {
+            filteredToCloseWindow += 1;
+            continue;
+          }
+
+          allMarkets.push(market);
+          marketsFetchedBySeries[seriesKey] += 1;
+
+          if (this.isLikelySportsTicker(market.event_ticker)) {
+            sportsEventTickers.add(market.event_ticker);
+          }
+
+          if (allMarkets.length >= maxTotalMarkets) {
+            break;
+          }
+        }
+
+        if (!nextCursor) {
+          break;
+        }
+
+        cursor = nextCursor;
       }
     }
 
-    return primaryResults;
+    const seriesTickersUsed = seriesTickers.filter(Boolean) as string[];
+
+    recordKalshiQueryApplied({
+      ...queryWindow,
+      discoveredSeriesTickersCount: sportsOnly ? seriesTickersUsed.length : seriesTickers.length,
+      seriesTickersUsed: seriesTickersUsed.slice(0, 10),
+      marketsFetchedBySeries,
+      totalPagesFetched,
+      cappedByMaxTotalMarkets: allMarkets.length >= maxTotalMarkets,
+      discoveryFailedReason: discoveryFailedReason ?? null,
+    });
+
+    recordKalshiRawItems(allMarkets.length, rawSamples);
+    recordKalshiFilteredToCloseWindow(filteredToCloseWindow);
+
+    if (sportsEventTickers.size > 0) {
+      await this.prefetchEventDetails(Array.from(sportsEventTickers));
+    }
+
+    return allMarkets.map((market) => this.mapKalshiMarket(market));
   }
 
   private async fetchMarketsPage(
