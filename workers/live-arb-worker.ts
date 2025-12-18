@@ -31,7 +31,7 @@ import { LivePriceCache } from '../lib/live-price-cache';
 
 const WORKER_TAG = 'LiveArbWorker';
 
-// Environment validation for clear error messaging
+// Environment validation
 const SXBET_WS_URL = (process.env.SXBET_WS_URL || '').trim();
 const SXBET_WS_DISABLED = !SXBET_WS_URL;
 
@@ -47,20 +47,42 @@ const IDLE_POLL_INTERVAL_MS = parseInt(
   10
 );
 
-// CRITICAL: Heartbeat interval - DECOUPLED from refresh cycle
+// CRITICAL: Heartbeat interval - MUST fire reliably
 const HEARTBEAT_INTERVAL_MS = parseInt(
   process.env.WORKER_HEARTBEAT_INTERVAL_MS || '5000',
   10
 );
 
-// Grace period for shutdown (must be less than pm2 kill_timeout)
+// Grace period for shutdown
 const SHUTDOWN_GRACE_MS = parseInt(
   process.env.WORKER_SHUTDOWN_GRACE_MS || '25000',
   10
 );
 
-// Rate limit for heartbeat error logs
+// Delay before final STOPPED write (so STOPPING is observable)
+const SHUTDOWN_STOPPING_DELAY_MS = parseInt(
+  process.env.WORKER_SHUTDOWN_STOPPING_DELAY_MS || '1500',
+  10
+);
+
+// Rate limits for logging
 const HEARTBEAT_ERROR_LOG_INTERVAL_MS = 30000;
+const HEARTBEAT_STATUS_LOG_INTERVAL_MS = 60000;
+
+// Cooperative yielding threshold
+const YIELD_EVERY_N_ITEMS = 100;
+
+// ============================================================================
+// Cooperative Yielding Helper
+// ============================================================================
+
+/**
+ * Yields to the event loop using setImmediate.
+ * Call this periodically in long loops to prevent event loop starvation.
+ */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
 
 // ============================================================================
 // Worker Implementation
@@ -70,15 +92,18 @@ class LiveArbWorker {
   private marketFetcher = new LiveMarketFetcher();
   private arbActive = false;
   private processRunning = true;
-  private refreshTimer: NodeJS.Timeout | null = null;
-  private heartbeatTimer: NodeJS.Timeout | null = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private adapters: PlatformAdapters;
   private cachedBotConfig: BotConfig | null = null;
   private cachedRuntimeConfig: LiveArbRuntimeConfig | null = null;
 
-  // Heartbeat state
-  private isHeartbeatWriteInFlight = false;
+  // Heartbeat state - with tick counting for diagnostics
+  private heartbeatTickCount = 0;
+  private lastHeartbeatWriteAt = 0;
   private lastHeartbeatErrorLogAt = 0;
+  private lastHeartbeatStatusLogAt = 0;
+  private isHeartbeatWriteInFlight = false;
 
   // Refresh metadata
   private refreshInProgress = false;
@@ -101,8 +126,11 @@ class LiveArbWorker {
 
   /**
    * Main entry point - starts the worker process.
+   * CRITICAL: Heartbeat loop starts FIRST before any heavy init.
    */
   async start(): Promise<void> {
+    const startTime = Date.now();
+    
     liveArbLog('info', WORKER_TAG, 'Starting live-arb worker', {
       pid: process.pid,
       nodeEnv: process.env.NODE_ENV || 'unknown',
@@ -112,25 +140,35 @@ class LiveArbWorker {
       sxbetWsDisabled: SXBET_WS_DISABLED,
     });
 
-    // Write STARTING state
-    await this.writeHeartbeat('STARTING');
+    // STEP 1: Write STARTING state IMMEDIATELY before any heavy init
+    try {
+      await this.writeHeartbeatDirect('STARTING');
+      liveArbLog('info', WORKER_TAG, 'STARTING heartbeat written to KV');
+    } catch (error) {
+      liveArbLog('error', WORKER_TAG, 'Failed to write initial STARTING heartbeat', error as Error);
+    }
 
-    // Cache bot config once at startup
-    this.cachedBotConfig = await getOrSeedBotConfig();
-
-    // Start the dedicated heartbeat loop
+    // STEP 2: Start heartbeat loop BEFORE heavy init
     this.startHeartbeatLoop();
 
-    // Start the main loop
+    // STEP 3: Now do potentially slow init
+    try {
+      this.cachedBotConfig = await getOrSeedBotConfig();
+    } catch (error) {
+      liveArbLog('error', WORKER_TAG, 'Failed to load bot config', error as Error);
+      // Continue - heartbeat will still run
+    }
+
+    // STEP 4: Start main loop
     this.scheduleMainLoop();
+
+    liveArbLog('info', WORKER_TAG, `Worker startup complete in ${Date.now() - startTime}ms`);
   }
 
   /**
    * Begin graceful shutdown. Called by signal handlers.
-   * Immediately writes STOPPING to KV, then cleans up.
    */
   async beginShutdown(reason: string): Promise<void> {
-    // Prevent multiple shutdown calls
     if (this.isShuttingDown) {
       liveArbLog('warn', WORKER_TAG, 'Shutdown already in progress, ignoring duplicate signal');
       return;
@@ -143,14 +181,15 @@ class LiveArbWorker {
 
     liveArbLog('info', WORKER_TAG, `Beginning graceful shutdown (reason: ${reason})`);
 
-    // Immediately write STOPPING heartbeat
+    // IMMEDIATELY write STOPPING to KV
     try {
-      await this.writeHeartbeat('STOPPING');
+      await this.writeHeartbeatDirect('STOPPING');
+      liveArbLog('info', WORKER_TAG, 'STOPPING heartbeat written to KV');
     } catch (error) {
       liveArbLog('error', WORKER_TAG, 'Failed to write STOPPING heartbeat', error as Error);
     }
 
-    // Stop timers first
+    // Stop timers
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
@@ -167,57 +206,132 @@ class LiveArbWorker {
       liveArbLog('error', WORKER_TAG, 'Error stopping arb system', error as Error);
     }
 
-    // Final heartbeat
+    // Wait a bit so STOPPING state is observable
+    await new Promise((resolve) => setTimeout(resolve, SHUTDOWN_STOPPING_DELAY_MS));
+
+    // Final STOPPED heartbeat
     try {
-      await this.writeHeartbeat('STOPPED');
+      await this.writeHeartbeatDirect('STOPPED');
+      liveArbLog('info', WORKER_TAG, 'STOPPED heartbeat written to KV');
     } catch (error) {
-      liveArbLog('error', WORKER_TAG, 'Failed to write final STOPPED heartbeat', error as Error);
+      liveArbLog('error', WORKER_TAG, 'Failed to write STOPPED heartbeat', error as Error);
     }
 
     liveArbLog('info', WORKER_TAG, 'Graceful shutdown complete');
   }
 
   // ==========================================================================
-  // Heartbeat Loop
+  // Heartbeat Loop - MUST BE RELIABLE
   // ==========================================================================
 
+  /**
+   * Start the dedicated heartbeat loop.
+   * Uses setInterval but the callback is lightweight and yields immediately
+   * to an async function to prevent blocking.
+   */
   private startHeartbeatLoop(): void {
     liveArbLog('info', WORKER_TAG, `Starting heartbeat loop (interval: ${HEARTBEAT_INTERVAL_MS}ms)`);
 
-    // Initial heartbeat
-    this.writeHeartbeat(this.arbActive ? 'RUNNING' : 'IDLE');
-
-    // Schedule regular heartbeats
+    // Use setInterval with unref() so it doesn't keep process alive during shutdown
     this.heartbeatTimer = setInterval(() => {
-      if (this.isShuttingDown) return;
-      const state: WorkerState = this.arbActive ? 'RUNNING' : 'IDLE';
-      this.writeHeartbeat(state);
+      // Don't block the interval callback - fire and forget
+      this.heartbeatTick().catch((err) => {
+        // Error already logged in heartbeatTick
+      });
     }, HEARTBEAT_INTERVAL_MS);
+
+    // Allow process to exit even if interval is pending
+    if (this.heartbeatTimer.unref) {
+      this.heartbeatTimer.unref();
+    }
   }
 
-  private async writeHeartbeat(state: WorkerState): Promise<void> {
-    // Use lock but always release in finally
-    if (this.isHeartbeatWriteInFlight && state !== 'STOPPING' && state !== 'STOPPED') {
+  /**
+   * Single heartbeat tick. Called by interval.
+   * Protected against concurrent writes and errors.
+   */
+  private async heartbeatTick(): Promise<void> {
+    if (this.isShuttingDown) return;
+
+    const tickStart = Date.now();
+    this.heartbeatTickCount++;
+
+    // Check for delayed heartbeat (event loop starvation warning)
+    if (this.lastHeartbeatWriteAt > 0) {
+      const sinceLastWrite = tickStart - this.lastHeartbeatWriteAt;
+      const expectedInterval = HEARTBEAT_INTERVAL_MS;
+      if (sinceLastWrite > expectedInterval * 3) {
+        liveArbLog('warn', WORKER_TAG, `Heartbeat delayed: expected ${expectedInterval}ms, actual ${sinceLastWrite}ms`, {
+          tickCount: this.heartbeatTickCount,
+          refreshInProgress: this.refreshInProgress,
+        });
+      }
+    }
+
+    // Skip if previous write still in flight (don't queue up)
+    if (this.isHeartbeatWriteInFlight) {
       return;
     }
 
+    // Determine state
+    const state: WorkerState = this.arbActive ? 'RUNNING' : 'IDLE';
+
+    // Write heartbeat
+    await this.writeHeartbeat(state);
+
+    // Periodic status log (every 60s)
+    const now = Date.now();
+    if (now - this.lastHeartbeatStatusLogAt >= HEARTBEAT_STATUS_LOG_INTERVAL_MS) {
+      liveArbLog('info', WORKER_TAG, 'Heartbeat OK', {
+        tickCount: this.heartbeatTickCount,
+        lastWriteAgoMs: now - this.lastHeartbeatWriteAt,
+        intervalMs: HEARTBEAT_INTERVAL_MS,
+        state,
+        arbActive: this.arbActive,
+        refreshInProgress: this.refreshInProgress,
+      });
+      this.lastHeartbeatStatusLogAt = now;
+    }
+  }
+
+  /**
+   * Write heartbeat to KV with lock and error handling.
+   */
+  private async writeHeartbeat(state: WorkerState): Promise<void> {
     this.isHeartbeatWriteInFlight = true;
 
     try {
-      const heartbeat = this.buildHeartbeatPayload(state);
+      const heartbeat = await this.buildHeartbeatPayload(state);
       await updateWorkerHeartbeat(heartbeat);
+      this.lastHeartbeatWriteAt = Date.now();
     } catch (error) {
+      // Rate-limit error logs
       const now = Date.now();
       if (now - this.lastHeartbeatErrorLogAt > HEARTBEAT_ERROR_LOG_INTERVAL_MS) {
         liveArbLog('error', WORKER_TAG, 'Failed to write heartbeat to KV', error as Error);
         this.lastHeartbeatErrorLogAt = now;
       }
     } finally {
+      // ALWAYS release lock
       this.isHeartbeatWriteInFlight = false;
     }
   }
 
-  private buildHeartbeatPayload(state: WorkerState): LiveArbWorkerHeartbeat {
+  /**
+   * Direct heartbeat write for lifecycle transitions (STARTING/STOPPING/STOPPED).
+   * Bypasses the lock and always writes.
+   */
+  private async writeHeartbeatDirect(state: WorkerState): Promise<void> {
+    const heartbeat = await this.buildHeartbeatPayload(state);
+    await updateWorkerHeartbeat(heartbeat);
+    this.lastHeartbeatWriteAt = Date.now();
+  }
+
+  /**
+   * Build heartbeat payload. Uses cooperative yielding for large data.
+   */
+  private async buildHeartbeatPayload(state: WorkerState): Promise<LiveArbWorkerHeartbeat> {
+    // Collect platform statuses (fast - in memory)
     const wsStatuses = LiveArbManager.getWsStatuses();
     const platforms = {
       sxbet: this.formatPlatformStatusForKV(wsStatuses.sxbet, 'sxbet'),
@@ -225,8 +339,10 @@ class LiveArbWorker {
       kalshi: this.formatPlatformStatusForKV(wsStatuses.kalshi, 'kalshi'),
     };
 
-    const priceCacheStats = this.collectPriceCacheStats();
+    // Collect price cache stats with yielding
+    const priceCacheStats = await this.collectPriceCacheStatsAsync();
 
+    // Get circuit breaker (fast - in memory)
     const status = getLiveArbStatus();
     const circuitBreaker = {
       isOpen: status.safetyStatus.circuitBreakerOpen,
@@ -235,10 +351,11 @@ class LiveArbWorker {
       openedAt: status.safetyStatus.circuitBreakerState.openedAt,
     };
 
-    const heartbeat: LiveArbWorkerHeartbeat = {
+    return {
       updatedAt: new Date().toISOString(),
       state,
       heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+      heartbeatTickCount: this.heartbeatTickCount,
 
       // Shutdown metadata
       shutdownReason: this.shutdownReason ?? undefined,
@@ -261,11 +378,12 @@ class LiveArbWorker {
       priceCacheStats,
       circuitBreaker,
     };
-
-    return heartbeat;
   }
 
-  private collectPriceCacheStats(): WorkerPriceCacheStats {
+  /**
+   * Collect price cache stats with cooperative yielding.
+   */
+  private async collectPriceCacheStatsAsync(): Promise<WorkerPriceCacheStats> {
     const cacheStats = LivePriceCache.getStats();
     const pricesByPlatform = LivePriceCache.getPriceCountByPlatform();
     const allPrices = LivePriceCache.getAllPrices();
@@ -274,14 +392,22 @@ class LiveArbWorker {
     let newestUpdateMs: number | undefined;
     let lastPriceUpdateAt: string | undefined;
 
-    for (const price of allPrices) {
+    // Process prices with yielding to prevent event loop starvation
+    for (let i = 0; i < allPrices.length; i++) {
+      const price = allPrices[i];
       const ageMs = price.ageMs ?? 0;
+      
       if (oldestUpdateMs === undefined || ageMs > oldestUpdateMs) {
         oldestUpdateMs = ageMs;
       }
       if (newestUpdateMs === undefined || ageMs < newestUpdateMs) {
         newestUpdateMs = ageMs;
         lastPriceUpdateAt = price.lastUpdatedAt;
+      }
+
+      // Yield every N items
+      if (i > 0 && i % YIELD_EVERY_N_ITEMS === 0) {
+        await yieldToEventLoop();
       }
     }
 
@@ -393,7 +519,18 @@ class LiveArbWorker {
     try {
       const filters = this.marketFetcher.buildFiltersFromConfig(botConfig, runtimeConfig);
       const results = await this.marketFetcher.fetchAllPlatforms(filters);
-      const markets = Object.values(results).flatMap((r) => r.markets);
+      
+      // Collect markets with yielding
+      const markets: any[] = [];
+      for (const [platform, result] of Object.entries(results)) {
+        for (let i = 0; i < result.markets.length; i++) {
+          markets.push(result.markets[i]);
+          // Yield periodically during large merges
+          if (markets.length % YIELD_EVERY_N_ITEMS === 0) {
+            await yieldToEventLoop();
+          }
+        }
+      }
 
       await refreshRegistry(markets);
 
@@ -525,7 +662,6 @@ function buildPlatformAdapters(): PlatformAdapters {
 
 const worker = new LiveArbWorker(DEFAULT_REFRESH_INTERVAL_MS);
 
-// Graceful shutdown with bounded timeout
 async function gracefulExit(reason: string, exitCode: number): Promise<never> {
   const timeout = setTimeout(() => {
     liveArbLog('error', WORKER_TAG, `Shutdown timeout (${SHUTDOWN_GRACE_MS}ms) exceeded, forcing exit`);
@@ -560,7 +696,6 @@ process.on('SIGINT', () => {
   gracefulExit('SIGINT', 0);
 });
 
-// Exception handlers - report to KV then exit non-zero
 process.on('uncaughtException', (error) => {
   liveArbLog('error', WORKER_TAG, 'Uncaught exception', error);
   gracefulExit('uncaughtException', 1);

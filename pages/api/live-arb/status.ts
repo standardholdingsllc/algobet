@@ -45,6 +45,8 @@ interface LiveArbStatusResponse {
   workerHeartbeatAt: string | null;
   workerHeartbeatAgeMs: number | null;
   heartbeatIntervalMs: number | null;
+  /** Monotonic tick count - proves heartbeat loop is advancing */
+  heartbeatTickCount: number | null;
   runtimeConfig: LiveArbRuntimeConfig | null;
   liveArbEnabled: boolean;
   liveArbReady: boolean;
@@ -207,6 +209,7 @@ export default async function handler(
       workerHeartbeatAt: heartbeat?.updatedAt ?? null,
       workerHeartbeatAgeMs,
       heartbeatIntervalMs: heartbeat?.heartbeatIntervalMs ?? null,
+      heartbeatTickCount: heartbeat?.heartbeatTickCount ?? null,
       runtimeConfig,
       liveArbEnabled: runtimeConfig?.liveArbEnabled ?? false,
       liveArbReady,

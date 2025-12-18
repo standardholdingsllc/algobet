@@ -129,6 +129,8 @@ export interface LiveArbWorkerHeartbeat {
   state: WorkerState;
   /** Configured heartbeat interval in ms (for diagnostics) */
   heartbeatIntervalMs?: number;
+  /** Monotonically increasing tick count - proves heartbeat loop is advancing */
+  heartbeatTickCount?: number;
   
   // Shutdown metadata (populated during graceful shutdown)
   /** Reason for shutdown: SIGTERM, SIGINT, uncaughtException, unhandledRejection */

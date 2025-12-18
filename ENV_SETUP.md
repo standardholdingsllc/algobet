@@ -209,6 +209,10 @@ WORKER_HEARTBEAT_STALE_MS=60000
 # MUST be less than pm2 kill_timeout (30000)
 WORKER_SHUTDOWN_GRACE_MS=25000
 
+# Delay before final STOPPED write during shutdown (default: 1500)
+# This ensures STOPPING state is observable during pm2 restart
+WORKER_SHUTDOWN_STOPPING_DELAY_MS=1500
+
 # Minimum profit in basis points (default: 50)
 LIVE_ARB_MIN_PROFIT_BPS=50
 
