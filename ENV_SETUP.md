@@ -204,6 +204,11 @@ WORKER_HEARTBEAT_INTERVAL_MS=5000
 # Should be much larger than WORKER_HEARTBEAT_INTERVAL_MS to allow for temporary failures
 WORKER_HEARTBEAT_STALE_MS=60000
 
+# Graceful shutdown timeout in milliseconds (default: 25000)
+# Worker will force-exit after this if shutdown takes too long
+# MUST be less than pm2 kill_timeout (30000)
+WORKER_SHUTDOWN_GRACE_MS=25000
+
 # Minimum profit in basis points (default: 50)
 LIVE_ARB_MIN_PROFIT_BPS=50
 
@@ -454,6 +459,111 @@ Before running the app:
 - Test each service independently
 - Consult service documentation
 - Open GitHub issue with details (never share actual keys!)
+
+## PM2 Operations (Production Worker)
+
+The live-arb-worker is designed to run with PM2 for production stability.
+
+### Initial Setup
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start the worker
+pm2 start ecosystem.config.js
+
+# Save PM2 process list (survives reboot)
+pm2 save
+
+# Set up PM2 to run on startup
+pm2 startup
+```
+
+### Common Commands
+
+```bash
+# View status
+pm2 status live-arb-worker
+
+# View logs
+pm2 logs live-arb-worker
+
+# Restart (graceful)
+pm2 restart live-arb-worker
+
+# Stop
+pm2 stop live-arb-worker
+
+# Delete from PM2
+pm2 delete live-arb-worker
+```
+
+### Log Rotation
+
+Install pm2-logrotate to prevent logs from filling disk:
+
+```bash
+# Install logrotate module
+pm2 install pm2-logrotate
+
+# Configure rotation settings
+pm2 set pm2-logrotate:max_size 50M       # Rotate when log exceeds 50MB
+pm2 set pm2-logrotate:retain 7           # Keep 7 rotated logs
+pm2 set pm2-logrotate:compress true      # Compress old logs
+pm2 set pm2-logrotate:dateFormat YYYY-MM-DD_HH-mm-ss
+pm2 set pm2-logrotate:rotateModule true  # Also rotate PM2 module logs
+```
+
+### Monitoring
+
+```bash
+# Real-time monitoring
+pm2 monit
+
+# JSON status output
+pm2 jlist
+
+# Check restart count
+pm2 show live-arb-worker | grep restarts
+```
+
+### Graceful Shutdown Verification
+
+When you run `pm2 restart live-arb-worker`:
+
+1. Worker receives SIGINT/SIGTERM
+2. Writes `STOPPING` state to KV immediately
+3. Closes WebSocket connections
+4. Writes `STOPPED` state to KV
+5. Exits cleanly (exit code 0)
+6. PM2 starts new instance
+7. New instance writes `STARTING` then `RUNNING`/`IDLE`
+
+Check via:
+```bash
+# Watch status endpoint during restart
+watch -n 1 'curl -s https://your-app.vercel.app/api/live-arb/status | jq "{workerState, workerHeartbeatAt, shutdown}"'
+```
+
+### Troubleshooting PM2
+
+**Worker keeps restarting:**
+```bash
+pm2 logs live-arb-worker --lines 100  # Check for crash reasons
+```
+
+**Memory issues:**
+```bash
+pm2 show live-arb-worker  # Check memory usage
+# Adjust max_memory_restart in ecosystem.config.js if needed
+```
+
+**Config changes not applied:**
+```bash
+pm2 delete live-arb-worker
+pm2 start ecosystem.config.js
+```
 
 ## Summary
 

@@ -20,6 +20,7 @@ import {
   getWorkerHeartbeat,
   LiveArbWorkerHeartbeat,
   WorkerPlatformStatus,
+  WorkerState,
   isHeartbeatFresh,
 } from '@/lib/kv-storage';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
@@ -40,7 +41,7 @@ const WORKER_HEARTBEAT_STALE_MS = parseInt(
 
 interface LiveArbStatusResponse {
   workerPresent: boolean;
-  workerState: LiveArbWorkerHeartbeat['state'] | null;
+  workerState: WorkerState | null;
   workerHeartbeatAt: string | null;
   workerHeartbeatAgeMs: number | null;
   heartbeatIntervalMs: number | null;
@@ -48,6 +49,13 @@ interface LiveArbStatusResponse {
   liveArbEnabled: boolean;
   liveArbReady: boolean;
   timestamp: string;
+  
+  // Shutdown metadata (populated during graceful shutdown)
+  shutdown: {
+    inProgress: boolean;
+    reason: string | null;
+    startedAt: string | null;
+  };
   
   // Refresh cycle metadata (separate from heartbeat timing)
   refresh: {
@@ -180,9 +188,16 @@ export default async function handler(
       consecutiveFailures: 0,
     };
 
-    // Determine if system is ready
+    // Check if worker is stopping/starting
+    const isShuttingDown = heartbeat?.state === 'STOPPING';
+    const isStarting = heartbeat?.state === 'STARTING';
+
+    // Determine if system is ready for trading
+    // Not ready during shutdown, startup, or if circuit breaker is open
     const liveArbReady = workerPresent && 
       heartbeat?.state === 'RUNNING' &&
+      !isShuttingDown &&
+      !isStarting &&
       !circuitBreaker.isOpen &&
       (platforms.sxbet.connected || platforms.polymarket.connected || platforms.kalshi.connected);
 
@@ -196,6 +211,13 @@ export default async function handler(
       liveArbEnabled: runtimeConfig?.liveArbEnabled ?? false,
       liveArbReady,
       timestamp: new Date().toISOString(),
+      
+      // Shutdown metadata
+      shutdown: {
+        inProgress: isShuttingDown,
+        reason: heartbeat?.shutdownReason ?? null,
+        startedAt: heartbeat?.shutdownStartedAt ?? null,
+      },
       
       // Refresh metadata (decoupled from heartbeat)
       refresh: {

@@ -105,6 +105,16 @@ export interface WorkerPriceCacheStats {
 }
 
 /**
+ * Worker lifecycle states.
+ * - STARTING: Worker is initializing (brief, during startup)
+ * - RUNNING: Arb system is active
+ * - IDLE: Worker is alive but arb is disabled (waiting for dashboard enable)
+ * - STOPPING: Graceful shutdown in progress (SIGTERM/SIGINT received)
+ * - STOPPED: Worker has stopped (final heartbeat before exit)
+ */
+export type WorkerState = 'STARTING' | 'RUNNING' | 'IDLE' | 'STOPPING' | 'STOPPED';
+
+/**
  * Comprehensive worker heartbeat persisted to KV.
  * This is the source of truth for the serverless status API.
  * 
@@ -115,10 +125,16 @@ export interface WorkerPriceCacheStats {
 export interface LiveArbWorkerHeartbeat {
   /** ISO timestamp of when this heartbeat was written */
   updatedAt: string;
-  /** Worker state: RUNNING (arb active), IDLE (waiting for enable), STOPPED */
-  state: 'RUNNING' | 'STOPPED' | 'IDLE';
+  /** Worker lifecycle state */
+  state: WorkerState;
   /** Configured heartbeat interval in ms (for diagnostics) */
   heartbeatIntervalMs?: number;
+  
+  // Shutdown metadata (populated during graceful shutdown)
+  /** Reason for shutdown: SIGTERM, SIGINT, uncaughtException, unhandledRejection */
+  shutdownReason?: string;
+  /** ISO timestamp when shutdown began */
+  shutdownStartedAt?: string;
   
   // Runtime config snapshot
   liveArbEnabled?: boolean;
@@ -155,6 +171,9 @@ export interface LiveArbWorkerHeartbeat {
   };
 }
 
+/** All valid worker states */
+const VALID_WORKER_STATES: WorkerState[] = ['STARTING', 'RUNNING', 'IDLE', 'STOPPING', 'STOPPED'];
+
 /**
  * Validate that a heartbeat payload has the required fields.
  * Used for runtime sanity checks.
@@ -165,7 +184,7 @@ export function isValidWorkerHeartbeat(obj: unknown): obj is LiveArbWorkerHeartb
   return (
     typeof hb.updatedAt === 'string' &&
     typeof hb.state === 'string' &&
-    ['RUNNING', 'STOPPED', 'IDLE'].includes(hb.state as string)
+    VALID_WORKER_STATES.includes(hb.state as WorkerState)
   );
 }
 
