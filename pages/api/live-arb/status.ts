@@ -206,6 +206,11 @@ export default async function handler(
       watchersSkipped: {},
       subscriptionsAttempted: 0,
       subscriptionsFailed: {},
+      platformFetch: {
+        kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+        polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
+        sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
+      },
       kalshi: {
         fetchAttempted: 0,
         fetchFailed: 0,

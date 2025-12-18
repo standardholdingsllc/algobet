@@ -18,6 +18,11 @@ import {
 } from './markets/kalshi';
 import { PolymarketAPI } from './markets/polymarket';
 import { SXBetAPI } from './markets/sxbet';
+import {
+  recordPlatformFetchAttempt,
+  recordPlatformFetchError,
+  recordPlatformFetchSkipped,
+} from './live-events-debug';
 
 const DAY_MS = 86_400_000;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
@@ -88,12 +93,23 @@ export class LiveMarketFetcher {
     filters: MarketFilterInput
   ): Promise<FetchResult> {
     const fetchedAt = new Date().toISOString();
-    
+
+    recordPlatformFetchAttempt(platform);
+
     try {
       let markets: Market[] = [];
       
       switch (platform) {
         case 'kalshi':
+          if (!this.hasKalshiCredentials()) {
+            recordPlatformFetchSkipped('kalshi', 'missing_kalshi_credentials');
+            return {
+              platform,
+              markets: [],
+              fetchedAt,
+              error: 'missing_kalshi_credentials',
+            };
+          }
           markets = await this.fetchKalshiMarkets(filters);
           break;
         case 'polymarket':
@@ -117,6 +133,8 @@ export class LiveMarketFetcher {
       return { platform, markets, fetchedAt };
     } catch (error: any) {
       console.error(`[LiveMarketFetcher] Failed to fetch ${platform}:`, error.message);
+      recordPlatformFetchError(platform, error.message || 'unknown_error');
+      recordPlatformFetchSkipped(platform, 'exception');
       return { 
         platform, 
         markets: [], 
@@ -190,6 +208,12 @@ export class LiveMarketFetcher {
       maxPagesPerSeries: DEFAULT_KALSHI_MAX_PAGES_PER_SERIES,
       maxTotalMarkets: DEFAULT_KALSHI_MAX_TOTAL_MARKETS,
     });
+  }
+
+  private hasKalshiCredentials(): boolean {
+    const apiKey = process.env.KALSHI_API_KEY || '';
+    const privateKey = process.env.KALSHI_PRIVATE_KEY || '';
+    return Boolean(apiKey && privateKey);
   }
 
   private async fetchPolymarketMarkets(filters: MarketFilterInput): Promise<Market[]> {

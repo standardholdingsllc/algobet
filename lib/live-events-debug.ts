@@ -13,6 +13,15 @@ export interface LiveEventsDebugCounters {
   watchersSkipped: Record<string, number>;
   subscriptionsAttempted: number;
   subscriptionsFailed: Record<string, number>;
+  platformFetch: Record<
+    'kalshi' | 'polymarket' | 'sxbet',
+    {
+      attempted: number;
+      skipped: number;
+      skipReasons: Record<string, number>;
+      lastError?: string;
+    }
+  >;
   kalshi: {
     fetchAttempted: number;
     fetchFailed: number;
@@ -68,6 +77,11 @@ let counters: LiveEventsDebugCounters = {
   watchersSkipped: {},
   subscriptionsAttempted: 0,
   subscriptionsFailed: {},
+  platformFetch: {
+    kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+    polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
+    sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
+  },
   kalshi: {
     fetchAttempted: 0,
     fetchFailed: 0,
@@ -98,6 +112,11 @@ export function resetLiveEventsDebug(): void {
     watchersSkipped: {},
     subscriptionsAttempted: 0,
     subscriptionsFailed: {},
+    platformFetch: {
+      kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+      polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
+      sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
+    },
     kalshi: {
       fetchAttempted: 0,
       fetchFailed: 0,
@@ -139,6 +158,28 @@ export function recordMatchCandidatesConsidered(count: number): void {
 
 export function recordMatchReject(reason: string): void {
   bump(counters.matchRejectReasons, reason);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordPlatformFetchAttempt(platform: 'kalshi' | 'polymarket' | 'sxbet'): void {
+  counters.platformFetch[platform].attempted += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordPlatformFetchSkipped(
+  platform: 'kalshi' | 'polymarket' | 'sxbet',
+  reason: string
+): void {
+  counters.platformFetch[platform].skipped += 1;
+  bump(counters.platformFetch[platform].skipReasons, reason);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordPlatformFetchError(
+  platform: 'kalshi' | 'polymarket' | 'sxbet',
+  error: string
+): void {
+  counters.platformFetch[platform].lastError = error.slice(0, 200);
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
@@ -240,6 +281,20 @@ export function getLiveEventsDebug(): LiveEventsDebugCounters {
     matchRejectReasons: { ...counters.matchRejectReasons },
     watchersSkipped: { ...counters.watchersSkipped },
     subscriptionsFailed: { ...counters.subscriptionsFailed },
+    platformFetch: {
+      kalshi: {
+        ...counters.platformFetch.kalshi,
+        skipReasons: { ...counters.platformFetch.kalshi.skipReasons },
+      },
+      polymarket: {
+        ...counters.platformFetch.polymarket,
+        skipReasons: { ...counters.platformFetch.polymarket.skipReasons },
+      },
+      sxbet: {
+        ...counters.platformFetch.sxbet,
+        skipReasons: { ...counters.platformFetch.sxbet.skipReasons },
+      },
+    },
     kalshi: {
       ...counters.kalshi,
       filteredOut: { ...counters.kalshi.filteredOut },
