@@ -191,6 +191,28 @@ export class LiveMarketFetcher {
   }
 
   private async fetchKalshiMarkets(filters: MarketFilterInput): Promise<Market[]> {
+    const sportsOnly = filters.sportsOnly ?? true;
+
+    // For sports markets, skip close window filtering because:
+    // 1. Kalshi game markets (KXNBAGAME, KXNFLGAME, etc.) have close_time weeks in the future
+    // 2. The API doesn't allow status=open with min/max_close_ts parameters
+    // 3. We use open_time for LIVE classification instead
+    //
+    // This fetches all active/open sports markets and relies on client-side
+    // open_time-based filtering to determine which are LIVE.
+    const skipCloseWindowFilter = sportsOnly;
+
+    if (skipCloseWindowFilter) {
+      return this.kalshiApi.getOpenMarkets({
+        status: 'open',
+        sportsOnly,
+        skipCloseWindowFilter: true,
+        maxPagesPerSeries: DEFAULT_KALSHI_MAX_PAGES_PER_SERIES,
+        maxTotalMarkets: DEFAULT_KALSHI_MAX_TOTAL_MARKETS,
+      });
+    }
+
+    // For non-sports markets, use the original close window filtering
     const windowEnd = filters.windowEnd ? new Date(filters.windowEnd) : undefined;
     const now = Date.now();
     const windowMinutesFromFilter = windowEnd
@@ -198,13 +220,13 @@ export class LiveMarketFetcher {
       : DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES;
 
     const maxCloseMinutes = Math.min(windowMinutesFromFilter, DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES);
-    const sportsOnly = filters.sportsOnly ?? true;
 
     return this.kalshiApi.getOpenMarkets({
       maxCloseMinutes,
       minCloseMinutes: DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES,
       status: 'open',
-      sportsOnly,
+      sportsOnly: false,
+      skipCloseWindowFilter: false,
       maxPagesPerSeries: DEFAULT_KALSHI_MAX_PAGES_PER_SERIES,
       maxTotalMarkets: DEFAULT_KALSHI_MAX_TOTAL_MARKETS,
     });

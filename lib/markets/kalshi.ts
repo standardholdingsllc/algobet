@@ -67,6 +67,7 @@ interface KalshiMarket {
   volume: number;
   event_ticker: string;
   close_time: string;
+  open_time?: string;  // When trading opened - critical for LIVE classification
   series_ticker?: string;
   category?: string;
   expected_expiration_time?: string;
@@ -96,10 +97,11 @@ interface KalshiMarketsResponse {
 }
 
 interface KalshiMarketQueryParams {
-  minCloseTs: number;
-  maxCloseTs: number;
+  minCloseTs?: number;
+  maxCloseTs?: number;
   status?: string;
   seriesTicker?: string;
+  useCloseWindow?: boolean; // Whether to apply close_ts filtering
 }
 
 interface GetOpenMarketsOptions {
@@ -110,6 +112,12 @@ interface GetOpenMarketsOptions {
   seriesTickersOverride?: string[];
   maxPagesPerSeries?: number;
   maxTotalMarkets?: number;
+  /**
+   * If true, skip close window filtering entirely and just use status=open.
+   * This is useful for game markets where close_time is weeks in the future.
+   * Default: false (uses close window filtering)
+   */
+  skipCloseWindowFilter?: boolean;
 }
 
 interface KalshiSeries {
@@ -133,6 +141,18 @@ const SERIES_DISCOVERY_MAX_PAGES = 5;
 const SERIES_CACHE_KEY = 'kalshi:series:sports';
 
 const KALSHI_SPORT_PREFIX_MAP: Record<string, string> = {
+  // Game-specific series (higher priority - actual game winner markets)
+  KXNBAGAME: 'NBA',
+  KXNFLGAME: 'NFL',
+  KXNHLGAME: 'NHL',
+  KXMLBGAME: 'MLB',
+  KXNCAABGAME: 'NCAA_BB',
+  KXNCAAFGAME: 'NCAA_FB',
+  // Player prop series
+  KXNBA3D: 'NBA',  // Triple doubles
+  KXNBAPTS: 'NBA', // Points
+  KXNFLPTS: 'NFL', // Points
+  // General sport series
   KXNFL: 'NFL',
   KXCFB: 'NCAA_FB',
   KXNCAAF: 'NCAA_FB',
@@ -145,11 +165,15 @@ const KALSHI_SPORT_PREFIX_MAP: Record<string, string> = {
   KXMLS: 'MLS',
   KXSOCCER: 'MLS',
   KXEPL: 'EPL',
+  KXEPLGAME: 'EPL',
+  KXUCLGAME: 'UCL',
   KXUCL: 'UCL',
   KXUFC: 'UFC',
   KXBOX: 'BOXING',
   KXTENNIS: 'TENNIS',
   KXGOLF: 'GOLF',
+  // E-sports
+  KXLOLGAME: 'ESPORTS',
 };
 
 type SeriesCacheValue = { tickers: string[]; failedReason?: string | null };
@@ -634,14 +658,23 @@ export class KalshiAPI {
     );
 
     const vendorMetadata =
-      eventMeta || sportHint || market.status || market.series_ticker
+      eventMeta || sportHint || market.status || market.series_ticker || market.open_time
         ? {
             kalshiEvent: eventMeta,
             kalshiSportHint: sportHint,
             kalshiMarketStatus: market.status,
             kalshiSeriesTicker: market.series_ticker,
+            kalshiOpenTime: market.open_time,  // Critical for LIVE classification
           }
         : undefined;
+
+    // For eventStartTime: prefer open_time (when trading/game started) over close_time
+    // open_time is when the market opened for trading, which for game markets
+    // corresponds closely to when the game becomes "live"
+    const eventStartTime = market.open_time ||
+      market.expected_expiration_time ||
+      market.expiration_time ||
+      market.close_time;
 
     return {
       id: market.ticker,
@@ -655,10 +688,7 @@ export class KalshiAPI {
       volume: market.volume,
       vendorMetadata,
       eventTicker: market.event_ticker,
-      eventStartTime:
-        market.expected_expiration_time ||
-        market.expiration_time ||
-        market.close_time,
+      eventStartTime,
     };
   }
 
@@ -736,6 +766,7 @@ export class KalshiAPI {
 
     try {
       const opts: GetOpenMarketsOptions = options ?? {};
+      const skipCloseWindow = opts.skipCloseWindowFilter ?? false;
       const closeWindowMinutes = Math.max(
         1,
         opts.maxCloseMinutes ?? DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES
@@ -756,17 +787,25 @@ export class KalshiAPI {
       );
 
       const nowTs = Math.floor(Date.now() / 1000);
-      const closeWindowFilteringUsed = Boolean(minCloseMinutes || closeWindowMinutes);
-      const statusSentToApi =
-        closeWindowFilteringUsed && requestedStatus === 'open' ? null : requestedStatus;
+      
+      // When skipCloseWindow is true, we use status=open without close_ts filtering
+      // This is needed for game markets where close_time is weeks in the future
+      const closeWindowFilteringUsed = !skipCloseWindow && Boolean(minCloseMinutes || closeWindowMinutes);
+      
+      // Kalshi API quirk: status=open cannot be combined with min_close_ts/max_close_ts
+      // If we're using close window, we must omit status and filter client-side
+      const statusSentToApi = closeWindowFilteringUsed 
+        ? null  // Omit status when using close_ts
+        : requestedStatus; // Use status when not using close_ts
       const statusOmittedReason =
         statusSentToApi === null ? 'close_ts_incompatible_with_status_open' : undefined;
       const clientSideStatusFilter = requestedStatus || 'open';
 
       const queryWindow: KalshiMarketQueryParams = {
-        minCloseTs: nowTs - minCloseMinutes * 60,
-        maxCloseTs: nowTs + closeWindowMinutes * 60,
+        minCloseTs: closeWindowFilteringUsed ? nowTs - minCloseMinutes * 60 : undefined,
+        maxCloseTs: closeWindowFilteringUsed ? nowTs + closeWindowMinutes * 60 : undefined,
         status: statusSentToApi || undefined,
+        useCloseWindow: closeWindowFilteringUsed,
       };
 
       recordKalshiFetchAttempted();
@@ -872,14 +911,17 @@ export class KalshiAPI {
               continue;
             }
 
-            const closeTs = Math.floor(new Date(market.close_time).getTime() / 1000);
-            if (
-              Number.isNaN(closeTs) ||
-              closeTs > queryWindow.maxCloseTs ||
-              closeTs < queryWindow.minCloseTs
-            ) {
-              filteredToCloseWindow += 1;
-              continue;
+            // Only filter by close window if we're using close window filtering
+            if (closeWindowFilteringUsed && queryWindow.maxCloseTs && queryWindow.minCloseTs) {
+              const closeTs = Math.floor(new Date(market.close_time).getTime() / 1000);
+              if (
+                Number.isNaN(closeTs) ||
+                closeTs > queryWindow.maxCloseTs ||
+                closeTs < queryWindow.minCloseTs
+              ) {
+                filteredToCloseWindow += 1;
+                continue;
+              }
             }
 
             allMarkets.push(market);
@@ -954,7 +996,8 @@ export class KalshiAPI {
     const seriesKey = query.seriesTicker || 'ALL';
     const statusKey = query.status || 'all';
     const cursorKey = cursor || 'start';
-    return `kalshi:markets:${seriesKey}:${statusKey}:${query.minCloseTs}:${query.maxCloseTs}:${cursorKey}`;
+    const windowKey = query.useCloseWindow ? `${query.minCloseTs}-${query.maxCloseTs}` : 'nowindow';
+    return `kalshi:markets:${seriesKey}:${statusKey}:${windowKey}:${cursorKey}`;
   }
 
   private async fetchMarketsPage(
@@ -963,9 +1006,16 @@ export class KalshiAPI {
   ): Promise<{ entries: KalshiMarket[]; nextCursor?: string; status: number; skipped?: boolean }> {
     const params: Record<string, string | number> = {
       limit: KALSHI_PAGE_LIMIT,
-      min_close_ts: query.minCloseTs,
-      max_close_ts: query.maxCloseTs,
     };
+
+    // Only add close_ts params if we're using close window filtering
+    // NOTE: Kalshi API does not allow status=open with min/max_close_ts
+    if (query.useCloseWindow && query.minCloseTs !== undefined) {
+      params.min_close_ts = query.minCloseTs;
+    }
+    if (query.useCloseWindow && query.maxCloseTs !== undefined) {
+      params.max_close_ts = query.maxCloseTs;
+    }
 
     if (query.status) {
       params.status = query.status;

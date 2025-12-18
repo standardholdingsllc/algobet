@@ -496,6 +496,18 @@ export function processPolymarketMarkets(markets: Market[]): number {
 
 /** Kalshi sports-related ticker patterns */
 const KALSHI_SPORTS_PATTERNS = [
+  // Game-specific patterns (higher priority)
+  /^(KX)?NBAGAME/i,
+  /^(KX)?NFLGAME/i,
+  /^(KX)?NHLGAME/i,
+  /^(KX)?MLBGAME/i,
+  /^(KX)?EPLGAME/i,
+  /^(KX)?UCLGAME/i,
+  // Player prop patterns
+  /^(KX)?NBA3D/i,   // Triple doubles
+  /^(KX)?NBAPTS/i,  // Points
+  /^(KX)?NFLPTS/i,  // Points
+  // General sport patterns
   /^(KX)?NBA/i,
   /^(KX)?NFL/i,
   /^(KX)?NHL/i,
@@ -506,6 +518,9 @@ const KALSHI_SPORTS_PATTERNS = [
   /^(KX)?NCAA/i,
   /^(KX)?CFP/i,
   /^(KX)?SPORT/i,
+  /^(KX)?UFC/i,
+  /^(KX)?GOLF/i,
+  /^(KX)?TENNIS/i,
 ];
 
 /**
@@ -516,12 +531,17 @@ const KALSHI_SPORTS_PATTERNS = [
  * - title: Market title/question
  * - event_ticker: Parent event ticker
  * - series_ticker: Series ticker
- * - status: Market status ("open", "closed", "settled")
+ * - status: Market status ("active", "open", "closed", "settled", "finalized")
  * - close_time: When trading closes (ISO 8601)
- * - open_time: When trading opened (ISO 8601)
+ * - open_time: When trading opened (ISO 8601) - CRITICAL for LIVE detection
  * - expiration_time: When market expires (ISO 8601)
  * - settlement_time: When market settles (ISO 8601)
  * - result: Settlement result ("yes", "no", null if unsettled)
+ *
+ * LIVE Classification Logic:
+ * - If open_time exists and open_time <= now < close_time AND status is tradable → LIVE
+ * - If status is "settled", "finalized", or "closed" → ENDED
+ * - Otherwise → PRE
  */
 export function extractKalshiEvent(
   ticker: string,
@@ -553,16 +573,25 @@ export function extractKalshiEvent(
     return null;
   }
   
-  // Parse start time
-  // NOTE: Kalshi uses close_time as the primary time reference
-  // For sports, the game typically happens around close_time
+  // Extract open_time (when trading/game starts) - critical for LIVE detection
+  const openTimeRaw = metadata?.open_time as string | undefined;
+  const openTimeMs = openTimeRaw ? new Date(openTimeRaw).getTime() : undefined;
+  
+  // Extract close_time (when trading ends)
+  const closeTimeRaw = metadata?.close_time as string | undefined;
+  const closeTimeMs = closeTimeRaw ? new Date(closeTimeRaw).getTime() : undefined;
+  
+  // Parse start time for the event (prefer open_time for sports games)
+  // For game markets, open_time is when the game/market becomes active
   let startTime: number | undefined;
-  if (metadata?.expected_expiration_time) {
+  if (openTimeMs && !isNaN(openTimeMs)) {
+    startTime = openTimeMs;
+  } else if (metadata?.expected_expiration_time) {
     startTime = new Date(metadata.expected_expiration_time as string).getTime();
   } else if (metadata?.event_start_time) {
     startTime = new Date(metadata.event_start_time as string).getTime();
-  } else if (metadata?.close_time) {
-    startTime = new Date(metadata.close_time as string).getTime();
+  } else if (closeTimeMs) {
+    startTime = closeTimeMs;
   } else if (metadata?.expiration_time) {
     startTime = new Date(metadata.expiration_time as string).getTime();
   }
@@ -574,26 +603,43 @@ export function extractKalshiEvent(
     (metadata?.series_ticker as string | undefined);
   
   // Detect status
-  // NOTE: Kalshi status is "open", "closed", or "settled"
+  // NOTE: Kalshi status values are "active", "open", "closed", "settled", "finalized", "initialized"
   let status: VendorEventStatus = 'PRE';
   
-  const kalshiStatus = metadata?.status as string | undefined;
+  const kalshiStatus = (metadata?.status as string | undefined)?.toLowerCase();
   const result = metadata?.result;
+  const now = Date.now();
   
-  if (kalshiStatus === 'settled' || result !== null && result !== undefined) {
+  // Check for ended states first
+  if (kalshiStatus === 'settled' || kalshiStatus === 'finalized' || kalshiStatus === 'closed') {
     status = 'ENDED';
-  } else if (kalshiStatus === 'closed') {
+  } else if (result !== null && result !== undefined) {
     status = 'ENDED';
-  } else if (startTime) {
-    const now = Date.now();
-    const fourHoursMs = 4 * 60 * 60 * 1000;
+  } else {
+    // Market is tradable (active, open, or initialized)
+    const isTradable = kalshiStatus === 'active' || kalshiStatus === 'open';
     
-    // For Kalshi, close_time is often during the game
-    // Consider it LIVE if we're within 4 hours before close_time
-    if (now >= startTime - fourHoursMs && now <= startTime) {
-      status = 'LIVE';
-    } else if (now > startTime) {
-      status = 'ENDED';
+    // LIVE classification using open_time:
+    // If we have open_time and close_time, use them for accurate LIVE detection
+    if (openTimeMs && closeTimeMs && isTradable) {
+      if (openTimeMs <= now && now < closeTimeMs) {
+        // Trading is open and we're between open_time and close_time
+        status = 'LIVE';
+      } else if (now >= closeTimeMs) {
+        status = 'ENDED';
+      } else {
+        // now < openTimeMs - market hasn't opened yet
+        status = 'PRE';
+      }
+    } else if (isTradable && startTime) {
+      // Fallback: use heuristic based on startTime
+      const fourHoursMs = 4 * 60 * 60 * 1000;
+      
+      if (now >= startTime && now <= startTime + fourHoursMs) {
+        status = 'LIVE';
+      } else if (now > startTime + fourHoursMs) {
+        status = 'ENDED';
+      }
     }
   }
   
@@ -646,6 +692,7 @@ export function createKalshiVendorEvent(market: Market): VendorEvent | null {
   } | undefined;
   const sportHint = vendorMeta.kalshiSportHint as string | undefined;
   const marketStatus = vendorMeta.kalshiMarketStatus as string | undefined;
+  const kalshiOpenTime = vendorMeta.kalshiOpenTime as string | undefined;
   const seriesTicker =
     kalshiEvent?.series_ticker ||
     (vendorMeta.kalshiSeriesTicker as string | undefined) ||
@@ -660,6 +707,7 @@ export function createKalshiVendorEvent(market: Market): VendorEvent | null {
 
   const metadata: Record<string, unknown> = {
     close_time: market.expiryDate,
+    open_time: kalshiOpenTime,  // Critical for LIVE classification
     expiration_time: market.expiryDate,
     expected_expiration_time: market.eventStartTime,
     event_ticker: eventTicker,
