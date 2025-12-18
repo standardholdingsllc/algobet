@@ -206,6 +206,14 @@ export default async function handler(
       watchersSkipped: {},
       subscriptionsAttempted: 0,
       subscriptionsFailed: {},
+      kalshi: {
+        fetchAttempted: 0,
+        fetchFailed: 0,
+        rawItemsCount: 0,
+        parsedEventsCount: 0,
+        filteredOut: {},
+        sampleRawItems: [],
+      },
     };
 
     const liveEventsStats = heartbeat?.liveEventsStats;
