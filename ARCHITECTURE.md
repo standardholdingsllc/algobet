@@ -266,7 +266,7 @@ All runtime configuration is managed via KV storage (no boolean env flags):
   - Excludes PRE (pre-game) events from matched groups
   - This is the primary control for running as a pure live-betting engine
 
-🚨 **Operational Lock**: All of the above runtime toggles are now hard-wired to `true` inside KV storage. The dashboard no longer exposes buttons to flip them, ensuring the live arb worker always runs with streaming enabled, the matcher active, and sports/live filters enforced.
+**Dashboard Control**: The Start/Stop buttons on `/live-arb` control the `liveArbEnabled` flag. The worker polls this flag every 5 seconds (when idle) or 15 seconds (when running) and responds accordingly.
 
 ---
 

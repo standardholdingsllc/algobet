@@ -63,25 +63,15 @@ const DEFAULT_DATA: StorageData = {
   liveArbRuntimeConfig: DEFAULT_LIVE_ARB_RUNTIME_CONFIG,
 };
 
+/**
+ * Previously this function forced all toggles to true (operational lock).
+ * Now it just passes through the config to allow dashboard control.
+ */
 function enforceLiveArbAlwaysOn(
   config: LiveArbRuntimeConfig
 ): LiveArbRuntimeConfig {
-  if (
-    config.liveArbEnabled &&
-    config.ruleBasedMatcherEnabled &&
-    config.sportsOnly &&
-    config.liveEventsOnly
-  ) {
-    return config;
-  }
-
-  return {
-    ...config,
-    liveArbEnabled: true,
-    ruleBasedMatcherEnabled: true,
-    sportsOnly: true,
-    liveEventsOnly: true,
-  };
+  // No longer enforcing - allow dashboard to control start/stop
+  return config;
 }
 
 const STORAGE_KEY = 'algobet:data';
