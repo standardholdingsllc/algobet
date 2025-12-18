@@ -18,8 +18,9 @@ module.exports = {
   apps: [
     {
       name: 'live-arb-worker',
-      script: 'npx',
-      args: 'ts-node --transpile-only workers/live-arb-worker.ts',
+      interpreter: 'node',
+      node_args: ['-r', 'esbuild-register', '-r', 'tsconfig-paths/register'],
+      script: 'workers/live-arb-worker.ts',
       cwd: __dirname,
       
       // Graceful shutdown
