@@ -107,16 +107,37 @@ export interface WorkerPriceCacheStats {
 /**
  * Comprehensive worker heartbeat persisted to KV.
  * This is the source of truth for the serverless status API.
+ * 
+ * IMPORTANT: The heartbeat is written by a dedicated timer (every 5-10s)
+ * that is DECOUPLED from the heavy refresh cycle. This ensures workerPresent
+ * stays true even when refresh takes minutes.
  */
 export interface LiveArbWorkerHeartbeat {
+  /** ISO timestamp of when this heartbeat was written */
   updatedAt: string;
+  /** Worker state: RUNNING (arb active), IDLE (waiting for enable), STOPPED */
   state: 'RUNNING' | 'STOPPED' | 'IDLE';
+  /** Configured heartbeat interval in ms (for diagnostics) */
+  heartbeatIntervalMs?: number;
+  
+  // Runtime config snapshot
   liveArbEnabled?: boolean;
   ruleBasedMatcherEnabled?: boolean;
   liveEventsOnly?: boolean;
   sportsOnly?: boolean;
+  
+  // Refresh cycle metadata (decoupled from heartbeat timing)
+  /** Configured refresh interval in ms */
   refreshIntervalMs?: number;
+  /** Whether a refresh is currently in progress */
+  refreshInProgress?: boolean;
+  /** ISO timestamp of last completed refresh */
+  lastRefreshAt?: string;
+  /** Duration of last refresh in ms */
+  lastRefreshDurationMs?: number;
+  /** Total markets from last refresh */
   totalMarkets?: number;
+  
   /** Platform connection statuses - source of truth for dashboard */
   platforms?: {
     sxbet: WorkerPlatformStatus;
@@ -132,6 +153,34 @@ export interface LiveArbWorkerHeartbeat {
     openReason?: string;
     openedAt?: string;
   };
+}
+
+/**
+ * Validate that a heartbeat payload has the required fields.
+ * Used for runtime sanity checks.
+ */
+export function isValidWorkerHeartbeat(obj: unknown): obj is LiveArbWorkerHeartbeat {
+  if (!obj || typeof obj !== 'object') return false;
+  const hb = obj as Record<string, unknown>;
+  return (
+    typeof hb.updatedAt === 'string' &&
+    typeof hb.state === 'string' &&
+    ['RUNNING', 'STOPPED', 'IDLE'].includes(hb.state as string)
+  );
+}
+
+/**
+ * Check if a heartbeat is fresh (within staleness threshold).
+ * @param heartbeat The heartbeat to check
+ * @param staleMs Maximum age in ms before considered stale (default 60000)
+ */
+export function isHeartbeatFresh(
+  heartbeat: LiveArbWorkerHeartbeat | null,
+  staleMs: number = 60000
+): boolean {
+  if (!heartbeat?.updatedAt) return false;
+  const age = Date.now() - new Date(heartbeat.updatedAt).getTime();
+  return age <= staleMs;
 }
 
 /**

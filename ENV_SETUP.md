@@ -184,15 +184,24 @@ CRON_SECRET=<openssl rand -hex 32>
 # LIVE ARB WORKER (Optional - for live betting)
 # ===================================
 # SX.bet WebSocket URL (leave empty to disable SX.bet WS)
+# When empty, SX.bet shows as "disabled" in dashboard (not an error)
 SXBET_WS_URL=wss://ably.sx.bet/...
 
 # Worker refresh interval in milliseconds (default: 15000)
+# This is how often the worker fetches market data (can be slow)
 LIVE_ARB_WORKER_REFRESH_MS=15000
 
 # Idle polling interval when bot is stopped (default: 5000)
 LIVE_ARB_IDLE_POLL_MS=5000
 
+# CRITICAL: Heartbeat interval in milliseconds (default: 5000)
+# This is DECOUPLED from refresh - heartbeat writes every 5s even if refresh takes minutes
+# This ensures workerPresent stays true as long as the worker process is alive
+WORKER_HEARTBEAT_INTERVAL_MS=5000
+
 # How long before a heartbeat is considered stale (default: 60000)
+# If heartbeat is older than this, workerPresent becomes false
+# Should be much larger than WORKER_HEARTBEAT_INTERVAL_MS to allow for temporary failures
 WORKER_HEARTBEAT_STALE_MS=60000
 
 # Minimum profit in basis points (default: 50)
@@ -292,6 +301,35 @@ Should output:
 - ✅ Enable 2FA on all accounts
 
 ## Troubleshooting
+
+### Worker Shows "No Heartbeat" or workerPresent=false
+
+**Symptom**: Dashboard shows "ENABLED (NO HEARTBEAT)" even though worker is running.
+
+**Diagnosis**:
+```bash
+curl https://your-app.vercel.app/api/live-arb/status | jq '{workerPresent, workerState, workerHeartbeatAt, workerHeartbeatAgeMs}'
+```
+
+**Causes & Solutions**:
+1. **Worker not running**: Start with `npm run live-arb-worker` or `pm2 restart live-arb-worker`
+2. **KV connection issues**: Check Upstash credentials (`KV_REST_API_URL`, `KV_REST_API_TOKEN`)
+3. **Heartbeat interval too slow**: Ensure `WORKER_HEARTBEAT_INTERVAL_MS` ≤ 10000
+4. **Stale threshold too short**: Ensure `WORKER_HEARTBEAT_STALE_MS` ≥ 60000
+
+### Platforms Show "No Worker" When Worker Is Running
+
+**Symptom**: Kalshi/Polymarket show "no_worker" state but worker is alive.
+
+**Cause**: Heartbeat is stale (workerPresent=false triggers "no_worker" for all non-disabled platforms).
+
+**Solution**: Same as above - ensure heartbeat is writing frequently.
+
+### SX.bet Shows "Disabled"
+
+**Expected behavior** when `SXBET_WS_URL` is not set. This is informational, not an error.
+
+To enable SX.bet: Set `SXBET_WS_URL` to the SX.bet Ably WebSocket endpoint.
 
 ### Variable Not Found
 

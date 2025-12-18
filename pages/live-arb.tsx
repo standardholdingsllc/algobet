@@ -268,6 +268,8 @@ function formatStateLabel(state: string): string {
     case 'disabled': return 'Disabled (Config)';
     case 'no_worker': return 'No Worker';
     case 'not_initialized': return 'Not Initialized';
+    case 'idle': return 'Idle';
+    case 'initializing': return 'Initializing...';
     case 'connecting': return 'Connecting...';
     case 'connected': return 'Connected';
     case 'disconnected': return 'Disconnected';

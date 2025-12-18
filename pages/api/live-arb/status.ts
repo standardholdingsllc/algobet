@@ -7,7 +7,7 @@
  * 
  * IMPORTANT: This serverless endpoint reads ALL status from KV storage,
  * NOT from in-memory state. The worker process writes its state to KV
- * periodically, and this endpoint reads it back.
+ * via a dedicated heartbeat loop (every 5s), and this endpoint reads it back.
  * 
  * This design ensures the Vercel serverless function can accurately
  * display worker status even though it cannot access the worker's
@@ -20,32 +20,67 @@ import {
   getWorkerHeartbeat,
   LiveArbWorkerHeartbeat,
   WorkerPlatformStatus,
+  isHeartbeatFresh,
 } from '@/lib/kv-storage';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
 
 /**
  * Heartbeat TTL - worker is considered "present" if heartbeat is fresher than this.
- * Set to 60s to allow for network hiccups when worker writes every 10-15s.
+ * Default 60s allows for temporary KV write failures when heartbeat writes every 5s.
  * Can be overridden via WORKER_HEARTBEAT_STALE_MS env var.
  */
-const WORKER_HEARTBEAT_TTL_MS = parseInt(
+const WORKER_HEARTBEAT_STALE_MS = parseInt(
   process.env.WORKER_HEARTBEAT_STALE_MS || '60000',
   10
 );
+
+// ============================================================================
+// Response Types
+// ============================================================================
 
 interface LiveArbStatusResponse {
   workerPresent: boolean;
   workerState: LiveArbWorkerHeartbeat['state'] | null;
   workerHeartbeatAt: string | null;
+  workerHeartbeatAgeMs: number | null;
+  heartbeatIntervalMs: number | null;
   runtimeConfig: LiveArbRuntimeConfig | null;
   liveArbEnabled: boolean;
   liveArbReady: boolean;
   timestamp: string;
+  
+  // Refresh cycle metadata (separate from heartbeat timing)
+  refresh: {
+    inProgress: boolean;
+    lastRefreshAt: string | null;
+    lastRefreshDurationMs: number | null;
+    intervalMs: number | null;
+    totalMarkets: number | null;
+  };
+
   platforms: {
     sxbet: PlatformStatus;
     polymarket: PlatformStatus;
     kalshi: PlatformStatus;
   };
+  
+  priceCacheStats: {
+    totalEntries: number;
+    entriesByPlatform: Record<string, number>;
+    totalPriceUpdates: number;
+    oldestUpdateMs?: number;
+    newestUpdateMs?: number;
+    lastPriceUpdateAt?: string;
+  };
+  
+  circuitBreaker: {
+    isOpen: boolean;
+    consecutiveFailures: number;
+    openReason?: string;
+    openedAt?: string;
+  };
+  
+  // Legacy fields for backward compatibility
   liveEvents: {
     enabled: boolean;
     running: boolean;
@@ -73,19 +108,7 @@ interface LiveArbStatusResponse {
       totalMarketsWatched: number;
     };
   };
-  priceCacheStats: {
-    totalEntries: number;
-    entriesByPlatform: Record<string, number>;
-    totalPriceUpdates: number;
-    oldestUpdateMs?: number;
-    newestUpdateMs?: number;
-  };
-  circuitBreaker: {
-    isOpen: boolean;
-    consecutiveFailures: number;
-    openReason?: string;
-    openedAt?: string;
-  };
+  
   subscriptionStats: {
     lastUpdateAt?: string;
     updateCount: number;
@@ -101,7 +124,13 @@ interface PlatformStatus {
   lastMessageAt: string | null;
   subscribedMarkets: number;
   errorMessage?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
+
+// ============================================================================
+// Handler
+// ============================================================================
 
 export default async function handler(
   req: NextApiRequest,
@@ -120,22 +149,25 @@ export default async function handler(
       console.error('[API] /api/live-arb/status failed to load runtime config:', configError);
     }
 
-    // Load worker heartbeat from KV - this is the SOURCE OF TRUTH for:
-    // - Worker presence
-    // - Platform connection statuses
-    // - Price cache stats
-    // - Circuit breaker state
+    // Load worker heartbeat from KV - this is the SOURCE OF TRUTH
     const heartbeat = await getWorkerHeartbeat();
-    const workerPresent = isHeartbeatFresh(heartbeat);
+    const workerPresent = isHeartbeatFresh(heartbeat, WORKER_HEARTBEAT_STALE_MS);
+    
+    // Calculate heartbeat age for debugging
+    const workerHeartbeatAgeMs = heartbeat?.updatedAt 
+      ? Date.now() - new Date(heartbeat.updatedAt).getTime()
+      : null;
 
-    // Extract platform statuses from KV heartbeat (NOT in-memory)
+    // Extract platform statuses from KV heartbeat
+    // If worker is present, use the KV values
+    // If worker is stale, show "no_worker" EXCEPT for disabled platforms
     const platforms: LiveArbStatusResponse['platforms'] = {
-      sxbet: heartbeat?.platforms?.sxbet ?? getDefaultPlatformStatus('sxbet'),
-      polymarket: heartbeat?.platforms?.polymarket ?? getDefaultPlatformStatus('polymarket'),
-      kalshi: heartbeat?.platforms?.kalshi ?? getDefaultPlatformStatus('kalshi'),
+      sxbet: buildPlatformStatus(heartbeat?.platforms?.sxbet, 'sxbet', workerPresent),
+      polymarket: buildPlatformStatus(heartbeat?.platforms?.polymarket, 'polymarket', workerPresent),
+      kalshi: buildPlatformStatus(heartbeat?.platforms?.kalshi, 'kalshi', workerPresent),
     };
 
-    // Extract price cache stats from KV heartbeat (NOT in-memory)
+    // Extract price cache stats from KV heartbeat
     const priceCacheStats: LiveArbStatusResponse['priceCacheStats'] = heartbeat?.priceCacheStats ?? {
       totalEntries: 0,
       entriesByPlatform: { kalshi: 0, polymarket: 0, sxbet: 0 },
@@ -148,7 +180,7 @@ export default async function handler(
       consecutiveFailures: 0,
     };
 
-    // Determine if system is ready based on heartbeat data
+    // Determine if system is ready
     const liveArbReady = workerPresent && 
       heartbeat?.state === 'RUNNING' &&
       !circuitBreaker.isOpen &&
@@ -158,12 +190,27 @@ export default async function handler(
       workerPresent,
       workerState: heartbeat?.state ?? null,
       workerHeartbeatAt: heartbeat?.updatedAt ?? null,
+      workerHeartbeatAgeMs,
+      heartbeatIntervalMs: heartbeat?.heartbeatIntervalMs ?? null,
       runtimeConfig,
       liveArbEnabled: runtimeConfig?.liveArbEnabled ?? false,
       liveArbReady,
       timestamp: new Date().toISOString(),
+      
+      // Refresh metadata (decoupled from heartbeat)
+      refresh: {
+        inProgress: heartbeat?.refreshInProgress ?? false,
+        lastRefreshAt: heartbeat?.lastRefreshAt ?? null,
+        lastRefreshDurationMs: heartbeat?.lastRefreshDurationMs ?? null,
+        intervalMs: heartbeat?.refreshIntervalMs ?? null,
+        totalMarkets: heartbeat?.totalMarkets ?? null,
+      },
+      
       platforms,
-      // Live events data - defaults when no heartbeat
+      priceCacheStats,
+      circuitBreaker,
+      
+      // Legacy liveEvents structure for backward compatibility
       liveEvents: {
         enabled: runtimeConfig?.ruleBasedMatcherEnabled ?? false,
         running: workerPresent && heartbeat?.state === 'RUNNING',
@@ -191,8 +238,7 @@ export default async function handler(
           totalMarketsWatched: 0,
         },
       },
-      priceCacheStats,
-      circuitBreaker,
+      
       subscriptionStats: {
         updateCount: 0,
         currentSubscriptions: {},
@@ -208,38 +254,74 @@ export default async function handler(
   }
 }
 
+// ============================================================================
+// Helpers
+// ============================================================================
+
 /**
- * Get default platform status when no heartbeat data exists.
- * Shows appropriate messaging for each platform.
+ * Build platform status for API response.
+ * 
+ * Logic:
+ * - If platform is disabled (e.g., SXBET_WS_URL missing), show "disabled" regardless of worker state
+ * - If worker is present and heartbeat is fresh, use the KV values
+ * - If worker is stale/missing, show "no_worker"
  */
-function getDefaultPlatformStatus(platform: 'sxbet' | 'polymarket' | 'kalshi'): PlatformStatus {
-  // Check if SX.bet is disabled due to missing env var
+function buildPlatformStatus(
+  kvStatus: WorkerPlatformStatus | undefined,
+  platform: 'sxbet' | 'polymarket' | 'kalshi',
+  workerPresent: boolean
+): PlatformStatus {
+  // Check if platform is disabled at the API level (for when no heartbeat exists)
   if (platform === 'sxbet' && !process.env.SXBET_WS_URL) {
     return {
       connected: false,
       state: 'disabled',
       lastMessageAt: null,
       subscribedMarkets: 0,
-      errorMessage: 'SXBET_WS_URL not configured',
+      disabled: true,
+      disabledReason: 'SXBET_WS_URL not configured',
     };
   }
 
+  // If we have KV status and it shows disabled, always use that
+  if (kvStatus?.disabled) {
+    return {
+      connected: false,
+      state: 'disabled',
+      lastMessageAt: kvStatus.lastMessageAt,
+      subscribedMarkets: 0,
+      disabled: true,
+      disabledReason: kvStatus.disabledReason || kvStatus.errorMessage,
+    };
+  }
+
+  // If worker is not present (stale heartbeat), show no_worker
+  if (!workerPresent) {
+    return {
+      connected: false,
+      state: 'no_worker',
+      lastMessageAt: null,
+      subscribedMarkets: 0,
+      errorMessage: 'Worker heartbeat stale or missing',
+    };
+  }
+
+  // Worker is present but no KV status for this platform
+  if (!kvStatus) {
+    return {
+      connected: false,
+      state: 'initializing',
+      lastMessageAt: null,
+      subscribedMarkets: 0,
+    };
+  }
+
+  // Worker is present and we have KV status - use it
   return {
-    connected: false,
-    state: 'no_worker',
-    lastMessageAt: null,
-    subscribedMarkets: 0,
-    errorMessage: 'Worker not running or no heartbeat received',
+    connected: kvStatus.connected,
+    state: kvStatus.state,
+    lastMessageAt: kvStatus.lastMessageAt,
+    subscribedMarkets: kvStatus.subscribedMarkets,
+    errorMessage: kvStatus.errorMessage,
   };
 }
-
-/**
- * Check if worker heartbeat is fresh (within TTL).
- * Returns true if worker is considered "present".
- */
-function isHeartbeatFresh(heartbeat: LiveArbWorkerHeartbeat | null): boolean {
-  if (!heartbeat?.updatedAt) return false;
-  const age = Date.now() - new Date(heartbeat.updatedAt).getTime();
-  return age <= WORKER_HEARTBEAT_TTL_MS;
-}
-
