@@ -13,6 +13,24 @@ export interface LiveEventsDebugCounters {
   watchersSkipped: Record<string, number>;
   subscriptionsAttempted: number;
   subscriptionsFailed: Record<string, number>;
+  kalshi: {
+    fetchAttempted: number;
+    fetchFailed: number;
+    lastError?: string;
+    lastHttpStatus?: number;
+    rawItemsCount: number;
+    parsedEventsCount: number;
+    filteredOut: Record<string, number>;
+    sampleRawItems: Array<{
+      ticker?: string;
+      title?: string;
+      status?: string;
+      event_ticker?: string;
+      series_ticker?: string;
+      close_time?: string;
+      expiration_time?: string;
+    }>;
+  };
 }
 
 const emptyPlatformCounts: Record<LiveEventPlatform, number> = {
@@ -34,6 +52,14 @@ let counters: LiveEventsDebugCounters = {
   watchersSkipped: {},
   subscriptionsAttempted: 0,
   subscriptionsFailed: {},
+  kalshi: {
+    fetchAttempted: 0,
+    fetchFailed: 0,
+    rawItemsCount: 0,
+    parsedEventsCount: 0,
+    filteredOut: {},
+    sampleRawItems: [],
+  },
 };
 
 function bump(map: Record<string, number>, key: string): void {
@@ -54,6 +80,14 @@ export function resetLiveEventsDebug(): void {
     watchersSkipped: {},
     subscriptionsAttempted: 0,
     subscriptionsFailed: {},
+    kalshi: {
+      fetchAttempted: 0,
+      fetchFailed: 0,
+      rawItemsCount: 0,
+      parsedEventsCount: 0,
+      filteredOut: {},
+      sampleRawItems: [],
+    },
   };
 }
 
@@ -108,6 +142,52 @@ export function recordSubscriptionFailed(reason: string): void {
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
+export function recordKalshiFetchAttempted(): void {
+  counters.kalshi.fetchAttempted += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiFetchFailed(status?: number, error?: string): void {
+  counters.kalshi.fetchFailed += 1;
+  counters.kalshi.lastHttpStatus = status ?? counters.kalshi.lastHttpStatus;
+  if (error) {
+    counters.kalshi.lastError = error.slice(0, 200);
+  }
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiHttpStatus(status: number): void {
+  counters.kalshi.lastHttpStatus = status;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiRawItems(
+  count: number,
+  samples: Array<Record<string, any>>
+): void {
+  counters.kalshi.rawItemsCount = count;
+  counters.kalshi.sampleRawItems = samples.slice(0, 3).map((item) => ({
+    ticker: item.ticker,
+    title: item.title,
+    status: item.status,
+    event_ticker: item.event_ticker,
+    series_ticker: item.series_ticker,
+    close_time: item.close_time,
+    expiration_time: item.expiration_time,
+  }));
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiParsedEvent(): void {
+  counters.kalshi.parsedEventsCount += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiFiltered(reason: string): void {
+  bump(counters.kalshi.filteredOut, reason);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
 export function getLiveEventsDebug(): LiveEventsDebugCounters {
   return {
     ...counters,
@@ -116,6 +196,11 @@ export function getLiveEventsDebug(): LiveEventsDebugCounters {
     matchRejectReasons: { ...counters.matchRejectReasons },
     watchersSkipped: { ...counters.watchersSkipped },
     subscriptionsFailed: { ...counters.subscriptionsFailed },
+    kalshi: {
+      ...counters.kalshi,
+      filteredOut: { ...counters.kalshi.filteredOut },
+      sampleRawItems: [...counters.kalshi.sampleRawItems],
+    },
   };
 }
 

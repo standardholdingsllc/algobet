@@ -27,6 +27,8 @@ import {
   recordClassification,
   recordVendorEventFiltered,
   recordVendorEventsFetched,
+  recordKalshiFiltered,
+  recordKalshiParsedEvent,
 } from './live-events-debug';
 
 // ============================================================================
@@ -689,6 +691,7 @@ export function processKalshiMarkets(markets: Market[]): number {
     if (isKalshiMultiEventTicker(market.eventTicker)) {
       combosSkipped++;
       recordVendorEventFiltered('kalshi_multi_event_ticker');
+      recordKalshiFiltered('multi_event_ticker');
       continue;
     }
 
@@ -698,15 +701,20 @@ export function processKalshiMarkets(markets: Market[]): number {
       if (looksSports) {
         metadataMisses++;
         recordVendorEventFiltered('kalshi_missing_metadata_or_parse_failed');
+        recordKalshiFiltered('parse_failed');
+      } else {
+        recordKalshiFiltered('not_sports_ticker');
       }
       continue;
     }
 
     if (event.teams.length < 2) {
       recordVendorEventFiltered('kalshi_missing_teams');
+      recordKalshiFiltered('missing_teams');
       continue;
     }
 
+    recordKalshiParsedEvent();
     recordClassification(event.status);
     addOrUpdateEvent(event);
     added++;

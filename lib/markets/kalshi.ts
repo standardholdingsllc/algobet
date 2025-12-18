@@ -2,6 +2,14 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { Market } from '@/types';
 import { isDryFireMode } from '../execution-wrapper';
+import {
+  recordKalshiFetchAttempted,
+  recordKalshiFetchFailed,
+  recordKalshiFiltered,
+  recordKalshiHttpStatus,
+  recordKalshiParsedEvent,
+  recordKalshiRawItems,
+} from '../live-events-debug';
 
 const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const API_SIGNATURE_PREFIX = '/trade-api/v2';
@@ -386,6 +394,10 @@ export class KalshiAPI {
       endISO: maxDate.toISOString(),
     };
 
+    recordKalshiFetchAttempted();
+    const rawSamples: KalshiMarket[] = [];
+    let rawSeenCount = 0;
+
     try {
       const rawMarkets: KalshiMarket[] = [];
       const sportsEventTickers = new Set<string>();
@@ -393,12 +405,18 @@ export class KalshiAPI {
       let page = 0;
 
       while (page < KALSHI_MAX_PAGES) {
-        const { entries, nextCursor } = await this.fetchMarketsPage(cursor, window);
+        const { entries, nextCursor, status } = await this.fetchMarketsPage(cursor, window);
+        recordKalshiHttpStatus(status);
         page += 1;
 
         if (!entries.length) {
           console.info(`[Kalshi] Markets page ${page} returned 0 entries; stopping pagination.`);
           break;
+        }
+
+        rawSeenCount += entries.length;
+        if (rawSamples.length < 3) {
+          rawSamples.push(...entries.slice(0, 3 - rawSamples.length));
         }
 
         for (const market of entries) {
@@ -442,6 +460,8 @@ export class KalshiAPI {
         );
       }
 
+      recordKalshiRawItems(rawSeenCount, rawSamples);
+
       if (sportsEventTickers.size > 0) {
         await this.prefetchEventDetails(Array.from(sportsEventTickers));
       }
@@ -450,6 +470,7 @@ export class KalshiAPI {
       return markets;
     } catch (error: any) {
       console.error('Error fetching Kalshi markets:', error.response?.status || error.message);
+      recordKalshiFetchFailed(error.response?.status, error.message);
       return [];
     }
   }
@@ -457,7 +478,7 @@ export class KalshiAPI {
   private async fetchMarketsPage(
     cursor: string | undefined,
     window: { startISO: string; endISO: string }
-  ): Promise<{ entries: KalshiMarket[]; nextCursor?: string }> {
+  ): Promise<{ entries: KalshiMarket[]; nextCursor?: string; status: number }> {
     const startDate = new Date(window.startISO);
     const endDate = new Date(window.endISO);
     const startUnix = Math.floor(startDate.getTime() / 1000);
@@ -486,6 +507,7 @@ export class KalshiAPI {
     return {
       entries: response.data.markets ?? [],
       nextCursor,
+      status: response.status,
     };
   }
 
