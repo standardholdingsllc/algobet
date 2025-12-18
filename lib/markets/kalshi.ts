@@ -8,6 +8,7 @@ import {
   recordKalshiFetchAttempted,
   recordKalshiFetchFailed,
   recordKalshiFilteredToCloseWindow,
+  recordKalshiFilteredByStatus,
   recordKalshiHttpStatus,
   recordKalshiQueryApplied,
   recordKalshiRateLimitState,
@@ -743,7 +744,7 @@ export class KalshiAPI {
         1,
         opts.minCloseMinutes ?? DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES
       );
-      const status = opts.status ?? 'open';
+      const requestedStatus = opts.status ?? 'open';
       const sportsOnly = opts.sportsOnly ?? true;
       const maxPagesPerSeries = Math.max(
         1,
@@ -755,10 +756,17 @@ export class KalshiAPI {
       );
 
       const nowTs = Math.floor(Date.now() / 1000);
+      const closeWindowFilteringUsed = Boolean(minCloseMinutes || closeWindowMinutes);
+      const statusSentToApi =
+        closeWindowFilteringUsed && requestedStatus === 'open' ? null : requestedStatus;
+      const statusOmittedReason =
+        statusSentToApi === null ? 'close_ts_incompatible_with_status_open' : undefined;
+      const clientSideStatusFilter = requestedStatus || 'open';
+
       const queryWindow: KalshiMarketQueryParams = {
         minCloseTs: nowTs - minCloseMinutes * 60,
         maxCloseTs: nowTs + closeWindowMinutes * 60,
-        status,
+        status: statusSentToApi || undefined,
       };
 
       recordKalshiFetchAttempted();
@@ -769,6 +777,8 @@ export class KalshiAPI {
       const sportsEventTickers = new Set<string>();
       let totalPagesFetched = 0;
       let filteredToCloseWindow = 0;
+      let filteredByStatus = 0;
+      let totalRawItems = 0;
       let discoveryFailedReason: string | null | undefined;
       let backoffTriggered = false;
 
@@ -807,6 +817,9 @@ export class KalshiAPI {
           seriesTickersTotal,
           seriesTickersChosen: [],
           maxSeriesPerRefresh: KALSHI_MAX_SERIES_PER_REFRESH,
+          statusSentToApi,
+          statusOmittedReason,
+          clientSideStatusFilter,
         });
         console.warn('[Kalshi] No series tickers available for fetching markets.');
         recordKalshiRateLimitState(getKalshiRateLimitDebug());
@@ -837,6 +850,8 @@ export class KalshiAPI {
             break;
           }
 
+          totalRawItems += entries.length;
+
           recordKalshiHttpStatus(httpStatus);
           page += 1;
           totalPagesFetched += 1;
@@ -850,6 +865,13 @@ export class KalshiAPI {
           }
 
           for (const market of entries) {
+            const statusLower = (market.status || '').toLowerCase();
+            const isTradable = statusLower === 'open' || statusLower === 'active';
+            if (!isTradable) {
+              filteredByStatus += 1;
+              continue;
+            }
+
             const closeTs = Math.floor(new Date(market.close_time).getTime() / 1000);
             if (
               Number.isNaN(closeTs) ||
@@ -905,10 +927,14 @@ export class KalshiAPI {
         seriesTickersTotal,
         seriesTickersChosen: seriesTickersUsed,
         maxSeriesPerRefresh: KALSHI_MAX_SERIES_PER_REFRESH,
+        statusSentToApi,
+        statusOmittedReason,
+        clientSideStatusFilter,
       });
 
-      recordKalshiRawItems(allMarkets.length, rawSamples);
+      recordKalshiRawItems(totalRawItems, rawSamples);
       recordKalshiFilteredToCloseWindow(filteredToCloseWindow);
+      recordKalshiFilteredByStatus(filteredByStatus);
 
       if (sportsEventTickers.size > 0) {
         await this.prefetchEventDetails(Array.from(sportsEventTickers));

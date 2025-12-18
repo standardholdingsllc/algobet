@@ -64,6 +64,7 @@ export interface LiveEventsDebugCounters {
     parsedEventsCount: number;
     filteredOut: Record<string, number>;
     filteredToCloseWindowCount?: number;
+    filteredByStatusCount?: number;
     queryApplied?: {
       seriesTicker?: string;
       maxCloseTs?: number;
@@ -81,6 +82,9 @@ export interface LiveEventsDebugCounters {
       seriesTickersTotal?: number;
       seriesTickersChosen?: string[];
       maxSeriesPerRefresh?: number;
+      statusSentToApi?: string | null;
+      statusOmittedReason?: string;
+      clientSideStatusFilter?: string;
     };
     sampleRawItems: Array<{
       ticker?: string;
@@ -180,6 +184,8 @@ export function resetLiveEventsDebug(): void {
       parsedEventsCount: 0,
       filteredOut: {},
       filteredToCloseWindowCount: 0,
+    filteredByStatusCount: 0,
+    filteredByStatusCount: 0,
       queryApplied: undefined,
       sampleRawItems: [],
     },
@@ -346,6 +352,11 @@ export function recordKalshiFilteredToCloseWindow(count: number): void {
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
+export function recordKalshiFilteredByStatus(count: number): void {
+  counters.kalshi.filteredByStatusCount = count;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
 export function recordKalshiQueryApplied(query: {
   seriesTicker?: string;
   maxCloseTs?: number;
@@ -363,6 +374,9 @@ export function recordKalshiQueryApplied(query: {
   seriesTickersTotal?: number;
   seriesTickersChosen?: string[];
   maxSeriesPerRefresh?: number;
+  statusSentToApi?: string | null;
+  statusOmittedReason?: string;
+  clientSideStatusFilter?: string;
 }): void {
   counters.kalshi.queryApplied = query;
   counters.lastUpdatedAt = new Date().toISOString();

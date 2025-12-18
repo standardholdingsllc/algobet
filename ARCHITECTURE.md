@@ -434,4 +434,18 @@ pm2 start npm --name "live-arb-worker" -- run live-arb-worker
 - **A/B threshold testing**: Run multiple parameter sets in parallel dry-fire mode
 - **Sport-specific matching rules**: Customize matching logic per sport
 
+---
+
+## 15. Kalshi Close-Window Verification (REST)
+
+Use these to confirm we avoid the Kalshi API's incompatible `status=open` + `min_close_ts/max_close_ts` combo:
+
+```bash
+# Broken: status=open combined with close window (returns 0)
+curl "https://api.elections.kalshi.com/trade-api/v2/markets?status=open&min_close_ts=$(date -u +%s)&max_close_ts=$(($(date -u +%s)+10800))"
+
+# Fixed: omit status, let client filter open/active (returns >0)
+curl "https://api.elections.kalshi.com/trade-api/v2/markets?min_close_ts=$(date -u +%s)&max_close_ts=$(($(date -u +%s)+10800))"
+```
+
 This architecture keeps trading logic centralized, provides real-time price streaming, and enables safe paper trading before going live.
