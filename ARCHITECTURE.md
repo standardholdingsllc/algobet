@@ -258,11 +258,38 @@ All integrations return the shared `Market` interface for platform-agnostic arbi
 
 | Store | Module | Usage |
 |-------|--------|-------|
-| **Upstash KV** | `lib/kv-storage.ts` | Balances, configuration, bets, dry-fire logs |
+| **Upstash KV** | `lib/kv-storage.ts` | Balances, configuration, bets, dry-fire logs, worker heartbeat, live events snapshot |
 | **Local JSON** | `data/*.json` | Dev defaults |
-| **Event Groups** | `lib/live-event-groups-store.ts` | Matched groups persisted to disk |
 
-### 8.1 KV-Backed Runtime Configuration
+### 8.1 Cross-Process KV Storage
+
+The system uses a split architecture where the **worker runs on Digital Ocean** and the **API runs on Vercel serverless**. KV storage bridges these processes:
+
+| KV Key | Writer | Reader | Purpose |
+|--------|--------|--------|---------|
+| `algobet:live-arb:worker-heartbeat` | Worker | API (`/status`) | Worker presence, platform connections, circuit breaker |
+| `algobet:live-arb:live-events-snapshot` | Worker | API (`/live-events`) | Registry events, matched groups, watcher stats |
+| `algobet:data` | Both | Both | Config, balances, bets, opportunity logs |
+
+**LiveEventsSnapshot** (`lib/kv-storage.ts`):
+```typescript
+interface LiveEventsSnapshot {
+  updatedAt: string;
+  registry: {
+    totalEvents: number;
+    events: VendorEvent[];  // Capped at 500
+    countByPlatform: Record<Platform, number>;
+    countByStatus: Record<Status, number>;
+  };
+  matchedGroups: MatchedEventGroup[];  // Capped at 200
+  watchers: WatcherInfo[];  // Capped at 100
+  stats: { liveEvents, preEvents, matchedGroups, arbChecksTotal, ... };
+}
+```
+
+The worker writes this snapshot after each market refresh cycle, enabling the Vercel API to display live event data.
+
+### 8.2 KV-Backed Runtime Configuration
 
 **BotConfig** (`lib/kv-storage.ts`):
 - `maxBetPercentage`, `maxDaysToExpiry`, `minProfitMargin`
@@ -281,13 +308,15 @@ All integrations return the shared `Market` interface for platform-agnostic arbi
 
 ### 9.1 Live Arb Endpoints
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/live-arb/status` | Overall status, WS connections, cache stats |
-| `GET/POST /api/live-arb/config` | Read/write runtime configuration |
-| `GET/POST /api/live-arb/execution-mode` | Read/write execution mode |
-| `GET /api/live-arb/live-events` | Registry snapshot, matched groups |
-| `GET /api/live-arb/dry-fire-stats` | Aggregated dry-fire statistics |
+All live-arb endpoints read from **KV storage**, not in-memory state. This enables cross-process visibility between the DO worker and Vercel serverless.
+
+| Endpoint | Data Source | Purpose |
+|----------|-------------|---------|
+| `GET /api/live-arb/status` | KV heartbeat | Worker presence, WS connections, circuit breaker |
+| `GET/POST /api/live-arb/config` | KV config | Read/write runtime configuration |
+| `GET/POST /api/live-arb/execution-mode` | KV config | Read/write execution mode |
+| `GET /api/live-arb/live-events` | KV snapshot | Registry events, matched groups, watchers |
+| `GET /api/live-arb/dry-fire-stats` | KV logs | Aggregated dry-fire statistics |
 
 ### 9.2 Dashboard Endpoints
 
@@ -317,9 +346,11 @@ The main entry point for live betting. Run via `npm run live-arb-worker`.
 3. If `liveEventsOnly=true`: Use Live Sports Discovery for accurate live detection
 4. Otherwise: Standard market fetch with expiry-based filtering
 5. Update registry via `refreshRegistry()`
+6. Write `LiveEventsSnapshot` to KV for API visibility
 
-**Heartbeat Reporting:**
-Worker calls `updateWorkerHeartbeat()` (KV) after startup, each refresh, and shutdown.
+**KV Writes:**
+- **Heartbeat** (`updateWorkerHeartbeat`): Written every 5-10s with worker state, platform connections, circuit breaker
+- **Live Events Snapshot** (`updateLiveEventsSnapshot`): Written after each refresh with registry, matched groups, watchers
 
 ---
 
