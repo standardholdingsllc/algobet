@@ -91,6 +91,7 @@ function enforceLiveArbAlwaysOn(
 
 const STORAGE_KEY = 'algobet:data';
 const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
+const LIVE_EVENTS_SNAPSHOT_KEY = 'algobet:live-arb:live-events-snapshot';
 
 /**
  * Platform connection status as reported by the worker.
@@ -615,6 +616,103 @@ export async function getWorkerHeartbeat(): Promise<LiveArbWorkerHeartbeat | nul
     return (await redis.get<LiveArbWorkerHeartbeat>(WORKER_HEARTBEAT_KEY)) ?? null;
   } catch (error) {
     console.error('[KVStorage] Failed to read worker heartbeat', error);
+    return null;
+  }
+}
+
+// ============================================================================
+// Live Events Snapshot (for cross-process visibility)
+// ============================================================================
+
+/**
+ * Snapshot of live events data written by the worker for the API to read.
+ * This enables the Vercel serverless API to display event data that only
+ * exists in the worker's memory on Digital Ocean.
+ */
+export interface LiveEventsSnapshot {
+  /** ISO timestamp when this snapshot was written */
+  updatedAt: string;
+  
+  /** Registry snapshot - all tracked vendor events */
+  registry: {
+    totalEvents: number;
+    events: Array<{
+      platform: LiveEventPlatform;
+      vendorMarketId: string;
+      sport: string;
+      status: VendorEventStatus;
+      rawTitle: string;
+      normalizedTitle?: string;
+      startTime?: number;
+      homeTeam?: string;
+      awayTeam?: string;
+    }>;
+    countByPlatform: Record<LiveEventPlatform, number>;
+    countByStatus: Record<VendorEventStatus, number>;
+  };
+  
+  /** Matched event groups - cross-platform matches */
+  matchedGroups: Array<{
+    eventKey: string;
+    sport: string;
+    status: VendorEventStatus;
+    homeTeam?: string;
+    awayTeam?: string;
+    platformCount: number;
+    matchQuality: number;
+    vendors: {
+      SXBET?: Array<{ vendorMarketId: string; rawTitle: string }>;
+      POLYMARKET?: Array<{ vendorMarketId: string; rawTitle: string }>;
+      KALSHI?: Array<{ vendorMarketId: string; rawTitle: string }>;
+    };
+  }>;
+  
+  /** Active watchers */
+  watchers: Array<{
+    eventKey: string;
+    sport: string;
+    marketCount: number;
+    lastCheckAt?: number;
+  }>;
+  
+  /** Summary stats */
+  stats: {
+    totalVendorEvents: number;
+    liveEvents: number;
+    preEvents: number;
+    endedEvents: number;
+    matchedGroups: number;
+    threeWayMatches: number;
+    twoWayMatches: number;
+    activeWatchers: number;
+    arbChecksTotal: number;
+    opportunitiesTotal: number;
+  };
+}
+
+/**
+ * Update the live events snapshot in KV.
+ * Called by the worker after each registry refresh.
+ */
+export async function updateLiveEventsSnapshot(
+  snapshot: LiveEventsSnapshot
+): Promise<void> {
+  try {
+    await redis.set(LIVE_EVENTS_SNAPSHOT_KEY, snapshot);
+  } catch (error) {
+    console.error('[KVStorage] Failed to update live events snapshot', error);
+  }
+}
+
+/**
+ * Get the live events snapshot from KV.
+ * Called by the API to display event data.
+ */
+export async function getLiveEventsSnapshot(): Promise<LiveEventsSnapshot | null> {
+  try {
+    return (await redis.get<LiveEventsSnapshot>(LIVE_EVENTS_SNAPSHOT_KEY)) ?? null;
+  } catch (error) {
+    console.error('[KVStorage] Failed to read live events snapshot', error);
     return null;
   }
 }

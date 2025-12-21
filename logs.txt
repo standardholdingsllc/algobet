@@ -1,773 +1,100 @@
-# show recent logs
-pm2 logs live-arb-worker --lines 80
-[PM2] Applying action restartProcessId on app [live-arb-worker](ids: [ 0 ])
-[PM2] [live-arb-worker](0) ✓
-┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
-│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
-├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
-│ 0  │ live-arb-worker    │ fork     │ 587  │ online    │ 0%       │ 3.3mb    │
-└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
-[TAILING] Tailing last 80 lines for [live-arb-worker] process (change the value with --lines option)
-/root/.pm2/logs/live-arb-worker-error.log last 80 lines:
-0|live-arb |   error: Error: Unexpected server response: 401
-0|live-arb |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb |       at ClientRequest.emit (node:events:517:28)
-0|live-arb |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb |       at TLSSocket.emit (node:events:517:28)
-0|live-arb |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb | }
-0|live-arb | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [KALSHI-WS] WARNING: stuck in reconnecting state { attempts: 4, lastError: 'Unexpected server response: 401' }
-0|live-arb | [SXBET-WS] WARNING: stuck in reconnecting state { attempts: 4, lastError: 'Unexpected server response: 404' }
-0|live-arb | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb | [KALSHI-WS] Reconnection failed {
-0|live-arb |   error: Error: Unexpected server response: 401
-0|live-arb |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb |       at ClientRequest.emit (node:events:517:28)
-0|live-arb |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb |       at TLSSocket.emit (node:events:517:28)
-0|live-arb |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb | }
-0|live-arb | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [KALSHI-WS] WARNING: stuck in reconnecting state { attempts: 5, lastError: 'Unexpected server response: 401' }
-0|live-arb | [SXBET-WS] WARNING: stuck in reconnecting state { attempts: 5, lastError: 'Unexpected server response: 404' }
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
-0|live-arb | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb | [KALSHI-WS] Reconnection failed {
-0|live-arb |   error: Error: Unexpected server response: 401
-0|live-arb |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb |       at ClientRequest.emit (node:events:517:28)
-0|live-arb |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb |       at TLSSocket.emit (node:events:517:28)
-0|live-arb |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb | }
-0|live-arb | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
-0|live-arb | [KALSHI-WS] WARNING: stuck in reconnecting state { attempts: 6, lastError: 'Unexpected server response: 401' }
-0|live-arb | [SXBET-WS] WARNING: stuck in reconnecting state { attempts: 6, lastError: 'Unexpected server response: 404' }
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb | [KALSHI-WS] Reconnection failed {
-0|live-arb |   error: Error: Unexpected server response: 401
-0|live-arb |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb |       at ClientRequest.emit (node:events:517:28)
-0|live-arb |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb |       at TLSSocket.emit (node:events:517:28)
-0|live-arb |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb | }
-0|live-arb | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb | [KALSHI-WS] WARNING: stuck in reconnecting state { attempts: 7, lastError: 'Unexpected server response: 401' }
-0|live-arb | [SXBET-WS] WARNING: stuck in reconnecting state { attempts: 7, lastError: 'Unexpected server response: 404' }
-0|live-arb | [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
-0|live-arb | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
+{
+  "enabled": true,
+  "running": false,
+  "uptimeMs": 0,
+  "config": {
+    "enabled": true,
+    "sportsOnly": true,
+    "timeToleranceMinutes": 15,
+    "minTeamSimilarity": 0.7,
+    "maxWatchers": 50,
+    "minPlatforms": 2,
+    "registryRefreshIntervalSeconds": 30,
+    "matcherIntervalSeconds": 10,
+    "preGameWindowMinutes": 60,
+    "postGameWindowMinutes": 5
+  },
+  "registry": {
+    "totalEvents": 0,
+    "events": [],
+    "countByPlatform": {
+      "SXBET": 0,
+      "POLYMARKET": 0,
+      "KALSHI": 0
+    },
+    "countByStatus": {
+      "PRE": 0,
+      "LIVE": 0,
+      "ENDED": 0
+    },
+    "updatedAt": 1766359515464
+  },
+  "matcher": {
+    "totalGroups": 0,
+    "groupsReturned": 0,
+    "threeWayMatches": 0,
+    "twoWayMatches": 0,
+    "bySport": {
 
-/root/.pm2/logs/live-arb-worker-out.log last 80 lines:
-0|live-arb |     derivedExpirySource: 'endDateIso'
-0|live-arb |   },
-0|live-arb |   {
-0|live-arb |     conditionId: '0x92c863de3e818302bdfe388e1aca9b314742e463aae220844297b3ace904e04f',
-0|live-arb |     question: 'Will Jon Thorp win TN-7 Special Election?',
-0|live-arb |     source: 'gamma',
-0|live-arb |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb |     derivedExpirySource: 'endDateIso'
-0|live-arb |   }
-0|live-arb | ]
-0|live-arb | [sx.bet] /markets/active page 30 ← pageMarkets=50, nextKey=692c6809bf0514046506f28d
-0|live-arb | [sx.bet] /markets/active page 31 → requesting params={"pageSize":50,"paginationKey":"692c6809bf0514046506f28d"}
-0|live-arb | [sx.bet] /markets/active page 31 ← pageMarkets=50, nextKey=692c6cdfb9e07ac0b4ca2654
-0|live-arb | [sx.bet] /markets/active page 32 → requesting params={"pageSize":50,"paginationKey":"692c6cdfb9e07ac0b4ca2654"}
-0|live-arb | [sx.bet] /markets/active page 32 ← pageMarkets=50, nextKey=692c6e1ffba29c515b08f61b
-0|live-arb | [sx.bet] /markets/active page 33 → requesting params={"pageSize":50,"paginationKey":"692c6e1ffba29c515b08f61b"}
-0|live-arb | [sx.bet] /markets/active page 33 ← pageMarkets=50, nextKey=692c741497a8cec2e270c7ae
-0|live-arb | [sx.bet] /markets/active page 34 → requesting params={"pageSize":50,"paginationKey":"692c741497a8cec2e270c7ae"}
-0|live-arb | [sx.bet] /markets/active page 34 ← pageMarkets=50, nextKey=692c761bead504056a734826
-0|live-arb | [sx.bet] /markets/active page 35 → requesting params={"pageSize":50,"paginationKey":"692c761bead504056a734826"}
-0|live-arb | [sx.bet] /markets/active page 35 ← pageMarkets=50, nextKey=692c77bbc3ace46652220f7f
-0|live-arb | [sx.bet] /markets/active page 36 → requesting params={"pageSize":50,"paginationKey":"692c77bbc3ace46652220f7f"}
-0|live-arb | [sx.bet] /markets/active page 36 ← pageMarkets=50, nextKey=692c80435efb91dc101d20fc
-0|live-arb | [sx.bet] /markets/active page 37 → requesting params={"pageSize":50,"paginationKey":"692c80435efb91dc101d20fc"}
-0|live-arb | [sx.bet] /markets/active page 37 ← pageMarkets=50, nextKey=692c87d06472690df6f6efed
-0|live-arb | [sx.bet] /markets/active page 38 → requesting params={"pageSize":50,"paginationKey":"692c87d06472690df6f6efed"}
-0|live-arb | [sx.bet] /markets/active page 38 ← pageMarkets=50, nextKey=692c8a3582ac94a447db71c0
-0|live-arb | [sx.bet] /markets/active page 39 → requesting params={"pageSize":50,"paginationKey":"692c8a3582ac94a447db71c0"}
-0|live-arb | [sx.bet] /markets/active page 39 ← pageMarkets=50, nextKey=692c8e3ed803da4eb0bf8943
-0|live-arb | [sx.bet] /markets/active page 40 → requesting params={"pageSize":50,"paginationKey":"692c8e3ed803da4eb0bf8943"}
-0|live-arb | [sx.bet] /markets/active page 40 ← pageMarkets=50, nextKey=692c91b182ac94a447db9151
-0|live-arb | [sx.bet] /markets/active page 41 → requesting params={"pageSize":50,"paginationKey":"692c91b182ac94a447db9151"}
-0|live-arb | [sx.bet] /markets/active page 41 ← pageMarkets=50, nextKey=692c963e80dbfb1da8faa8aa
-0|live-arb | [sx.bet] /markets/active page 42 → requesting params={"pageSize":50,"paginationKey":"692c963e80dbfb1da8faa8aa"}
-0|live-arb | [sx.bet] /markets/active page 42 ← pageMarkets=50, nextKey=692c9a92008ad3a2322e63ba
-0|live-arb | [sx.bet] /markets/active page 43 → requesting params={"pageSize":50,"paginationKey":"692c9a92008ad3a2322e63ba"}
-0|live-arb | [sx.bet] /markets/active page 43 ← pageMarkets=50, nextKey=692ca0a580dbfb1da8fad7eb
-0|live-arb | [sx.bet] /markets/active page 44 → requesting params={"pageSize":50,"paginationKey":"692ca0a580dbfb1da8fad7eb"}
-0|live-arb | [sx.bet] /markets/active page 44 ← pageMarkets=50, nextKey=692ca46fe1571fd474cf4901
-0|live-arb | [sx.bet] /markets/active page 45 → requesting params={"pageSize":50,"paginationKey":"692ca46fe1571fd474cf4901"}
-0|live-arb | [sx.bet] /markets/active page 45 ← pageMarkets=50, nextKey=692ca8308b7d1b183ceba083
-0|live-arb | [sx.bet] /markets/active page 46 → requesting params={"pageSize":50,"paginationKey":"692ca8308b7d1b183ceba083"}
-0|live-arb | [sx.bet] /markets/active page 46 ← pageMarkets=50, nextKey=692caaf3a397862d79fff230
-0|live-arb | [sx.bet] /markets/active page 47 → requesting params={"pageSize":50,"paginationKey":"692caaf3a397862d79fff230"}
-0|live-arb | [sx.bet] /markets/active page 47 ← pageMarkets=50, nextKey=692cad8980dbfb1da8fb1b62
-0|live-arb | [sx.bet] /markets/active page 48 → requesting params={"pageSize":50,"paginationKey":"692cad8980dbfb1da8fb1b62"}
-0|live-arb | [sx.bet] /markets/active page 48 ← pageMarkets=33, nextKey=692caf35748fd6313575f32a
-0|live-arb | [sx.bet] /markets/active page 49 → requesting params={"pageSize":50,"paginationKey":"692caf35748fd6313575f32a"}
-0|live-arb | [sx.bet] /markets/active page 49 ← pageMarkets=0, nextKey=∅
-0|live-arb | [sx.bet] Collected 2383 active markets across 49 page(s) (stop=nextKey empty).
-0|live-arb | [sx.bet] Odds hydration starting: totalInWindow=1081, reusedFromSnapshot=0, toFetch=1081
-0|live-arb | [LiveEvents] Matcher results {
-0|live-arb |   totalGroups: 0,
-0|live-arb |   liveGroups: 0,
-0|live-arb |   preGroups: 0,
-0|live-arb |   threeWayMatches: 0,
-0|live-arb |   twoWayMatches: 0,
-0|live-arb |   bySport: {}
-0|live-arb | }
-0|live-arb | [LiveSportsOrchestrator] Stopping...
-0|live-arb | [LiveWatcher] All watchers stopped
-0|live-arb | [LiveWatcher] Cleaned up watchers
-0|live-arb | [LiveSportsOrchestrator] Stopped
-0|live-arb | [LiveArbManager] Shutting down LiveArbManager
-0|live-arb | [SXBET-WS] Disconnecting websocket
-0|live-arb | [SXBET-WS] State change: reconnecting → disconnected
-0|live-arb | [SXBET-WS] State changed to disconnected
-0|live-arb | [POLYMARKET-WS] Disconnecting websocket
-0|live-arb | [POLYMARKET-WS] State change: connected → disconnected
-0|live-arb | [POLYMARKET-WS] State changed to disconnected
-0|live-arb | [KALSHI-WS] Disconnecting websocket
-0|live-arb | [KALSHI-WS] State change: reconnecting → disconnected
-0|live-arb | [KALSHI-WS] State changed to disconnected
-0|live-arb | [LiveArbManager] Shutdown complete
-0|live-arb | [LiveArbWorker] Stopped live-arb worker
-0|live-arb |
-0|live-arb | > algobet@1.0.0 live-arb-worker
-0|live-arb | > node -r esbuild-register workers/live-arb-worker.ts
-0|live-arb |
-
-0|live-arb-worker  | [LiveArbWorker] Starting live-arb worker (script-managed) { pid: 49775, nodeEnv: 'unknown' }
-0|live-arb-worker  | [LiveArbManager] Starting LiveArbManager {
-0|live-arb-worker  |   enabled: true,
-0|live-arb-worker  |   liveEventsOnly: true,
-0|live-arb-worker  |   maxSubscriptions: { sxbet: 100, polymarket: 100, kalshi: 100 },
-0|live-arb-worker  |   platforms: 'kalshi,polymarket,sxbet'
-0|live-arb-worker  | }
-0|live-arb-worker  | [SXBET-WS] State change: disconnected → connecting
-0|live-arb-worker  | [SXBET-WS] State changed to connecting
-0|live-arb-worker  | [SXBET-WS] Connecting to wss://api.sx.bet/ws...
-0|live-arb-worker  | [POLYMARKET-WS] State change: disconnected → connecting
-0|live-arb-worker  | [POLYMARKET-WS] State changed to connecting
-0|live-arb-worker  | [POLYMARKET-WS] Connecting to wss://ws-subscriptions-clob.polymarket.com/ws/market...
-0|live-arb-worker  | [KALSHI-WS] State change: disconnected → connecting
-0|live-arb-worker  | [KALSHI-WS] State changed to connecting
-0|live-arb-worker  | [KALSHI-WS] Connecting to wss://trading-api.kalshi.com/trade-api/ws/v2...
-0|live-arb-worker  | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb-worker  | [KALSHI-WS] Connection closed { code: 1006, reason: '' }
-0|live-arb-worker  | [KALSHI-WS] State change: connecting → reconnecting
-0|live-arb-worker  | [KALSHI-WS] State changed to reconnecting
-0|live-arb-worker  | [KALSHI-WS] Scheduling reconnect attempt 1 in 1000ms { delayMs: 1000 }
-0|live-arb-worker  | [KALSHI-WS] Failed to initialize websocket client Error: Unexpected server response: 401
-0|live-arb-worker  |     at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb-worker  |     at ClientRequest.emit (node:events:517:28)
-0|live-arb-worker  |     at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb-worker  |     at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb-worker  |     at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb-worker  |     at TLSSocket.emit (node:events:517:28)
-0|live-arb-worker  |     at addChunk (node:internal/streams/readable:368:12)
-0|live-arb-worker  |     at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb-worker  |     at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb-worker  |     at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb-worker  | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb-worker  | [SXBET-WS] State change: connecting → error
-0|live-arb-worker  | [SXBET-WS] State changed to error
-0|live-arb-worker  | [SXBET-WS] Connection closed { code: 1006, reason: 'unknown' }
-0|live-arb-worker  | [SXBET-WS] State change: error → reconnecting
-0|live-arb-worker  | [SXBET-WS] State changed to reconnecting
-0|live-arb-worker  | [SXBET-WS] Scheduling reconnect attempt 1 in 1000ms { delayMs: 1000 }
-0|live-arb-worker  | [SXBET-WS] Subscribed to best-odds stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to live-scores stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to line-changes stream
-0|live-arb-worker  | [SXBET-WS] Initialized websocket client
-0|live-arb-worker  | [POLYMARKET-WS] State change: connecting → connected
-0|live-arb-worker  | [POLYMARKET-WS] State changed to connected
-0|live-arb-worker  | [POLYMARKET-WS] Connected successfully
-0|live-arb-worker  | [POLYMARKET-WS] Initialized websocket client
-0|live-arb-worker  | [LiveArbManager] Initialization complete: 3/3 websocket clients connected (0 failed)
-0|live-arb-worker  | [LiveSportsOrchestrator] Starting...
-0|live-arb-worker  | [LiveSportsOrchestrator] Configuration:
-0|live-arb-worker  |   enabled: true
-0|live-arb-worker  |   sportsOnly: true
-0|live-arb-worker  |   timeTolerance: 15 minutes
-0|live-arb-worker  |   minTeamSimilarity: 0.7
-0|live-arb-worker  |   maxWatchers: 50
-0|live-arb-worker  |   minPlatforms: 2
-0|live-arb-worker  |   registryRefreshInterval: 30s
-0|live-arb-worker  |   matcherInterval: 10s
-0|live-arb-worker  |   preGameWindow: 60 minutes
-0|live-arb-worker  |   postGameWindow: 5 minutes
-0|live-arb-worker  | [LiveWatcher] Initialized watchers with platform adapters
-0|live-arb-worker  | [LiveSportsOrchestrator] Started successfully
-0|live-arb-worker  | [LiveArbWorker] Execution mode summary {
-0|live-arb-worker  |   executionMode: 'DRY_FIRE',
-0|live-arb-worker  |   minProfitBps: '50',
-0|live-arb-worker  |   maxPriceAgeMs: '2000',
-0|live-arb-worker  |   logLevel: 'info'
-0|live-arb-worker  | }
-0|live-arb-worker  | [Polymarket Gamma] Fetching /markets page {
-0|live-arb-worker  |   page: 1,
-0|live-arb-worker  |   limit: 500,
-0|live-arb-worker  |   offset: 0,
-0|live-arb-worker  |   filters: {
-0|live-arb-worker  |     closed: 'false',
-0|live-arb-worker  |     end_date_min: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     end_date_max: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   }
-0|live-arb-worker  | }
-0|live-arb-worker  | [sx.bet] /markets/active page 1 → requesting params={"pageSize":50,"paginationKey":"∅"}
-0|live-arb-worker  | [Kalshi] Processed Kalshi page 1 (200 raw within <=10d, 200 total tradable so far).
-0|live-arb-worker  | [Kalshi] Reached target tradable market count (200); stopping pagination early.
-0|live-arb-worker  | [sx.bet] /markets/active page 1 ← pageMarkets=50, nextKey=6924f18fcfe23ce4833182e7
-0|live-arb-worker  | [sx.bet] /markets/active page 2 → requesting params={"pageSize":50,"paginationKey":"6924f18fcfe23ce4833182e7"}
-0|live-arb-worker  | [sx.bet] /markets/active page 2 ← pageMarkets=50, nextKey=6925cb7040a72227fda4c756
-0|live-arb-worker  | [sx.bet] /markets/active page 3 → requesting params={"pageSize":50,"paginationKey":"6925cb7040a72227fda4c756"}
-0|live-arb-worker  | [sx.bet] /markets/active page 3 ← pageMarkets=50, nextKey=692787bc5aa843159026da89
-0|live-arb-worker  | [sx.bet] /markets/active page 4 → requesting params={"pageSize":50,"paginationKey":"692787bc5aa843159026da89"}
-0|live-arb-worker  | [sx.bet] /markets/active page 4 ← pageMarkets=50, nextKey=6927952e561ac72ae4ab1201
-0|live-arb-worker  | [sx.bet] /markets/active page 5 → requesting params={"pageSize":50,"paginationKey":"6927952e561ac72ae4ab1201"}
-0|live-arb-worker  | [sx.bet] /markets/active page 5 ← pageMarkets=50, nextKey=6928af79b27ea1187c02cf1b
-0|live-arb-worker  | [sx.bet] /markets/active page 6 → requesting params={"pageSize":50,"paginationKey":"6928af79b27ea1187c02cf1b"}
-0|live-arb-worker  | [KALSHI-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [KALSHI-WS] State changed to connecting
-0|live-arb-worker  | [KALSHI-WS] Connecting to wss://trading-api.kalshi.com/trade-api/ws/v2...
-0|live-arb-worker  | [sx.bet] /markets/active page 6 ← pageMarkets=50, nextKey=6928af8bb27ea1187c02d000
-0|live-arb-worker  | [sx.bet] /markets/active page 7 → requesting params={"pageSize":50,"paginationKey":"6928af8bb27ea1187c02d000"}
-0|live-arb-worker  | [SXBET-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [SXBET-WS] State changed to connecting
-0|live-arb-worker  | [SXBET-WS] Connecting to wss://api.sx.bet/ws...
-0|live-arb-worker  | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb-worker  | [KALSHI-WS] Connection closed { code: 1006, reason: '' }
-0|live-arb-worker  | [KALSHI-WS] State change: connecting → reconnecting
-0|live-arb-worker  | [KALSHI-WS] State changed to reconnecting
-0|live-arb-worker  | [KALSHI-WS] Scheduling reconnect attempt 2 in 2000ms { delayMs: 2000 }
-0|live-arb-worker  | [KALSHI-WS] Reconnection failed {
-0|live-arb-worker  |   error: Error: Unexpected server response: 401
-0|live-arb-worker  |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb-worker  |       at ClientRequest.emit (node:events:517:28)
-0|live-arb-worker  |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb-worker  |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb-worker  |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb-worker  |       at TLSSocket.emit (node:events:517:28)
-0|live-arb-worker  |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb-worker  |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb-worker  |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb-worker  |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb-worker  | }
-0|live-arb-worker  | [sx.bet] /markets/active page 7 ← pageMarkets=50, nextKey=6928b71346765f066278967e
-0|live-arb-worker  | [sx.bet] /markets/active page 8 → requesting params={"pageSize":50,"paginationKey":"6928b71346765f066278967e"}
-0|live-arb-worker  | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb-worker  | [SXBET-WS] State change: connecting → error
-0|live-arb-worker  | [SXBET-WS] State changed to error
-0|live-arb-worker  | [SXBET-WS] Connection closed { code: 1006, reason: 'unknown' }
-0|live-arb-worker  | [SXBET-WS] State change: error → reconnecting
-0|live-arb-worker  | [SXBET-WS] State changed to reconnecting
-0|live-arb-worker  | [SXBET-WS] Scheduling reconnect attempt 2 in 2000ms { delayMs: 2000 }
-0|live-arb-worker  | [SXBET-WS] Resubscribing to 0 markets
-0|live-arb-worker  | [SXBET-WS] Subscribed to best-odds stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to live-scores stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to line-changes stream
-0|live-arb-worker  | [Polymarket Gamma] Page 1 summary: raw=500, tradable=500, cumulativeTradable=500.
-0|live-arb-worker  | [Polymarket Gamma] Fetching /markets page {
-0|live-arb-worker  |   page: 2,
-0|live-arb-worker  |   limit: 500,
-0|live-arb-worker  |   offset: 500,
-0|live-arb-worker  |   filters: {
-0|live-arb-worker  |     closed: 'false',
-0|live-arb-worker  |     end_date_min: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     end_date_max: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   }
-0|live-arb-worker  | }
-0|live-arb-worker  | [sx.bet] /markets/active page 8 ← pageMarkets=50, nextKey=6928c0ea11ddc2d5c99b2808
-0|live-arb-worker  | [sx.bet] /markets/active page 9 → requesting params={"pageSize":50,"paginationKey":"6928c0ea11ddc2d5c99b2808"}
-0|live-arb-worker  | [sx.bet] /markets/active page 9 ← pageMarkets=50, nextKey=6928e70d6b3796199d01d299
-0|live-arb-worker  | [sx.bet] /markets/active page 10 → requesting params={"pageSize":50,"paginationKey":"6928e70d6b3796199d01d299"}
-0|live-arb-worker  | [sx.bet] /markets/active page 10 ← pageMarkets=50, nextKey=692a3887fa1a16b1b3b9c15e
-0|live-arb-worker  | [sx.bet] /markets/active page 11 → requesting params={"pageSize":50,"paginationKey":"692a3887fa1a16b1b3b9c15e"}
-0|live-arb-worker  | [sx.bet] /markets/active page 11 ← pageMarkets=50, nextKey=692afa7524477f74511db282
-0|live-arb-worker  | [sx.bet] /markets/active page 12 → requesting params={"pageSize":50,"paginationKey":"692afa7524477f74511db282"}
-0|live-arb-worker  | [sx.bet] /markets/active page 12 ← pageMarkets=50, nextKey=692b5e4b4e8aedb7a1063039
-0|live-arb-worker  | [sx.bet] /markets/active page 13 → requesting params={"pageSize":50,"paginationKey":"692b5e4b4e8aedb7a1063039"}
-0|live-arb-worker  | [sx.bet] /markets/active page 13 ← pageMarkets=50, nextKey=692b890490b9707aa1faa2dd
-0|live-arb-worker  | [sx.bet] /markets/active page 14 → requesting params={"pageSize":50,"paginationKey":"692b890490b9707aa1faa2dd"}
-0|live-arb-worker  | [sx.bet] /markets/active page 14 ← pageMarkets=50, nextKey=692b89e590b9707aa1faa650
-0|live-arb-worker  | [sx.bet] /markets/active page 15 → requesting params={"pageSize":50,"paginationKey":"692b89e590b9707aa1faa650"}
-0|live-arb-worker  | [sx.bet] /markets/active page 15 ← pageMarkets=50, nextKey=692b96278494a372bfd79a92
-0|live-arb-worker  | [sx.bet] /markets/active page 16 → requesting params={"pageSize":50,"paginationKey":"692b96278494a372bfd79a92"}
-0|live-arb-worker  | [Polymarket Gamma] Page 2 summary: raw=500, tradable=500, cumulativeTradable=1000.
-0|live-arb-worker  | [Polymarket Gamma] Fetching /markets page {
-0|live-arb-worker  |   page: 3,
-0|live-arb-worker  |   limit: 500,
-0|live-arb-worker  |   offset: 1000,
-0|live-arb-worker  |   filters: {
-0|live-arb-worker  |     closed: 'false',
-0|live-arb-worker  |     end_date_min: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     end_date_max: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   }
-0|live-arb-worker  | }
-0|live-arb-worker  | [sx.bet] /markets/active page 16 ← pageMarkets=50, nextKey=692ba197bfe009d764b75159
-0|live-arb-worker  | [sx.bet] /markets/active page 17 → requesting params={"pageSize":50,"paginationKey":"692ba197bfe009d764b75159"}
-0|live-arb-worker  | [sx.bet] /markets/active page 17 ← pageMarkets=50, nextKey=692bae04af47c968ab850df1
-0|live-arb-worker  | [sx.bet] /markets/active page 18 → requesting params={"pageSize":50,"paginationKey":"692bae04af47c968ab850df1"}
-0|live-arb-worker  | [sx.bet] /markets/active page 18 ← pageMarkets=50, nextKey=692bbf409972e264c9a17beb
-0|live-arb-worker  | [sx.bet] /markets/active page 19 → requesting params={"pageSize":50,"paginationKey":"692bbf409972e264c9a17beb"}
-0|live-arb-worker  | [sx.bet] /markets/active page 19 ← pageMarkets=50, nextKey=692bd74de5da5c74613a756a
-0|live-arb-worker  | [sx.bet] /markets/active page 20 → requesting params={"pageSize":50,"paginationKey":"692bd74de5da5c74613a756a"}
-0|live-arb-worker  | [KALSHI-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [KALSHI-WS] State changed to connecting
-0|live-arb-worker  | [KALSHI-WS] Connecting to wss://trading-api.kalshi.com/trade-api/ws/v2...
-0|live-arb-worker  | [SXBET-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [SXBET-WS] State changed to connecting
-0|live-arb-worker  | [SXBET-WS] Connecting to wss://api.sx.bet/ws...
-0|live-arb-worker  | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb-worker  | [KALSHI-WS] Connection closed { code: 1006, reason: '' }
-0|live-arb-worker  | [KALSHI-WS] State change: connecting → reconnecting
-0|live-arb-worker  | [KALSHI-WS] State changed to reconnecting
-0|live-arb-worker  | [KALSHI-WS] Scheduling reconnect attempt 3 in 4000ms { delayMs: 4000 }
-0|live-arb-worker  | [KALSHI-WS] Reconnection failed {
-0|live-arb-worker  |   error: Error: Unexpected server response: 401
-0|live-arb-worker  |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb-worker  |       at ClientRequest.emit (node:events:517:28)
-0|live-arb-worker  |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb-worker  |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb-worker  |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb-worker  |       at TLSSocket.emit (node:events:517:28)
-0|live-arb-worker  |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb-worker  |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb-worker  |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb-worker  |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb-worker  | }
-0|live-arb-worker  | [sx.bet] /markets/active page 20 ← pageMarkets=50, nextKey=692bf37ddfc85555ee61b353
-0|live-arb-worker  | [sx.bet] /markets/active page 21 → requesting params={"pageSize":50,"paginationKey":"692bf37ddfc85555ee61b353"}
-0|live-arb-worker  | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb-worker  | [SXBET-WS] State change: connecting → error
-0|live-arb-worker  | [SXBET-WS] State changed to error
-0|live-arb-worker  | [SXBET-WS] Connection closed { code: 1006, reason: 'unknown' }
-0|live-arb-worker  | [SXBET-WS] State change: error → reconnecting
-0|live-arb-worker  | [SXBET-WS] State changed to reconnecting
-0|live-arb-worker  | [SXBET-WS] Scheduling reconnect attempt 3 in 4000ms { delayMs: 4000 }
-0|live-arb-worker  | [SXBET-WS] Resubscribing to 0 markets
-0|live-arb-worker  | [SXBET-WS] Subscribed to best-odds stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to live-scores stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to line-changes stream
-0|live-arb-worker  | [sx.bet] /markets/active page 21 ← pageMarkets=50, nextKey=692c432ace7ec301e6d17714
-0|live-arb-worker  | [sx.bet] /markets/active page 22 → requesting params={"pageSize":50,"paginationKey":"692c432ace7ec301e6d17714"}
-0|live-arb-worker  | [Polymarket Gamma] Page 3 summary: raw=500, tradable=500, cumulativeTradable=1500.
-0|live-arb-worker  | [Polymarket Gamma] Fetching /markets page {
-0|live-arb-worker  |   page: 4,
-0|live-arb-worker  |   limit: 500,
-0|live-arb-worker  |   offset: 1500,
-0|live-arb-worker  |   filters: {
-0|live-arb-worker  |     closed: 'false',
-0|live-arb-worker  |     end_date_min: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     end_date_max: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   }
-0|live-arb-worker  | }
-0|live-arb-worker  | [sx.bet] /markets/active page 22 ← pageMarkets=50, nextKey=692c51138e3368cbb07b9127
-0|live-arb-worker  | [sx.bet] /markets/active page 23 → requesting params={"pageSize":50,"paginationKey":"692c51138e3368cbb07b9127"}
-0|live-arb-worker  | [sx.bet] /markets/active page 23 ← pageMarkets=50, nextKey=692c511afe9c4e0277529ff9
-0|live-arb-worker  | [sx.bet] /markets/active page 24 → requesting params={"pageSize":50,"paginationKey":"692c511afe9c4e0277529ff9"}
-0|live-arb-worker  | [sx.bet] /markets/active page 24 ← pageMarkets=50, nextKey=692c5151fe9c4e027752a15c
-0|live-arb-worker  | [sx.bet] /markets/active page 25 → requesting params={"pageSize":50,"paginationKey":"692c5151fe9c4e027752a15c"}
-0|live-arb-worker  | [sx.bet] /markets/active page 25 ← pageMarkets=50, nextKey=692c52b8c4efddef1ce690dd
-0|live-arb-worker  | [sx.bet] /markets/active page 26 → requesting params={"pageSize":50,"paginationKey":"692c52b8c4efddef1ce690dd"}
-0|live-arb-worker  | [sx.bet] /markets/active page 26 ← pageMarkets=50, nextKey=692c5d69bf0514046506c303
-0|live-arb-worker  | [sx.bet] /markets/active page 27 → requesting params={"pageSize":50,"paginationKey":"692c5d69bf0514046506c303"}
-0|live-arb-worker  | [sx.bet] /markets/active page 27 ← pageMarkets=50, nextKey=692c5e094b7f2616df443772
-0|live-arb-worker  | [sx.bet] /markets/active page 28 → requesting params={"pageSize":50,"paginationKey":"692c5e094b7f2616df443772"}
-0|live-arb-worker  | [Polymarket Gamma] Page 4 summary: raw=500, tradable=500, cumulativeTradable=2000.
-0|live-arb-worker  | [Polymarket Gamma] Collected 2000 tradable markets out of 2000 raw across 4 page(s) (stopped because reached maxMarkets cap (2000)).
-0|live-arb-worker  | [Polymarket Gamma] 2000 tradable markets out of 2000 raw entries for window 2025-11-30T20:55:30.224Z → 2025-12-10T20:55:30.224Z.
-0|live-arb-worker  | [Polymarket] Filter breakdown (window 2025-11-30T20:55:30.224Z → 2025-12-10T20:55:30.224Z): raw=2000, kept=1996, skippedByExpiry=4, skippedByPrice=0.
-0|live-arb-worker  | [Polymarket] Skipping by expiry (sample): [
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x6cd827626df41b698b234e79cce1757918e2bf21b47a746a21f24d74c7fe6ef3',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     question: 'Will Apple acquire Mistral by November 30?',
-0|live-arb-worker  |     sportsMarketType: null,
-0|live-arb-worker  |     gameId: null,
-0|live-arb-worker  |     eventStartTime: null,
-0|live-arb-worker  |     gameStartTime: null,
-0|live-arb-worker  |     endDate: '2025-11-30T00:00:00.000Z',
-0|live-arb-worker  |     endDateIso: '2025-11-30T00:00:00.000Z',
-0|live-arb-worker  |     umaEndDate: null,
-0|live-arb-worker  |     umaEndDateIso: null,
-0|live-arb-worker  |     derivedExpiry: '2025-11-30T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso',
-0|live-arb-worker  |     windowStart: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     windowEnd: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x59c26d8eefea4029f991dd8ec94bb742762da267bb074faacbdc86c63eca1df2',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     question: 'Will Russia capture Rodynske by November 30?',
-0|live-arb-worker  |     sportsMarketType: null,
-0|live-arb-worker  |     gameId: null,
-0|live-arb-worker  |     eventStartTime: null,
-0|live-arb-worker  |     gameStartTime: null,
-0|live-arb-worker  |     endDate: '2025-11-30T00:00:00.000Z',
-0|live-arb-worker  |     endDateIso: '2025-11-30T00:00:00.000Z',
-0|live-arb-worker  |     umaEndDate: null,
-0|live-arb-worker  |     umaEndDateIso: null,
-0|live-arb-worker  |     derivedExpiry: '2025-11-30T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso',
-0|live-arb-worker  |     windowStart: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     windowEnd: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x4ae98f18125f22bd0881be15874b982658026bab26be58b8ef46dad652606023',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     question: 'Will Microstrategy announce a Bitcoin purchase November 25-December 1?',
-0|live-arb-worker  |     sportsMarketType: null,
-0|live-arb-worker  |     gameId: null,
-0|live-arb-worker  |     eventStartTime: '2025-11-25T05:00:00.000Z',
-0|live-arb-worker  |     gameStartTime: null,
-0|live-arb-worker  |     endDate: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     endDateIso: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     umaEndDate: null,
-0|live-arb-worker  |     umaEndDateIso: null,
-0|live-arb-worker  |     derivedExpiry: '2025-11-25T05:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'eventStartTime',
-0|live-arb-worker  |     windowStart: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     windowEnd: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x936da33ec0a9ad43a2dce312ccadbc0593447e81c262603002cdf61ab9c33fd2',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     question: 'MicroStrategy announces >1000 BTC purchase November 25-December 1?',
-0|live-arb-worker  |     sportsMarketType: null,
-0|live-arb-worker  |     gameId: null,
-0|live-arb-worker  |     eventStartTime: '2025-11-25T05:00:00.000Z',
-0|live-arb-worker  |     gameStartTime: null,
-0|live-arb-worker  |     endDate: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     endDateIso: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     umaEndDate: null,
-0|live-arb-worker  |     umaEndDateIso: null,
-0|live-arb-worker  |     derivedExpiry: '2025-11-25T05:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'eventStartTime',
-0|live-arb-worker  |     windowStart: '2025-11-30T20:55:30.224Z',
-0|live-arb-worker  |     windowEnd: '2025-12-10T20:55:30.224Z'
-0|live-arb-worker  |   }
-0|live-arb-worker  | ]
-0|live-arb-worker  | [Polymarket] gameStartTime: usedForSports=1075, ignoredAsNonSports=128.
-0|live-arb-worker  | [Polymarket] Sample markets using gameStartTime for expiry: [
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xcfbab87fa04925b8db7c8768535514e6b4cddfb4e7d3a372f7f51cd73d4f29ae',
-0|live-arb-worker  |     question: 'Will Fenerbahçe SK win on 2025-12-01?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T17:00:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T17:00:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xfd2a6b90817d52ba90ce5cf9d747437a2e0dd9391851c31b0290b49cdcf74da0',
-0|live-arb-worker  |     question: 'Will Fenerbahçe SK vs. Galatasaray SK end in a draw?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T17:00:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T17:00:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xfac4ed87031fb857179cb581747f58c0be9b037e4c0b1b05d93d4a81e1b99d0a',
-0|live-arb-worker  |     question: 'Will Galatasaray SK win on 2025-12-01?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T17:00:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T17:00:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x0956d882032da2aaef71909d822243cbbf83b1de1cda95e94851894b48c2dbac',
-0|live-arb-worker  |     question: 'Will Samsunspor win on 2025-12-01?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T17:00:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T17:00:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xbfbf2bec8f9a64fdc349194b1014961f00cce0282565b6d72ef529a525bf1434',
-0|live-arb-worker  |     question: 'Will Samsunspor vs. Alanyaspor end in a draw?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T17:00:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T17:00:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xf4f1c6babd3c3ac28e94f6c8802e3727ff9744970973a53bddc35090ae8e051c',
-0|live-arb-worker  |     question: 'Will Alanyaspor win on 2025-12-01?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T17:00:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T17:00:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x83fcc627c76935bb327dba897641ba29e9241f973c463e58e46c54826468d9ee',
-0|live-arb-worker  |     question: 'Will FK Sochi win on 2025-12-01?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T16:30:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T16:30:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xbeb95176c51c1e625f90ea5bd72324fbec7421d7714d15476e53e6ac5b6d901c',
-0|live-arb-worker  |     question: 'Will FK Sochi vs. FK Dinamo Makhachkala end in a draw?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T16:30:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T16:30:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xfc0235e4b394a6f3d252d0cfbc96b003a03d5ba62525d4d8ffb4b4e0f264fca1',
-0|live-arb-worker  |     question: 'Will FK Dinamo Makhachkala win on 2025-12-01?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T16:30:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T16:30:00.000Z'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xf90cfa879790a04fca0f3f7d91861d87f8674653c68bb79fadcf742f7f3071f9',
-0|live-arb-worker  |     question: 'Will Brøndby IF win on 2025-12-01?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-12-01T18:00:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-01T18:00:00.000Z'
-0|live-arb-worker  |   }
-0|live-arb-worker  | ]
-0|live-arb-worker  | [Polymarket] gameStartTime ignored for non-sports markets (sample): [
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x7c27e0e039c587c0dd63104ddb3031fd635cfc1e1b011c748259a54cb942bf0e',
-0|live-arb-worker  |     question: 'Will Jody Barrett win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xcecf5bd4aebcda50818f73a755cd5d35080658e20bae41cb8339761963109e5f',
-0|live-arb-worker  |     question: 'Will Aftyn Behn win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xc40fa670744916b201f1e00e7f52f15448deaedb68d84ad25807e219e7d49402',
-0|live-arb-worker  |     question: 'Will Gino Bulso win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xa4dee20fb53121c0bf21cbb9c6ba975883e150a19b2af98029b0c8c7f17b8188',
-0|live-arb-worker  |     question: 'Will Darden Copeland win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x844780ede82f45209ff767a0827d5b61b2e617308145bdf2c24a54015b6afec3',
-0|live-arb-worker  |     question: 'Will Vincent Dixie win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xce92edd1bc80d108134adaee49bb889ab5cfa87a9d441836c159695b1154c9a5',
-0|live-arb-worker  |     question: 'Will Jason Knight win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0xee24db5258a8c846244454bf67abec9a51d7d54fdd8b856541dba14bde21efa2',
-0|live-arb-worker  |     question: 'Will Bo Mitchell win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x5e67e5c2405d9eec82a7cc68a41fb6e9afe2221754397ddb5ff13c382f6ec58d',
-0|live-arb-worker  |     question: 'Will Stewart Parks win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x6abdb2f59bab899d206c66fd533edf19919d3d2bd2a176bb9a98c63f880edc3b',
-0|live-arb-worker  |     question: 'Will Lee Reeves win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   },
-0|live-arb-worker  |   {
-0|live-arb-worker  |     conditionId: '0x92c863de3e818302bdfe388e1aca9b314742e463aae220844297b3ace904e04f',
-0|live-arb-worker  |     question: 'Will Jon Thorp win TN-7 Special Election?',
-0|live-arb-worker  |     source: 'gamma',
-0|live-arb-worker  |     gameStartTime: '2025-09-10T18:15:00.000Z',
-0|live-arb-worker  |     derivedExpiry: '2025-12-02T00:00:00.000Z',
-0|live-arb-worker  |     derivedExpirySource: 'endDateIso'
-0|live-arb-worker  |   }
-0|live-arb-worker  | ]
-0|live-arb-worker  | [sx.bet] /markets/active page 28 ← pageMarkets=50, nextKey=692c60b0bf0514046506cbe4
-0|live-arb-worker  | [sx.bet] /markets/active page 29 → requesting params={"pageSize":50,"paginationKey":"692c60b0bf0514046506cbe4"}
-0|live-arb-worker  | [sx.bet] /markets/active page 29 ← pageMarkets=50, nextKey=692c65d3fdffe87b7647ded5
-0|live-arb-worker  | [sx.bet] /markets/active page 30 → requesting params={"pageSize":50,"paginationKey":"692c65d3fdffe87b7647ded5"}
-0|live-arb-worker  | [sx.bet] /markets/active page 30 ← pageMarkets=50, nextKey=692c681efdffe87b7647ead3
-0|live-arb-worker  | [sx.bet] /markets/active page 31 → requesting params={"pageSize":50,"paginationKey":"692c681efdffe87b7647ead3"}
-0|live-arb-worker  | [sx.bet] /markets/active page 31 ← pageMarkets=50, nextKey=692c6d63b9e07ac0b4ca2807
-0|live-arb-worker  | [sx.bet] /markets/active page 32 → requesting params={"pageSize":50,"paginationKey":"692c6d63b9e07ac0b4ca2807"}
-0|live-arb-worker  | [sx.bet] /markets/active page 32 ← pageMarkets=50, nextKey=692c6e48b9e07ac0b4ca2d41
-0|live-arb-worker  | [sx.bet] /markets/active page 33 → requesting params={"pageSize":50,"paginationKey":"692c6e48b9e07ac0b4ca2d41"}
-0|live-arb-worker  | [sx.bet] /markets/active page 33 ← pageMarkets=50, nextKey=692c74644b7f2616df449bb8
-0|live-arb-worker  | [sx.bet] /markets/active page 34 → requesting params={"pageSize":50,"paginationKey":"692c74644b7f2616df449bb8"}
-0|live-arb-worker  | [sx.bet] /markets/active page 34 ← pageMarkets=50, nextKey=692c76b9ead504056a734c5f
-0|live-arb-worker  | [sx.bet] /markets/active page 35 → requesting params={"pageSize":50,"paginationKey":"692c76b9ead504056a734c5f"}
-0|live-arb-worker  | [sx.bet] /markets/active page 35 ← pageMarkets=50, nextKey=692c7911ead504056a735e21
-0|live-arb-worker  | [sx.bet] /markets/active page 36 → requesting params={"pageSize":50,"paginationKey":"692c7911ead504056a735e21"}
-0|live-arb-worker  | [sx.bet] /markets/active page 36 ← pageMarkets=50, nextKey=692c83b15efb91dc101d32d3
-0|live-arb-worker  | [sx.bet] /markets/active page 37 → requesting params={"pageSize":50,"paginationKey":"692c83b15efb91dc101d32d3"}
-0|live-arb-worker  | [sx.bet] /markets/active page 37 ← pageMarkets=50, nextKey=692c8901d803da4eb0bf76a7
-0|live-arb-worker  | [sx.bet] /markets/active page 38 → requesting params={"pageSize":50,"paginationKey":"692c8901d803da4eb0bf76a7"}
-0|live-arb-worker  | [sx.bet] /markets/active page 38 ← pageMarkets=50, nextKey=692c8bfd82ac94a447db78c5
-0|live-arb-worker  | [sx.bet] /markets/active page 39 → requesting params={"pageSize":50,"paginationKey":"692c8bfd82ac94a447db78c5"}
-0|live-arb-worker  | [sx.bet] /markets/active page 39 ← pageMarkets=50, nextKey=692c8f221cb6cda5eea9fb21
-0|live-arb-worker  | [sx.bet] /markets/active page 40 → requesting params={"pageSize":50,"paginationKey":"692c8f221cb6cda5eea9fb21"}
-0|live-arb-worker  | [sx.bet] /markets/active page 40 ← pageMarkets=50, nextKey=692c93a982ac94a447db94ae
-0|live-arb-worker  | [sx.bet] /markets/active page 41 → requesting params={"pageSize":50,"paginationKey":"692c93a982ac94a447db94ae"}
-0|live-arb-worker  | [sx.bet] /markets/active page 41 ← pageMarkets=50, nextKey=692c9844b83eaeb18b415717
-0|live-arb-worker  | [sx.bet] /markets/active page 42 → requesting params={"pageSize":50,"paginationKey":"692c9844b83eaeb18b415717"}
-0|live-arb-worker  | [sx.bet] /markets/active page 42 ← pageMarkets=50, nextKey=692c9e60008ad3a2322e7893
-0|live-arb-worker  | [sx.bet] /markets/active page 43 → requesting params={"pageSize":50,"paginationKey":"692c9e60008ad3a2322e7893"}
-0|live-arb-worker  | [sx.bet] /markets/active page 43 ← pageMarkets=50, nextKey=692ca29e96603d281f4ddcd3
-0|live-arb-worker  | [sx.bet] /markets/active page 44 → requesting params={"pageSize":50,"paginationKey":"692ca29e96603d281f4ddcd3"}
-0|live-arb-worker  | [sx.bet] /markets/active page 44 ← pageMarkets=50, nextKey=692ca6b4a397862d79ffcecc
-0|live-arb-worker  | [sx.bet] /markets/active page 45 → requesting params={"pageSize":50,"paginationKey":"692ca6b4a397862d79ffcecc"}
-0|live-arb-worker  | [sx.bet] /markets/active page 45 ← pageMarkets=50, nextKey=692caa15748fd6313575d8f2
-0|live-arb-worker  | [sx.bet] /markets/active page 46 → requesting params={"pageSize":50,"paginationKey":"692caa15748fd6313575d8f2"}
-0|live-arb-worker  | [sx.bet] /markets/active page 46 ← pageMarkets=50, nextKey=692cad1bf187d75042513f90
-0|live-arb-worker  | [sx.bet] /markets/active page 47 → requesting params={"pageSize":50,"paginationKey":"692cad1bf187d75042513f90"}
-0|live-arb-worker  | [sx.bet] /markets/active page 47 ← pageMarkets=50, nextKey=692caf46a77136021681266b
-0|live-arb-worker  | [sx.bet] /markets/active page 48 → requesting params={"pageSize":50,"paginationKey":"692caf46a77136021681266b"}
-0|live-arb-worker  | [sx.bet] /markets/active page 48 ← pageMarkets=0, nextKey=∅
-0|live-arb-worker  | [sx.bet] Collected 2350 active markets across 48 page(s) (stop=nextKey empty).
-0|live-arb-worker  | [sx.bet] Odds hydration starting: totalInWindow=1081, reusedFromSnapshot=0, toFetch=1081
-0|live-arb-worker  | [KALSHI-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [KALSHI-WS] State changed to connecting
-0|live-arb-worker  | [KALSHI-WS] Connecting to wss://trading-api.kalshi.com/trade-api/ws/v2...
-0|live-arb-worker  | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb-worker  | [KALSHI-WS] Connection closed { code: 1006, reason: '' }
-0|live-arb-worker  | [KALSHI-WS] State change: connecting → reconnecting
-0|live-arb-worker  | [KALSHI-WS] State changed to reconnecting
-0|live-arb-worker  | [KALSHI-WS] Scheduling reconnect attempt 4 in 8000ms { delayMs: 8000 }
-0|live-arb-worker  | [KALSHI-WS] Reconnection failed {
-0|live-arb-worker  |   error: Error: Unexpected server response: 401
-0|live-arb-worker  |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb-worker  |       at ClientRequest.emit (node:events:517:28)
-0|live-arb-worker  |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb-worker  |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb-worker  |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb-worker  |       at TLSSocket.emit (node:events:517:28)
-0|live-arb-worker  |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb-worker  |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb-worker  |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb-worker  |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb-worker  | }
-0|live-arb-worker  | [SXBET-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [SXBET-WS] State changed to connecting
-0|live-arb-worker  | [SXBET-WS] Connecting to wss://api.sx.bet/ws...
-0|live-arb-worker  | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb-worker  | [SXBET-WS] State change: connecting → error
-0|live-arb-worker  | [SXBET-WS] State changed to error
-0|live-arb-worker  | [SXBET-WS] Connection closed { code: 1006, reason: 'unknown' }
-0|live-arb-worker  | [SXBET-WS] State change: error → reconnecting
-0|live-arb-worker  | [SXBET-WS] State changed to reconnecting
-0|live-arb-worker  | [SXBET-WS] Scheduling reconnect attempt 4 in 8000ms { delayMs: 8000 }
-0|live-arb-worker  | [SXBET-WS] Resubscribing to 0 markets
-0|live-arb-worker  | [SXBET-WS] Subscribed to best-odds stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to live-scores stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to line-changes stream
-0|live-arb-worker  | [sx.bet] Rate limited while hydrating odds (chunk=25, attempt=1); retrying in 10000ms.
-0|live-arb-worker  | [LiveEvents] Matcher results {
-0|live-arb-worker  |   totalGroups: 0,
-0|live-arb-worker  |   liveGroups: 0,
-0|live-arb-worker  |   preGroups: 0,
-0|live-arb-worker  |   threeWayMatches: 0,
-0|live-arb-worker  |   twoWayMatches: 0,
-0|live-arb-worker  |   bySport: {}
-0|live-arb-worker  | }
-0|live-arb-worker  | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
-0|live-arb-worker  | [KALSHI-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [KALSHI-WS] State changed to connecting
-0|live-arb-worker  | [KALSHI-WS] Connecting to wss://trading-api.kalshi.com/trade-api/ws/v2...
-0|live-arb-worker  | [KALSHI-WS] WebSocket error { message: 'Unexpected server response: 401' }
-0|live-arb-worker  | [KALSHI-WS] Connection closed { code: 1006, reason: '' }
-0|live-arb-worker  | [KALSHI-WS] State change: connecting → reconnecting
-0|live-arb-worker  | [KALSHI-WS] State changed to reconnecting
-0|live-arb-worker  | [KALSHI-WS] Scheduling reconnect attempt 5 in 16000ms { delayMs: 16000 }
-0|live-arb-worker  | [KALSHI-WS] Reconnection failed {
-0|live-arb-worker  |   error: Error: Unexpected server response: 401
-0|live-arb-worker  |       at ClientRequest.<anonymous> (/opt/algobet/node_modules/ws/lib/websocket.js:913:7)
-0|live-arb-worker  |       at ClientRequest.emit (node:events:517:28)
-0|live-arb-worker  |       at HTTPParser.parserOnIncomingClient (node:_http_client:700:27)
-0|live-arb-worker  |       at HTTPParser.parserOnHeadersComplete (node:_http_common:119:17)
-0|live-arb-worker  |       at TLSSocket.socketOnData (node:_http_client:541:22)
-0|live-arb-worker  |       at TLSSocket.emit (node:events:517:28)
-0|live-arb-worker  |       at addChunk (node:internal/streams/readable:368:12)
-0|live-arb-worker  |       at readableAddChunk (node:internal/streams/readable:341:9)
-0|live-arb-worker  |       at Readable.push (node:internal/streams/readable:278:10)
-0|live-arb-worker  |       at TLSWrap.onStreamRead (node:internal/stream_base_commons:190:23)
-0|live-arb-worker  | }
-0|live-arb-worker  | [SXBET-WS] State change: reconnecting → connecting
-0|live-arb-worker  | [SXBET-WS] State changed to connecting
-0|live-arb-worker  | [SXBET-WS] Connecting to wss://api.sx.bet/ws...
-0|live-arb-worker  | [SXBET-WS] WebSocket error { message: 'Unexpected server response: 404' }
-0|live-arb-worker  | [SXBET-WS] State change: connecting → error
-0|live-arb-worker  | [SXBET-WS] State changed to error
-0|live-arb-worker  | [SXBET-WS] Connection closed { code: 1006, reason: 'unknown' }
-0|live-arb-worker  | [SXBET-WS] State change: error → reconnecting
-0|live-arb-worker  | [SXBET-WS] State changed to reconnecting
-0|live-arb-worker  | [SXBET-WS] Scheduling reconnect attempt 5 in 16000ms { delayMs: 16000 }
-0|live-arb-worker  | [SXBET-WS] Resubscribing to 0 markets
-0|live-arb-worker  | [SXBET-WS] Subscribed to best-odds stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to live-scores stream
-0|live-arb-worker  | [SXBET-WS] Subscribed to line-changes stream
-0|live-arb-worker  | [LiveEvents] Matcher results {
-0|live-arb-worker  |   totalGroups: 0,
-0|live-arb-worker  |   liveGroups: 0,
-0|live-arb-worker  |   preGroups: 0,
-0|live-arb-worker  |   threeWayMatches: 0,
-0|live-arb-worker  |   twoWayMatches: 0,
-0|live-arb-worker  |   bySport: {}
-0|live-arb-worker  | }
-0|live-arb-worker  | [LiveEvents] Matcher produced 0 groups – live arb will not run; check vendor events and matching thresholds
+    },
+    "lastRunAt": 0
+  },
+  "matchedGroups": [],
+  "watchers": {
+    "active": 0,
+    "list": [],
+    "stats": {
+      "totalArbChecks": 0,
+      "totalOpportunities": 0,
+      "avgChecksPerSecond": 0,
+      "avgCheckTimeMs": 0,
+      "maxCheckTimeMs": 0,
+      "totalMarketsWatched": 0
+    }
+  },
+  "eventsByPlatform": {
+    "sxbet": 0,
+    "polymarket": 0,
+    "kalshi": 0
+  },
+  "rateLimiter": {
+    "SXBET": {
+      "availableTokens": 10,
+      "totalRequests": 0,
+      "blockedRequests": 0,
+      "config": {
+        "maxRequestsPerSecond": 5,
+        "bucketSize": 10
+      }
+    },
+    "POLYMARKET": {
+      "availableTokens": 10,
+      "totalRequests": 0,
+      "blockedRequests": 0,
+      "config": {
+        "maxRequestsPerSecond": 5,
+        "bucketSize": 10
+      }
+    },
+    "KALSHI": {
+      "availableTokens": 10,
+      "totalRequests": 0,
+      "blockedRequests": 0,
+      "config": {
+        "maxRequestsPerSecond": 5,
+        "bucketSize": 10
+      }
+    }
+  },
+  "stats": {
+    "totalVendorEvents": 0,
+    "liveEvents": 0,
+    "preEvents": 0,
+    "endedEvents": 0,
+    "matchedGroups": 0,
+    "activeWatchers": 0,
+    "arbChecksTotal": 0,
+    "opportunitiesTotal": 0
+  },
+  "generatedAt": 1766359515464
+}

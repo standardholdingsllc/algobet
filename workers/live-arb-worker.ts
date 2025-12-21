@@ -3,7 +3,9 @@ import {
   KVStorage,
   getOrSeedBotConfig,
   updateWorkerHeartbeat,
+  updateLiveEventsSnapshot,
   LiveArbWorkerHeartbeat,
+  LiveEventsSnapshot,
   WorkerPlatformStatus,
   WorkerPriceCacheStats,
   WorkerState,
@@ -25,7 +27,9 @@ import { KalshiAPI } from '../lib/markets/kalshi';
 import { PolymarketAPI } from '../lib/markets/polymarket';
 import { SXBetAPI } from '../lib/markets/sxbet';
 import { LivePriceCache } from '../lib/live-price-cache';
-import { addOrUpdateEvent, markPlatformSnapshot } from '../lib/live-event-registry';
+import { addOrUpdateEvent, markPlatformSnapshot, getSnapshot as getRegistrySnapshot, getRegistryStats } from '../lib/live-event-registry';
+import { getMatchedEvents, getMatcherStats } from '../lib/live-event-matcher';
+import { getActiveWatchers, getWatcherStats } from '../lib/live-event-watchers';
 
 // ============================================================================
 // Configuration
@@ -568,6 +572,9 @@ class LiveArbWorker {
       if (markets.length === 0) {
         liveArbLog('warn', WORKER_TAG, 'Registry refresh returned 0 markets');
       }
+      
+      // Write live events snapshot to KV for the API to read
+      await this.writeLiveEventsSnapshot();
     } catch (error) {
       liveArbLog('error', WORKER_TAG, 'Registry refresh failed', error as Error);
     } finally {
@@ -655,6 +662,93 @@ class LiveArbWorker {
       this.lastTotalMarkets = markets.length;
     } finally {
       this.refreshInProgress = false;
+      
+      // Write live events snapshot to KV for the API to read
+      await this.writeLiveEventsSnapshot();
+    }
+  }
+
+  /**
+   * Write the current live events state to KV for cross-process visibility.
+   * This enables the Vercel serverless API to display event data.
+   */
+  private async writeLiveEventsSnapshot(): Promise<void> {
+    try {
+      const registrySnapshot = getRegistrySnapshot();
+      const matchedGroups = getMatchedEvents();
+      const watchers = getActiveWatchers();
+      const registryStats = getRegistryStats();
+      const watcherStats = getWatcherStats();
+      
+      const snapshot: LiveEventsSnapshot = {
+        updatedAt: new Date().toISOString(),
+        registry: {
+          totalEvents: registrySnapshot.events.length,
+          events: registrySnapshot.events.slice(0, 500).map(e => ({
+            platform: e.platform,
+            vendorMarketId: e.vendorMarketId,
+            sport: e.sport,
+            status: e.status,
+            rawTitle: e.rawTitle,
+            normalizedTitle: e.normalizedTitle,
+            startTime: e.startTime,
+            homeTeam: e.homeTeam,
+            awayTeam: e.awayTeam,
+          })),
+          countByPlatform: registrySnapshot.countByPlatform,
+          countByStatus: registrySnapshot.countByStatus,
+        },
+        matchedGroups: matchedGroups.slice(0, 200).map(g => ({
+          eventKey: g.eventKey,
+          sport: g.sport,
+          status: g.status || 'PRE',
+          homeTeam: g.homeTeam,
+          awayTeam: g.awayTeam,
+          platformCount: g.platformCount,
+          matchQuality: g.matchQuality,
+          vendors: {
+            SXBET: g.vendors.SXBET?.slice(0, 10).map(v => ({
+              vendorMarketId: v.vendorMarketId,
+              rawTitle: v.rawTitle,
+            })),
+            POLYMARKET: g.vendors.POLYMARKET?.slice(0, 10).map(v => ({
+              vendorMarketId: v.vendorMarketId,
+              rawTitle: v.rawTitle,
+            })),
+            KALSHI: g.vendors.KALSHI?.slice(0, 10).map(v => ({
+              vendorMarketId: v.vendorMarketId,
+              rawTitle: v.rawTitle,
+            })),
+          },
+        })),
+        watchers: watchers.slice(0, 100).map(w => ({
+          eventKey: w.eventKey,
+          sport: 'OTHER', // Sport is on the matched group, not the watcher
+          marketCount: Object.values(w.marketCount).reduce((sum, n) => sum + n, 0),
+          lastCheckAt: w.lastArbCheckAt,
+        })),
+        stats: {
+          totalVendorEvents: registryStats.totalEvents,
+          liveEvents: registryStats.byStatus.LIVE || 0,
+          preEvents: registryStats.byStatus.PRE || 0,
+          endedEvents: registryStats.byStatus.ENDED || 0,
+          matchedGroups: matchedGroups.length,
+          threeWayMatches: matchedGroups.filter(g => g.platformCount >= 3).length,
+          twoWayMatches: matchedGroups.filter(g => g.platformCount === 2).length,
+          activeWatchers: watchers.length,
+          arbChecksTotal: watcherStats.totalArbChecks,
+          opportunitiesTotal: watcherStats.totalOpportunities,
+        },
+      };
+      
+      await updateLiveEventsSnapshot(snapshot);
+      liveArbLog('debug', WORKER_TAG, 'Live events snapshot written to KV', {
+        events: snapshot.registry.totalEvents,
+        matchedGroups: snapshot.matchedGroups.length,
+        watchers: snapshot.watchers.length,
+      });
+    } catch (error) {
+      liveArbLog('error', WORKER_TAG, 'Failed to write live events snapshot', error as Error);
     }
   }
 
