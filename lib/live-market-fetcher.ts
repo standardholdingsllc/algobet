@@ -256,12 +256,6 @@ export class LiveMarketFetcher {
     });
   }
 
-  private hasKalshiCredentials(): boolean {
-    const apiKey = process.env.KALSHI_API_KEY || '';
-    const privateKey = process.env.KALSHI_PRIVATE_KEY || '';
-    return Boolean(apiKey && privateKey);
-  }
-
   private async fetchPolymarketMarkets(filters: MarketFilterInput): Promise<Market[]> {
     const windowEnd = filters.windowEnd ? new Date(filters.windowEnd) : undefined;
     const maxDays = windowEnd 

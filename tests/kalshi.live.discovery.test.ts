@@ -219,8 +219,10 @@ interface LiveSnapshot {
   config: {
     sportsGameSeries: string[];
     eventsLimit: number;
-    lookbackHours: number;
-    futureHoursMarket: number;
+    lookbackHours?: number;
+    futureHoursMarket?: number;
+    gameDurationHours?: Record<string, number>;
+    liveBufferHours?: number;
     maxLiveMarkets: number;
     maxEventTickers: number;
   };
