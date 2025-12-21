@@ -1,0 +1,452 @@
+{
+  "generatedAt": "2025-12-20T23:43:02.239Z",
+  "config": {
+    "sportsGameSeries": [
+      "KXNFLGAME",
+      "KXNBAGAME",
+      "KXNHLGAME",
+      "KXMLBGAME",
+      "KXWNBAGAME",
+      "KXMLSGAME",
+      "KXNCAAFGAME",
+      "KXNCAABGAME",
+      "KXNCAAWGAME",
+      "KXCFBGAME",
+      "KXCBBGAME",
+      "KXSOCCER",
+      "KXEPLGAME",
+      "KXUCLGAME",
+      "KXLALIGAGAME",
+      "KXBUNDESLIGAGAME",
+      "KXSABORAGAME",
+      "KXLIGUE1GAME",
+      "KXLIGAMXGAME",
+      "KXWORLDCUP",
+      "KXEUROGAME",
+      "KXUFCFIGHT",
+      "KXUFC",
+      "KXBOXING",
+      "KXBOX",
+      "KXMMAFIGHT",
+      "KXPFL",
+      "KXBELLATOR",
+      "KXTENNIS",
+      "KXTENNISGAME",
+      "KXGOLF",
+      "KXPGATOUR",
+      "KXF1RACE",
+      "KXNASCAR",
+      "KXINDYCAR",
+      "KXRUGBY",
+      "KXCRICKET",
+      "KXESPORTS",
+      "KXLOLGAME",
+      "KXCSGOGAME",
+      "KXDOTA2GAME"
+    ],
+    "eventsLimit": 100,
+    "gameDurationHours": {
+      "KXNFLGAME": 4,
+      "KXNCAAFGAME": 4,
+      "KXNBAGAME": 3,
+      "KXNCAABGAME": 2.5,
+      "KXNHLGAME": 3,
+      "KXMLBGAME": 3.5,
+      "KXEPLGAME": 2,
+      "KXLALIGAGAME": 2,
+      "KXBUNDESLIGAGAME": 2,
+      "KXUCLGAME": 2,
+      "KXBOXING": 4,
+      "KXUFCFIGHT": 4,
+      "DEFAULT": 3
+    },
+    "liveBufferHours": 1,
+    "maxLiveMarkets": 300,
+    "maxEventTickers": 200
+  },
+  "counts": {
+    "seriesQueried": 41,
+    "totalEventsFound": 149,
+    "liveEvents": 15,
+    "eventTickers": 15,
+    "marketsRequestsMade": 0,
+    "totalMarketsFetched": 30,
+    "liveMarketsFiltered": 30
+  },
+  "liveEvents": [
+    {
+      "event_ticker": "KXNFLGAME-25DEC20GBCHI",
+      "title": "Green Bay at Chicago",
+      "series_ticker": "KXNFLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNFLGAME-25DEC20PHIWAS",
+      "title": "Philadelphia at Washington",
+      "series_ticker": "KXNFLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNBAGAME-25DEC20CHADET",
+      "title": "Charlotte vs Detroit",
+      "series_ticker": "KXNBAGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNBAGAME-25DEC20INDNOP",
+      "title": "Indiana vs New Orleans",
+      "series_ticker": "KXNBAGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNBAGAME-25DEC20DALPHI",
+      "title": "Dallas vs Philadelphia",
+      "series_ticker": "KXNBAGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNBAGAME-25DEC20BOSTOR",
+      "title": "Boston vs Toronto",
+      "series_ticker": "KXNBAGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNBAGAME-25DEC20HOUDEN",
+      "title": "Houston vs Denver",
+      "series_ticker": "KXNBAGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNHLGAME-25DEC20VANBOS",
+      "title": "Vancouver vs Boston",
+      "series_ticker": "KXNHLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNHLGAME-25DEC20TORNSH",
+      "title": "Toronto vs Nashville",
+      "series_ticker": "KXNHLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNHLGAME-25DEC20PITMTL",
+      "title": "Pittsburgh vs Montreal",
+      "series_ticker": "KXNHLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNHLGAME-25DEC20CARTB",
+      "title": "Carolina vs Tampa Bay",
+      "series_ticker": "KXNHLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNHLGAME-25DEC20STLFLA",
+      "title": "St. Louis vs Florida",
+      "series_ticker": "KXNHLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNHLGAME-25DEC20NYIBUF",
+      "title": "New York I vs Buffalo",
+      "series_ticker": "KXNHLGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNCAAFGAME-25DEC20JMUORE",
+      "title": "James Madison at Oregon",
+      "series_ticker": "KXNCAAFGAME",
+      "market_count": 2
+    },
+    {
+      "event_ticker": "KXNCAAFGAME-25DEC20TULNMISS",
+      "title": "Tulane at Ole Miss",
+      "series_ticker": "KXNCAAFGAME",
+      "market_count": 2
+    }
+  ],
+  "markets": [
+    {
+      "ticker": "KXNFLGAME-25DEC20GBCHI-GB",
+      "event_ticker": "KXNFLGAME-25DEC20GBCHI",
+      "title": "Green Bay at Chicago Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T04:20:00Z",
+      "close_time": "2026-01-04T01:20:00Z"
+    },
+    {
+      "ticker": "KXNFLGAME-25DEC20GBCHI-CHI",
+      "event_ticker": "KXNFLGAME-25DEC20GBCHI",
+      "title": "Green Bay at Chicago Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T04:20:00Z",
+      "close_time": "2026-01-04T01:20:00Z"
+    },
+    {
+      "ticker": "KXNFLGAME-25DEC20PHIWAS-WAS",
+      "event_ticker": "KXNFLGAME-25DEC20PHIWAS",
+      "title": "Philadelphia at Washington Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T01:00:00Z",
+      "close_time": "2026-01-03T22:00:00Z"
+    },
+    {
+      "ticker": "KXNFLGAME-25DEC20PHIWAS-PHI",
+      "event_ticker": "KXNFLGAME-25DEC20PHIWAS",
+      "title": "Philadelphia at Washington Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T01:00:00Z",
+      "close_time": "2026-01-03T22:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20CHADET-DET",
+      "event_ticker": "KXNBAGAME-25DEC20CHADET",
+      "title": "Charlotte vs Detroit Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:30:00Z",
+      "close_time": "2026-01-04T00:30:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20CHADET-CHA",
+      "event_ticker": "KXNBAGAME-25DEC20CHADET",
+      "title": "Charlotte vs Detroit Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:30:00Z",
+      "close_time": "2026-01-04T00:30:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20INDNOP-NOP",
+      "event_ticker": "KXNBAGAME-25DEC20INDNOP",
+      "title": "Indiana vs New Orleans Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20INDNOP-IND",
+      "event_ticker": "KXNBAGAME-25DEC20INDNOP",
+      "title": "Indiana vs New Orleans Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20DALPHI-PHI",
+      "event_ticker": "KXNBAGAME-25DEC20DALPHI",
+      "title": "Dallas vs Philadelphia Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20DALPHI-DAL",
+      "event_ticker": "KXNBAGAME-25DEC20DALPHI",
+      "title": "Dallas vs Philadelphia Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20BOSTOR-TOR",
+      "event_ticker": "KXNBAGAME-25DEC20BOSTOR",
+      "title": "Boston vs Toronto Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20BOSTOR-BOS",
+      "event_ticker": "KXNBAGAME-25DEC20BOSTOR",
+      "title": "Boston vs Toronto Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20HOUDEN-HOU",
+      "event_ticker": "KXNBAGAME-25DEC20HOUDEN",
+      "title": "Houston vs Denver Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T01:00:00Z",
+      "close_time": "2026-01-03T22:00:00Z"
+    },
+    {
+      "ticker": "KXNBAGAME-25DEC20HOUDEN-DEN",
+      "event_ticker": "KXNBAGAME-25DEC20HOUDEN",
+      "title": "Houston vs Denver Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T01:00:00Z",
+      "close_time": "2026-01-03T22:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20VANBOS-VAN",
+      "event_ticker": "KXNHLGAME-25DEC20VANBOS",
+      "title": "Vancouver vs Boston Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20VANBOS-BOS",
+      "event_ticker": "KXNHLGAME-25DEC20VANBOS",
+      "title": "Vancouver vs Boston Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20TORNSH-TOR",
+      "event_ticker": "KXNHLGAME-25DEC20TORNSH",
+      "title": "Toronto vs Nashville Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20TORNSH-NSH",
+      "event_ticker": "KXNHLGAME-25DEC20TORNSH",
+      "title": "Toronto vs Nashville Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20PITMTL-PIT",
+      "event_ticker": "KXNHLGAME-25DEC20PITMTL",
+      "title": "Pittsburgh vs Montreal Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20PITMTL-MTL",
+      "event_ticker": "KXNHLGAME-25DEC20PITMTL",
+      "title": "Pittsburgh vs Montreal Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20CARTB-TB",
+      "event_ticker": "KXNHLGAME-25DEC20CARTB",
+      "title": "Carolina vs Tampa Bay Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20CARTB-CAR",
+      "event_ticker": "KXNHLGAME-25DEC20CARTB",
+      "title": "Carolina vs Tampa Bay Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:00:00Z",
+      "close_time": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20STLFLA-STL",
+      "event_ticker": "KXNHLGAME-25DEC20STLFLA",
+      "title": "St. Louis vs Florida Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T02:00:00Z",
+      "close_time": "2026-01-03T23:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20STLFLA-FLA",
+      "event_ticker": "KXNHLGAME-25DEC20STLFLA",
+      "title": "St. Louis vs Florida Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T02:00:00Z",
+      "close_time": "2026-01-03T23:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20NYIBUF-NYI",
+      "event_ticker": "KXNHLGAME-25DEC20NYIBUF",
+      "title": "New York I vs Buffalo Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T01:00:00Z",
+      "close_time": "2026-01-03T22:00:00Z"
+    },
+    {
+      "ticker": "KXNHLGAME-25DEC20NYIBUF-BUF",
+      "event_ticker": "KXNHLGAME-25DEC20NYIBUF",
+      "title": "New York I vs Buffalo Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T01:00:00Z",
+      "close_time": "2026-01-03T22:00:00Z"
+    },
+    {
+      "ticker": "KXNCAAFGAME-25DEC20JMUORE-ORE",
+      "event_ticker": "KXNCAAFGAME-25DEC20JMUORE",
+      "title": "James Madison at Oregon Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:30:00Z",
+      "close_time": "2026-01-04T00:30:00Z"
+    },
+    {
+      "ticker": "KXNCAAFGAME-25DEC20JMUORE-JMU",
+      "event_ticker": "KXNCAAFGAME-25DEC20JMUORE",
+      "title": "James Madison at Oregon Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-21T03:30:00Z",
+      "close_time": "2026-01-04T00:30:00Z"
+    },
+    {
+      "ticker": "KXNCAAFGAME-25DEC20TULNMISS-TULN",
+      "event_ticker": "KXNCAAFGAME-25DEC20TULNMISS",
+      "title": "Tulane at Ole Miss Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-20T23:30:00Z",
+      "close_time": "2026-01-03T20:30:00Z"
+    },
+    {
+      "ticker": "KXNCAAFGAME-25DEC20TULNMISS-MISS",
+      "event_ticker": "KXNCAAFGAME-25DEC20TULNMISS",
+      "title": "Tulane at Ole Miss Winner?",
+      "status": "active",
+      "expected_expiration_time": "2025-12-20T23:30:00Z",
+      "close_time": "2026-01-03T20:30:00Z"
+    }
+  ],
+  "marketTickers": [
+    "KXNFLGAME-25DEC20GBCHI-GB",
+    "KXNFLGAME-25DEC20GBCHI-CHI",
+    "KXNFLGAME-25DEC20PHIWAS-WAS",
+    "KXNFLGAME-25DEC20PHIWAS-PHI",
+    "KXNBAGAME-25DEC20CHADET-DET",
+    "KXNBAGAME-25DEC20CHADET-CHA",
+    "KXNBAGAME-25DEC20INDNOP-NOP",
+    "KXNBAGAME-25DEC20INDNOP-IND",
+    "KXNBAGAME-25DEC20DALPHI-PHI",
+    "KXNBAGAME-25DEC20DALPHI-DAL",
+    "KXNBAGAME-25DEC20BOSTOR-TOR",
+    "KXNBAGAME-25DEC20BOSTOR-BOS",
+    "KXNBAGAME-25DEC20HOUDEN-HOU",
+    "KXNBAGAME-25DEC20HOUDEN-DEN",
+    "KXNHLGAME-25DEC20VANBOS-VAN",
+    "KXNHLGAME-25DEC20VANBOS-BOS",
+    "KXNHLGAME-25DEC20TORNSH-TOR",
+    "KXNHLGAME-25DEC20TORNSH-NSH",
+    "KXNHLGAME-25DEC20PITMTL-PIT",
+    "KXNHLGAME-25DEC20PITMTL-MTL",
+    "KXNHLGAME-25DEC20CARTB-TB",
+    "KXNHLGAME-25DEC20CARTB-CAR",
+    "KXNHLGAME-25DEC20STLFLA-STL",
+    "KXNHLGAME-25DEC20STLFLA-FLA",
+    "KXNHLGAME-25DEC20NYIBUF-NYI",
+    "KXNHLGAME-25DEC20NYIBUF-BUF",
+    "KXNCAAFGAME-25DEC20JMUORE-ORE",
+    "KXNCAAFGAME-25DEC20JMUORE-JMU",
+    "KXNCAAFGAME-25DEC20TULNMISS-TULN",
+    "KXNCAAFGAME-25DEC20TULNMISS-MISS"
+  ],
+  "seriesWithEvents": {
+    "KXNFLGAME": 31,
+    "KXNBAGAME": 23,
+    "KXNHLGAME": 22,
+    "KXNCAAFGAME": 32,
+    "KXEPLGAME": 32,
+    "KXLALIGAGAME": 6,
+    "KXBUNDESLIGAGAME": 2,
+    "KXDOTA2GAME": 1
+  }
+}

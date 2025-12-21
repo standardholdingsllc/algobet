@@ -20,6 +20,18 @@ export interface KalshiRateLimitDebug {
   };
 }
 
+/** Dropped item sample for debugging */
+export interface KalshiDroppedItemSample {
+  ticker?: string;
+  title?: string;
+  status?: string;
+  event_ticker?: string;
+  series_ticker?: string;
+  close_time?: string;
+  open_time?: string;
+  reason: string;
+}
+
 export interface LiveEventsDebugCounters {
   lastUpdatedAt: string;
   vendorEventsFetched: number;
@@ -30,8 +42,12 @@ export interface LiveEventsDebugCounters {
   matchCandidatesConsidered: number;
   matchRejectReasons: Record<string, number>;
   watchersCreated: number;
+  watchersCreatedPre: number;  // Phase 6: PRE watchers
+  watchersCreatedLive: number; // Phase 6: LIVE watchers
   watchersSkipped: Record<string, number>;
   subscriptionsAttempted: number;
+  subscriptionsAttemptedPre: number;  // Phase 6
+  subscriptionsAttemptedLive: number; // Phase 6
   subscriptionsFailed: Record<string, number>;
   platformFetch: Record<
     'kalshi' | 'polymarket' | 'sxbet',
@@ -65,6 +81,17 @@ export interface LiveEventsDebugCounters {
     filteredOut: Record<string, number>;
     filteredToCloseWindowCount?: number;
     filteredByStatusCount?: number;
+    // Phase 1: Enhanced debug visibility
+    rawStatusHistogram: Record<string, number>;
+    dropReasons: Record<string, number>;
+    sampleDroppedItems: KalshiDroppedItemSample[];
+    // Phase 5: Events-based discovery
+    eventsFetchAttempted?: number;
+    eventsFetchedCount?: number;
+    eventsWithMarketsCount?: number;
+    classifiedPre?: number;
+    classifiedLive?: number;
+    classifiedEnded?: number;
     queryApplied?: {
       seriesTicker?: string;
       maxCloseTs?: number;
@@ -81,6 +108,8 @@ export interface LiveEventsDebugCounters {
       discoveryFailedReason?: string | null;
       seriesTickersTotal?: number;
       seriesTickersChosen?: string[];
+      seriesTickerScores?: Record<string, number>; // Phase 3: Show why series were chosen
+      seriesBlacklisted?: string[]; // Phase 3: Series that were blacklisted
       maxSeriesPerRefresh?: number;
       statusSentToApi?: string | null;
       statusOmittedReason?: string;
@@ -93,6 +122,7 @@ export interface LiveEventsDebugCounters {
       event_ticker?: string;
       series_ticker?: string;
       close_time?: string;
+      open_time?: string;
       expiration_time?: string;
     }>;
   };
@@ -114,8 +144,12 @@ let counters: LiveEventsDebugCounters = {
   matchCandidatesConsidered: 0,
   matchRejectReasons: {},
   watchersCreated: 0,
+  watchersCreatedPre: 0,
+  watchersCreatedLive: 0,
   watchersSkipped: {},
   subscriptionsAttempted: 0,
+  subscriptionsAttemptedPre: 0,
+  subscriptionsAttemptedLive: 0,
   subscriptionsFailed: {},
   platformFetch: {
     kalshi: {
@@ -140,6 +174,15 @@ let counters: LiveEventsDebugCounters = {
     filteredOut: {},
     filteredToCloseWindowCount: 0,
     filteredByStatusCount: 0,
+    rawStatusHistogram: {},
+    dropReasons: {},
+    sampleDroppedItems: [],
+    eventsFetchAttempted: 0,
+    eventsFetchedCount: 0,
+    eventsWithMarketsCount: 0,
+    classifiedPre: 0,
+    classifiedLive: 0,
+    classifiedEnded: 0,
     queryApplied: undefined,
     sampleRawItems: [],
   },
@@ -160,8 +203,12 @@ export function resetLiveEventsDebug(): void {
     matchCandidatesConsidered: 0,
     matchRejectReasons: {},
     watchersCreated: 0,
+    watchersCreatedPre: 0,
+    watchersCreatedLive: 0,
     watchersSkipped: {},
     subscriptionsAttempted: 0,
+    subscriptionsAttemptedPre: 0,
+    subscriptionsAttemptedLive: 0,
     subscriptionsFailed: {},
     platformFetch: {
     kalshi: {
@@ -186,6 +233,15 @@ export function resetLiveEventsDebug(): void {
       filteredOut: {},
       filteredToCloseWindowCount: 0,
       filteredByStatusCount: 0,
+      rawStatusHistogram: {},
+      dropReasons: {},
+      sampleDroppedItems: [],
+      eventsFetchAttempted: 0,
+      eventsFetchedCount: 0,
+      eventsWithMarketsCount: 0,
+      classifiedPre: 0,
+      classifiedLive: 0,
+      classifiedEnded: 0,
       queryApplied: undefined,
       sampleRawItems: [],
     },
@@ -332,8 +388,61 @@ export function recordKalshiRawItems(
     event_ticker: item.event_ticker,
     series_ticker: item.series_ticker,
     close_time: item.close_time,
+    open_time: item.open_time,
     expiration_time: item.expiration_time,
   }));
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+// Phase 1: Record raw status histogram from Kalshi markets
+export function recordKalshiRawStatusHistogram(histogram: Record<string, number>): void {
+  counters.kalshi.rawStatusHistogram = histogram;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+// Phase 1: Record a drop reason with increment
+export function recordKalshiDropReason(reason: string): void {
+  bump(counters.kalshi.dropReasons, reason);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+// Phase 1: Record a dropped item sample (capped at 10)
+export function recordKalshiDroppedItem(item: KalshiDroppedItemSample): void {
+  if (counters.kalshi.sampleDroppedItems.length < 10) {
+    counters.kalshi.sampleDroppedItems.push(item);
+  }
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+// Phase 5: Record Kalshi event classification
+export function recordKalshiEventClassification(status: 'PRE' | 'LIVE' | 'ENDED'): void {
+  if (status === 'PRE') counters.kalshi.classifiedPre = (counters.kalshi.classifiedPre || 0) + 1;
+  if (status === 'LIVE') counters.kalshi.classifiedLive = (counters.kalshi.classifiedLive || 0) + 1;
+  if (status === 'ENDED') counters.kalshi.classifiedEnded = (counters.kalshi.classifiedEnded || 0) + 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+// Phase 5: Record events fetch attempt
+export function recordKalshiEventsFetch(attempted: boolean, count?: number, withMarkets?: number): void {
+  if (attempted) counters.kalshi.eventsFetchAttempted = (counters.kalshi.eventsFetchAttempted || 0) + 1;
+  if (count !== undefined) counters.kalshi.eventsFetchedCount = count;
+  if (withMarkets !== undefined) counters.kalshi.eventsWithMarketsCount = withMarkets;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+// Phase 6: Record watcher creation by status
+export function recordWatcherCreatedByStatus(status: 'PRE' | 'LIVE'): void {
+  counters.watchersCreated += 1;
+  if (status === 'PRE') counters.watchersCreatedPre += 1;
+  if (status === 'LIVE') counters.watchersCreatedLive += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+// Phase 6: Record subscription attempt by status
+export function recordSubscriptionAttemptByStatus(status: 'PRE' | 'LIVE'): void {
+  counters.subscriptionsAttempted += 1;
+  if (status === 'PRE') counters.subscriptionsAttemptedPre += 1;
+  if (status === 'LIVE') counters.subscriptionsAttemptedLive += 1;
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
@@ -373,6 +482,8 @@ export function recordKalshiQueryApplied(query: {
   discoveryFailedReason?: string | null;
   seriesTickersTotal?: number;
   seriesTickersChosen?: string[];
+  seriesTickerScores?: Record<string, number>; // Phase 3: Why series were chosen
+  seriesBlacklisted?: string[]; // Phase 3: Blacklisted series
   maxSeriesPerRefresh?: number;
   statusSentToApi?: string | null;
   statusOmittedReason?: string;
@@ -416,6 +527,9 @@ export function getLiveEventsDebug(): LiveEventsDebugCounters {
     kalshi: {
       ...counters.kalshi,
       filteredOut: { ...counters.kalshi.filteredOut },
+      rawStatusHistogram: { ...counters.kalshi.rawStatusHistogram },
+      dropReasons: { ...counters.kalshi.dropReasons },
+      sampleDroppedItems: [...counters.kalshi.sampleDroppedItems],
       sampleRawItems: [...counters.kalshi.sampleRawItems],
     },
   };

@@ -13,11 +13,24 @@ import { LiveEventPlatform, VendorEventStatus } from '@/types/live-events';
 import { LiveEventsDebugCounters } from './live-events-debug';
 import { buildLiveArbRuntimeSeed } from './live-arb-runtime-seed';
 
+// Helper to fix double-quoted env vars (common .env parsing issue)
+function fixEnvQuotes(value: string | undefined): string | undefined {
+  if (!value) return value;
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
 // Initialize Upstash Redis client
 // Using Vercel's KV environment variables (set by Upstash integration)
+const kvUrl = fixEnvQuotes(process.env.KV_REST_API_URL);
+const kvToken = fixEnvQuotes(process.env.KV_REST_API_TOKEN);
+
 const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
+  url: kvUrl!,
+  token: kvToken!,
 });
 
 interface StorageData {

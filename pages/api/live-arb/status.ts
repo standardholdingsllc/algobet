@@ -203,8 +203,12 @@ export default async function handler(
       matchCandidatesConsidered: 0,
       matchRejectReasons: {},
       watchersCreated: 0,
+      watchersCreatedPre: 0,  // Phase 6
+      watchersCreatedLive: 0, // Phase 6
       watchersSkipped: {},
       subscriptionsAttempted: 0,
+      subscriptionsAttemptedPre: 0,  // Phase 6
+      subscriptionsAttemptedLive: 0, // Phase 6
       subscriptionsFailed: {},
       platformFetch: {
         kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
@@ -218,6 +222,10 @@ export default async function handler(
         parsedEventsCount: 0,
         filteredOut: {},
         filteredToCloseWindowCount: 0,
+        filteredByStatusCount: 0,
+        rawStatusHistogram: {},
+        dropReasons: {},
+        sampleDroppedItems: [],
         queryApplied: undefined,
         sampleRawItems: [],
       },

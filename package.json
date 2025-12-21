@@ -31,7 +31,10 @@
     "test-live-events": "node -r esbuild-register scripts/test-live-events.ts",
     "test-execution-mode": "node -r esbuild-register scripts/test-execution-mode.ts",
     "test-kalshi-ws-auth": "node -r esbuild-register scripts/test-kalshi-ws-auth.ts",
-    "debug-kalshi-sports": "node -r esbuild-register scripts/debug-kalshi-sports.ts"
+    "debug-kalshi-sports": "node -r esbuild-register scripts/debug-kalshi-sports.ts",
+    "test:kalshi-live": "vitest run tests/kalshi.live.discovery.test.ts",
+    "test:poly-live": "vitest run tests/polymarket.live.discovery.test.ts",
+    "test:live-sports": "vitest run tests/kalshi.live.discovery.test.ts tests/polymarket.live.discovery.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.5",
@@ -65,8 +68,10 @@
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
     "autoprefixer": "^10.4.16",
+    "dotenv": "^17.2.3",
     "esbuild-register": "^3.5.0",
     "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.6"
+    "tailwindcss": "^3.3.6",
+    "vitest": "^4.0.16"
   }
 }

@@ -35,6 +35,8 @@ import {
   recordSubscriptionAttempt,
   recordWatcherCreated,
   recordWatcherSkipped,
+  recordWatcherCreatedByStatus,
+  recordSubscriptionAttemptByStatus,
 } from './live-events-debug';
 
 const WATCHER_LOG_TAG = 'LiveWatcher';
@@ -398,6 +400,9 @@ export function startWatcher(group: MatchedEventGroup): boolean {
     }
   }, FALLBACK_POLL_INTERVAL_MS);
   
+  // Phase 6: Track PRE vs LIVE watcher creation
+  const watcherStatus = group.status === 'LIVE' ? 'LIVE' : 'PRE';
+  
   watcherInfo('Started watcher', {
     eventKey: group.eventKey,
     sport: group.sport,
@@ -405,8 +410,9 @@ export function startWatcher(group: MatchedEventGroup): boolean {
     awayTeam: group.awayTeam,
     platforms: group.platformCount,
     markets: watcher.marketIdToEventKey.size,
+    status: watcherStatus,
   });
-  recordWatcherCreated();
+  recordWatcherCreatedByStatus(watcherStatus);
   
   return true;
 }

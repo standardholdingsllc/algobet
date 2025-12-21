@@ -268,8 +268,12 @@ export async function runMatcherCycle(): Promise<void> {
     // Get registry snapshot
     const snapshot = getSnapshot();
 
+    // Phase 6: If allowPreWatchers is enabled, don't filter to liveOnly
+    // This allows PRE events to create watchers for bring-up/testing
+    const effectiveLiveOnly = runtimeConfig.liveEventsOnly && !runtimeConfig.allowPreWatchers;
+    
     // Update matches with liveOnly consideration
-    updateMatches(snapshot, { liveOnly: runtimeConfig.liveEventsOnly });
+    updateMatches(snapshot, { liveOnly: effectiveLiveOnly });
 
     // Update watchers based on matches
     updateWatchers();

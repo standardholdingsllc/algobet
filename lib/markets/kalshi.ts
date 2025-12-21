@@ -13,6 +13,10 @@ import {
   recordKalshiQueryApplied,
   recordKalshiRateLimitState,
   recordKalshiRawItems,
+  recordKalshiRawStatusHistogram,
+  recordKalshiDropReason,
+  recordKalshiDroppedItem,
+  recordKalshiEventsFetch,
   recordPlatformFetchSkipped,
 } from '../live-events-debug';
 import {
@@ -58,6 +62,77 @@ export const DEFAULT_KALSHI_MAX_TOTAL_MARKETS = Math.max(
 );
 export const DEFAULT_KALSHI_SERIES_CACHE_TTL_MS = KALSHI_SERIES_CACHE_TTL_MS;
 const DEFAULT_SPORTS_CATEGORY = 'Sports';
+
+// Phase 3: Series selection configuration
+const parsedMaxMarketsPerSeriesEffective = parseInt(
+  process.env.KALSHI_MAX_MARKETS_PER_SERIES_EFFECTIVE || '',
+  10
+);
+export const KALSHI_MAX_MARKETS_PER_SERIES_EFFECTIVE = Math.max(
+  50,
+  Number.isFinite(parsedMaxMarketsPerSeriesEffective) ? parsedMaxMarketsPerSeriesEffective : 200
+);
+
+const seriesBlacklistPatterns = (process.env.KALSHI_SERIES_BLACKLIST_PATTERNS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const seriesWhitelistPatterns = (process.env.KALSHI_SERIES_WHITELIST_PATTERNS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+// Phase 2: Helper to check if a Kalshi market status is tradable
+// Kalshi uses "active" for tradable markets, not "open"
+export function isKalshiTradableStatus(status: string | undefined): boolean {
+  if (!status) return false;
+  const statusLower = status.toLowerCase();
+  // Primary tradable status is "active", but also accept "open" if it ever appears
+  return statusLower === 'active' || statusLower === 'open';
+}
+
+// Phase 3: Score a series ticker for prioritization
+// Higher score = more preferred (game markets)
+// Lower/negative score = less preferred (futures, massive props)
+function scoreSeriesTicker(ticker: string): number {
+  const upper = ticker.toUpperCase();
+  let score = 0;
+
+  // Big bonus for GAME series (e.g., KXNBAGAME, KXNFLGAME)
+  if (upper.includes('GAME')) score += 100;
+  
+  // Bonus for known game-like patterns
+  if (upper.includes('MATCH')) score += 80;
+  if (upper.includes('VS')) score += 70;
+  
+  // Bonus for prop series that are game-specific (e.g., KXNBA3D, KXNBAPTS)
+  if (/^KX(NBA|NFL|NHL|MLB)(3D|PTS|REB|AST|STL|BLK)/.test(upper)) score += 50;
+
+  // Penalty for obvious futures/season winner patterns
+  if (upper.includes('WINNER') || upper.includes('CHAMPION') || upper.includes('TITLE')) score -= 50;
+  
+  // Penalty for league-only tickers (typically season futures)
+  const leagueFuturesPatterns = [
+    /^KX(SERIEA|EREDIVISIE|BUNDESLIGA|LALIGA|LIGUE1|EPL|UCL|MLS)$/i,
+    /^KXNBA$/i,  // Season winner, not games
+    /^KXNFL$/i,
+    /^KXMLB$/i,
+    /^KXNHL$/i,
+  ];
+  if (leagueFuturesPatterns.some(p => p.test(upper))) score -= 40;
+  
+  // Strong penalty for MVE (multivariate/combo) series
+  if (upper.includes('MVE') || upper.includes('MULTI')) score -= 100;
+  
+  // Check user blacklist patterns
+  if (seriesBlacklistPatterns.some(p => upper.includes(p.toUpperCase()))) score -= 200;
+  
+  // Boost for user whitelist patterns
+  if (seriesWhitelistPatterns.some(p => upper.includes(p.toUpperCase()))) score += 150;
+
+  return score;
+}
 
 interface KalshiMarket {
   ticker: string;
@@ -221,10 +296,22 @@ interface KalshiEventSummary {
   sub_title?: string;
   category?: string;
   series_ticker?: string;
+  // Phase 5: Event timing fields for LIVE classification
+  strike_date?: string;  // When the event occurs (game start time)
+  strike_time?: string;  // Alternative time field
+  status?: string;
+  close_time?: string;
+  markets?: KalshiMarket[];  // Nested markets if with_nested_markets=true
 }
 
 interface KalshiEventApiResponse {
   event: KalshiEventSummary;
+}
+
+// Phase 5: Events list response
+interface KalshiEventsListResponse {
+  events?: KalshiEventSummary[];
+  cursor?: string;
 }
 
 interface KalshiEventCacheEntry {
@@ -500,6 +587,125 @@ export class KalshiAPI {
     }
   }
 
+  /**
+   * Phase 5: Fetch events from a series with strike_date for LIVE classification.
+   * Uses GET /events endpoint with series_ticker filter.
+   * Returns events with their strike_date (game start time) if available.
+   */
+  async fetchEventsForSeries(seriesTicker: string, options?: {
+    status?: string;
+    withNestedMarkets?: boolean;
+    limit?: number;
+  }): Promise<{
+    events: KalshiEventSummary[];
+    fetchedCount: number;
+    withMarketsCount: number;
+    error?: string;
+  }> {
+    const { status = 'open', withNestedMarkets = false, limit = 100 } = options || {};
+    
+    recordKalshiEventsFetch(true);
+    
+    try {
+      const params: Record<string, string | number | boolean> = {
+        series_ticker: seriesTicker,
+        limit,
+      };
+      
+      if (status) {
+        params.status = status;
+      }
+      
+      if (withNestedMarkets) {
+        params.with_nested_markets = true;
+      }
+      
+      const response = await this.kalshiGet<KalshiEventsListResponse>(
+        '/events',
+        params,
+        undefined,
+        undefined,
+        undefined
+      );
+      
+      if (response.kind === 'skipped') {
+        return { events: [], fetchedCount: 0, withMarketsCount: 0, error: 'backoff_active' };
+      }
+      
+      const events = response.data.events || [];
+      const withMarketsCount = events.filter(e => e.markets && e.markets.length > 0).length;
+      
+      // Cache the events
+      for (const event of events) {
+        if (event.event_ticker) {
+          this.eventCache.set(event.event_ticker, {
+            event,
+            fetchedAt: Date.now(),
+          });
+        }
+      }
+      
+      recordKalshiEventsFetch(false, events.length, withMarketsCount);
+      
+      return { events, fetchedCount: events.length, withMarketsCount };
+    } catch (error: any) {
+      const errorMsg = error?.response?.status 
+        ? `HTTP ${error.response.status}`
+        : error?.message || 'unknown_error';
+      console.error(`[Kalshi] Failed to fetch events for series ${seriesTicker}:`, errorMsg);
+      return { events: [], fetchedCount: 0, withMarketsCount: 0, error: errorMsg };
+    }
+  }
+
+  /**
+   * Phase 5: Classify event status based on strike_date.
+   * - PRE: now < strike_date
+   * - LIVE: strike_date <= now < close_time
+   * - ENDED: now >= close_time OR status is closed/settled
+   */
+  classifyEventStatus(event: KalshiEventSummary): 'PRE' | 'LIVE' | 'ENDED' {
+    const now = Date.now();
+    const status = (event.status || '').toLowerCase();
+    
+    // Check for ended states first
+    if (status === 'closed' || status === 'settled' || status === 'finalized') {
+      return 'ENDED';
+    }
+    
+    // Parse strike_date (game start time)
+    const strikeDateStr = event.strike_date || event.strike_time;
+    const strikeTimeMs = strikeDateStr ? new Date(strikeDateStr).getTime() : null;
+    
+    // Parse close_time
+    const closeTimeMs = event.close_time ? new Date(event.close_time).getTime() : null;
+    
+    if (strikeTimeMs && !isNaN(strikeTimeMs)) {
+      if (now < strikeTimeMs) {
+        return 'PRE';
+      }
+      if (closeTimeMs && !isNaN(closeTimeMs) && now >= closeTimeMs) {
+        return 'ENDED';
+      }
+      // now >= strikeTimeMs and (no close_time or now < close_time)
+      return 'LIVE';
+    }
+    
+    // Fallback: if no strike_date, use close_time heuristic
+    if (closeTimeMs && !isNaN(closeTimeMs)) {
+      if (now >= closeTimeMs) {
+        return 'ENDED';
+      }
+      // If close_time is within 4 hours, might be live
+      const fourHoursMs = 4 * 60 * 60 * 1000;
+      if (closeTimeMs - now < fourHoursMs) {
+        return 'LIVE';
+      }
+    }
+    
+    // Default to PRE if we can't determine
+    return 'PRE';
+  }
+
   private parseSeriesOverride(): string[] {
     const override = process.env.KALSHI_SPORTS_SERIES_TICKERS_OVERRIDE || '';
     return override
@@ -601,50 +807,57 @@ export class KalshiAPI {
     return payload;
   }
 
-  private chooseSeriesTickers(allTickers: string[]): string[] {
-    if (!allTickers.length) return [];
+  // Phase 3: Score-based series selection with game prioritization
+  private chooseSeriesTickers(allTickers: string[]): { chosen: string[]; scores: Record<string, number>; blacklisted: string[] } {
+    if (!allTickers.length) return { chosen: [], scores: {}, blacklisted: [] };
 
-    const prioritized = allTickers
-      .filter((ticker) => (seriesStats.get(ticker)?.lastMarketCount ?? 0) > 0)
-      .sort((a, b) => {
-        const aStats = seriesStats.get(a) || {};
-        const bStats = seriesStats.get(b) || {};
-        if ((bStats.lastSuccessAt ?? 0) !== (aStats.lastSuccessAt ?? 0)) {
-          return (bStats.lastSuccessAt ?? 0) - (aStats.lastSuccessAt ?? 0);
-        }
-        return (bStats.lastMarketCount ?? 0) - (aStats.lastMarketCount ?? 0);
-      });
+    // Score all tickers
+    const tickerScores: Array<{ ticker: string; score: number }> = allTickers.map(ticker => ({
+      ticker,
+      score: scoreSeriesTicker(ticker) + this.getSeriesHistoricalBonus(ticker),
+    }));
 
-    const untested = allTickers.filter((ticker) => !seriesStats.has(ticker));
-    const probeCount = Math.min(
-      KALSHI_SERIES_PROBE_COUNT,
-      allTickers.length,
-      KALSHI_MAX_SERIES_PER_REFRESH
-    );
-    const reservedPrimary = Math.max(0, KALSHI_MAX_SERIES_PER_REFRESH - probeCount);
+    // Sort by score descending
+    tickerScores.sort((a, b) => b.score - a.score);
 
-    const chosen: string[] = [];
-    chosen.push(...prioritized.slice(0, reservedPrimary));
+    // Filter out very negative scores (blacklisted)
+    const blacklisted = tickerScores
+      .filter(t => t.score < -50)
+      .map(t => t.ticker);
 
-    const remainingCapacity = KALSHI_MAX_SERIES_PER_REFRESH - chosen.length;
-    const probes = untested.slice(0, Math.min(probeCount, remainingCapacity));
-    chosen.push(...probes);
+    // Choose top tickers with positive or neutral scores
+    const viable = tickerScores.filter(t => t.score >= -50);
+    const chosen = viable.slice(0, KALSHI_MAX_SERIES_PER_REFRESH).map(t => t.ticker);
 
-    if (chosen.length < KALSHI_MAX_SERIES_PER_REFRESH) {
-      const fillerPool = [
-        ...untested.slice(probes.length),
-        ...allTickers.filter((ticker) => !chosen.includes(ticker)),
-      ];
-
-      for (const ticker of fillerPool) {
-        if (chosen.length >= KALSHI_MAX_SERIES_PER_REFRESH) break;
-        if (!chosen.includes(ticker)) {
-          chosen.push(ticker);
-        }
-      }
+    // Build scores map for debug (top 10)
+    const scores: Record<string, number> = {};
+    for (const { ticker, score } of tickerScores.slice(0, 10)) {
+      scores[ticker] = score;
     }
 
-    return chosen.slice(0, KALSHI_MAX_SERIES_PER_REFRESH);
+    return { chosen, scores, blacklisted: blacklisted.slice(0, 5) };
+  }
+
+  // Get historical bonus based on past success
+  private getSeriesHistoricalBonus(ticker: string): number {
+    const stats = seriesStats.get(ticker);
+    if (!stats) return 0;
+    
+    // Bonus for series that returned markets recently
+    const marketCount = stats.lastMarketCount ?? 0;
+    const recency = stats.lastSuccessAt ? (Date.now() - stats.lastSuccessAt) / (1000 * 60 * 60) : Infinity;
+    
+    // If returned markets in last hour, give bonus proportional to count (capped)
+    if (recency < 1 && marketCount > 0) {
+      return Math.min(30, marketCount);
+    }
+    
+    // Penalty if series was recently blacklisted (returned too many)
+    if (marketCount > KALSHI_MAX_MARKETS_PER_SERIES_EFFECTIVE) {
+      return -30;
+    }
+    
+    return 0;
   }
 
   private mapKalshiMarket(market: KalshiMarket): Market {
@@ -820,10 +1033,14 @@ export class KalshiAPI {
       let totalRawItems = 0;
       let discoveryFailedReason: string | null | undefined;
       let backoffTriggered = false;
+      const rawStatusHistogram: Record<string, number> = {}; // Phase 1: Track raw status distribution
 
       let seriesTickers: Array<string | undefined> = [];
       let seriesTickersTotal = 0;
       let seriesTickersChosen: Array<string | undefined> = [];
+      let seriesTickerScores: Record<string, number> = {};
+      let seriesBlacklisted: string[] = [];
+      
       if (sportsOnly) {
         const { tickers, failedReason } = await this.fetchSportsSeriesTickers();
         seriesTickers = tickers;
@@ -839,9 +1056,16 @@ export class KalshiAPI {
       }
 
       seriesTickersTotal = sportsOnly ? seriesTickers.filter(Boolean).length : seriesTickers.length;
-      seriesTickersChosen = sportsOnly
-        ? this.chooseSeriesTickers(seriesTickers.filter(Boolean) as string[])
-        : seriesTickers;
+      
+      // Phase 3: Use score-based series selection
+      if (sportsOnly) {
+        const { chosen, scores, blacklisted } = this.chooseSeriesTickers(seriesTickers.filter(Boolean) as string[]);
+        seriesTickersChosen = chosen;
+        seriesTickerScores = scores;
+        seriesBlacklisted = blacklisted;
+      } else {
+        seriesTickersChosen = seriesTickers;
+      }
 
       if (!seriesTickersChosen.length && !sportsOnly) {
         seriesTickersChosen = [undefined];
@@ -899,14 +1123,19 @@ export class KalshiAPI {
             break;
           }
 
+          // Phase 1: Build raw status histogram BEFORE any filtering
+          for (const market of entries) {
+            const statusKey = market.status || 'undefined';
+            rawStatusHistogram[statusKey] = (rawStatusHistogram[statusKey] || 0) + 1;
+          }
+
           if (rawSamples.length < 3) {
             rawSamples.push(...entries.slice(0, 3 - rawSamples.length));
           }
 
           for (const market of entries) {
-            const statusLower = (market.status || '').toLowerCase();
-            const isTradable = statusLower === 'open' || statusLower === 'active';
-            if (!isTradable) {
+            // Phase 2: Use centralized tradable status check
+            if (!isKalshiTradableStatus(market.status)) {
               filteredByStatus += 1;
               continue;
             }
@@ -968,6 +1197,8 @@ export class KalshiAPI {
         discoveryFailedReason: discoveryFailedReason ?? null,
         seriesTickersTotal,
         seriesTickersChosen: seriesTickersUsed,
+        seriesTickerScores, // Phase 3: Show why series were chosen
+        seriesBlacklisted,  // Phase 3: Series that were blacklisted
         maxSeriesPerRefresh: KALSHI_MAX_SERIES_PER_REFRESH,
         statusSentToApi,
         statusOmittedReason,
@@ -975,6 +1206,7 @@ export class KalshiAPI {
       });
 
       recordKalshiRawItems(totalRawItems, rawSamples);
+      recordKalshiRawStatusHistogram(rawStatusHistogram); // Phase 1: Record status distribution
       recordKalshiFilteredToCloseWindow(filteredToCloseWindow);
       recordKalshiFilteredByStatus(filteredByStatus);
 

@@ -9,7 +9,14 @@
  * - Polymarket: https://docs.polymarket.com/developers/CLOB/introduction
  * - Kalshi: https://docs.kalshi.com/welcome
  *
- * If you're uncertain about a field, check the docs and add a // NOTE comment.
+ * LIVE DETECTION STRATEGY:
+ * - Polymarket: gameStartTime <= now < gameStartTime + maxGameDuration
+ * - Kalshi: Uses expected_expiration_time to estimate game window
+ *   - estimated_start = expected_expiration - game_duration
+ *   - LIVE if: (estimated_start - buffer) <= now <= (expected_end + buffer)
+ *
+ * @see docs/POLYMARKET_LIVE_SPORTS_DISCOVERY.md
+ * @see docs/KALSHI_API_LIVE_SPORTS.md
  */
 
 import {
@@ -29,7 +36,11 @@ import {
   recordVendorEventsFetched,
   recordKalshiFiltered,
   recordKalshiParsedEvent,
+  recordKalshiDropReason,
+  recordKalshiDroppedItem,
+  recordKalshiEventClassification,
 } from './live-events-debug';
+import { getKalshiGameDurationHours } from '@/types/live-sports-discovery';
 
 // ============================================================================
 // Sport Detection
@@ -411,8 +422,13 @@ export function extractPolymarketEvent(
     startTime = new Date(endDate).getTime();
   }
   
-  // Detect status
+  // Detect status using the improved LIVE detection logic
   // NOTE: Polymarket uses closed, active, resolved flags
+  // 
+  // LIVE DETECTION STRATEGY (from POLYMARKET_LIVE_SPORTS_DISCOVERY.md):
+  // - gameStartTime <= now < gameStartTime + maxGameDuration
+  // - With 15-minute tolerance for "about to start" games
+  // - Default max game duration is 6 hours
   let status: VendorEventStatus = 'PRE';
   
   const isClosed = metadata?.closed === true;
@@ -423,11 +439,18 @@ export function extractPolymarketEvent(
     status = 'ENDED';
   } else if (startTime) {
     const now = Date.now();
-    const fourHoursMs = 4 * 60 * 60 * 1000;
+    const maxGameDurationMs = 6 * 60 * 60 * 1000; // 6 hours
+    const gameStartToleranceMs = 15 * 60 * 1000; // 15 minutes
     
-    if (now >= startTime && now <= startTime + fourHoursMs) {
+    // Game is LIVE if:
+    // - Start time is in the past (with 15-min tolerance for "about to start")
+    // - Start time is within max game duration (game likely still in progress)
+    const gameStarted = startTime <= now + gameStartToleranceMs;
+    const gameNotEnded = startTime + maxGameDurationMs >= now;
+    
+    if (gameStarted && gameNotEnded) {
       status = 'LIVE';
-    } else if (now > startTime + fourHoursMs) {
+    } else if (!gameNotEnded) {
       status = 'ENDED';
     }
   }
@@ -494,33 +517,49 @@ export function processPolymarketMarkets(markets: Market[]): number {
 // ============================================================================
 // NOTE: Field mapping follows Kalshi docs: https://docs.kalshi.com/
 
-/** Kalshi sports-related ticker patterns */
+/** Kalshi sports-related ticker patterns 
+ * Phase 4: Made more inclusive to catch all sports series
+ */
 const KALSHI_SPORTS_PATTERNS = [
-  // Game-specific patterns (higher priority)
+  // Game-specific patterns (highest priority)
   /^(KX)?NBAGAME/i,
   /^(KX)?NFLGAME/i,
   /^(KX)?NHLGAME/i,
   /^(KX)?MLBGAME/i,
   /^(KX)?EPLGAME/i,
   /^(KX)?UCLGAME/i,
+  /GAME$/i,  // Any ticker ending with GAME
   // Player prop patterns
   /^(KX)?NBA3D/i,   // Triple doubles
   /^(KX)?NBAPTS/i,  // Points
   /^(KX)?NFLPTS/i,  // Points
-  // General sport patterns
+  // Major US sports
   /^(KX)?NBA/i,
   /^(KX)?NFL/i,
   /^(KX)?NHL/i,
   /^(KX)?MLB/i,
   /^(KX)?MLS/i,
-  /^(KX)?EPL/i,
-  /^(KX)?UCL/i,
   /^(KX)?NCAA/i,
   /^(KX)?CFP/i,
+  // European football leagues
+  /^(KX)?EPL/i,
+  /^(KX)?UCL/i,
+  /^(KX)?LALIGA/i,
+  /^(KX)?SERIEA/i,
+  /^(KX)?BUNDESLIGA/i,
+  /^(KX)?LIGUE1/i,
+  /^(KX)?EREDIVISIE/i,
+  // General sport patterns
   /^(KX)?SPORT/i,
   /^(KX)?UFC/i,
   /^(KX)?GOLF/i,
   /^(KX)?TENNIS/i,
+  /^(KX)?BOXING/i,
+  /^(KX)?F1/i,
+  /^(KX)?NASCAR/i,
+  // Match any ticker from Sports category (will be caught by series_ticker check)
+  /MATCH$/i,
+  /VS/i,
 ];
 
 /**
@@ -554,8 +593,17 @@ export function extractKalshiEvent(
   // Also check event_ticker if available
   const eventTicker = metadata?.event_ticker as string | undefined;
   const isSportsEvent = eventTicker && KALSHI_SPORTS_PATTERNS.some(p => p.test(eventTicker));
+  
+  // Phase 4: Also check series_ticker for sports patterns
+  const seriesTicker = metadata?.series_ticker as string | undefined;
+  const isSportsSeries = seriesTicker && KALSHI_SPORTS_PATTERNS.some(p => p.test(seriesTicker));
+  
   const sportHint = metadata?.sport_hint as string | undefined;
   const hasSportsHint = Boolean(sportHint);
+  
+  // Phase 4: Check if category is Sports
+  const category = metadata?.category as string | undefined;
+  const isSportsCategory = category?.toLowerCase() === 'sports';
   
   // Detect sport from ticker first, then title
   let sportResult = sportHint
@@ -564,12 +612,29 @@ export function extractKalshiEvent(
   if (sportResult.sport === 'OTHER') {
     sportResult = detectSport(title, metadata);
   }
+  // Phase 4: Try detecting from series ticker if still OTHER
+  if (sportResult.sport === 'OTHER' && seriesTicker) {
+    const seriesSportResult = detectSport(seriesTicker, metadata);
+    if (seriesSportResult.sport !== 'OTHER') {
+      sportResult = seriesSportResult;
+    }
+  }
   
   // Parse teams from title with sport context
   const { home, away, teams } = parseTeamsFromTitle(title, sportResult.sport);
   
-  // Need sports ticker or good detection with teams
-  if (!isSportsTicker && !isSportsEvent && !hasSportsHint && sportResult.sport === 'OTHER') {
+  // Phase 4: More lenient sports detection
+  // Accept if ANY of these are true:
+  // - ticker matches sports patterns
+  // - event_ticker matches sports patterns
+  // - series_ticker matches sports patterns
+  // - has explicit sport hint
+  // - category is Sports
+  // - sport was detected from title
+  const isSportsMarket = isSportsTicker || isSportsEvent || isSportsSeries || 
+                         hasSportsHint || isSportsCategory || sportResult.sport !== 'OTHER';
+  
+  if (!isSportsMarket) {
     return null;
   }
   
@@ -602,8 +667,13 @@ export function extractKalshiEvent(
     eventTicker ||
     (metadata?.series_ticker as string | undefined);
   
-  // Detect status
+  // Detect status using the improved LIVE detection logic
   // NOTE: Kalshi status values are "active", "open", "closed", "settled", "finalized", "initialized"
+  // 
+  // LIVE DETECTION STRATEGY (from KALSHI_API_LIVE_SPORTS.md):
+  // - Use expected_expiration_time as the key signal for when the game ENDS
+  // - Estimate start time by subtracting sport-specific game duration
+  // - Game is LIVE if: (estimated_start - buffer) <= now <= (expected_end + buffer)
   let status: VendorEventStatus = 'PRE';
   
   const kalshiStatus = (metadata?.status as string | undefined)?.toLowerCase();
@@ -619,9 +689,35 @@ export function extractKalshiEvent(
     // Market is tradable (active, open, or initialized)
     const isTradable = kalshiStatus === 'active' || kalshiStatus === 'open';
     
-    // LIVE classification using open_time:
-    // If we have open_time and close_time, use them for accurate LIVE detection
-    if (openTimeMs && closeTimeMs && isTradable) {
+    // PRIMARY: Use expected_expiration_time for accurate LIVE detection
+    const expectedExpirationStr = metadata?.expected_expiration_time as string | undefined;
+    if (expectedExpirationStr && isTradable) {
+      const expectedExpirationMs = new Date(expectedExpirationStr).getTime();
+      if (!isNaN(expectedExpirationMs)) {
+        // Get sport-specific game duration
+        const seriesTickerForDuration = eventTicker || seriesTicker || '';
+        const gameDurationHours = getKalshiGameDurationHours(seriesTickerForDuration);
+        const gameDurationMs = gameDurationHours * 60 * 60 * 1000;
+        const bufferMs = 1 * 60 * 60 * 1000; // 1 hour buffer
+        
+        // Calculate estimated start time
+        const estimatedStartMs = expectedExpirationMs - gameDurationMs;
+        
+        // Game is LIVE if we're within the game window (with buffer)
+        const startWindowMs = estimatedStartMs - bufferMs;
+        const endWindowMs = expectedExpirationMs + bufferMs;
+        
+        if (now >= startWindowMs && now <= endWindowMs) {
+          status = 'LIVE';
+        } else if (now > endWindowMs) {
+          status = 'ENDED';
+        } else {
+          status = 'PRE';
+        }
+      }
+    }
+    // FALLBACK: Use open_time and close_time if no expected_expiration_time
+    else if (openTimeMs && closeTimeMs && isTradable) {
       if (openTimeMs <= now && now < closeTimeMs) {
         // Trading is open and we're between open_time and close_time
         status = 'LIVE';
@@ -631,13 +727,16 @@ export function extractKalshiEvent(
         // now < openTimeMs - market hasn't opened yet
         status = 'PRE';
       }
-    } else if (isTradable && startTime) {
-      // Fallback: use heuristic based on startTime
-      const fourHoursMs = 4 * 60 * 60 * 1000;
+    } 
+    // LAST RESORT: Use startTime heuristic
+    else if (isTradable && startTime) {
+      const seriesTickerForDuration = eventTicker || seriesTicker || '';
+      const gameDurationHours = getKalshiGameDurationHours(seriesTickerForDuration);
+      const gameDurationMs = gameDurationHours * 60 * 60 * 1000;
       
-      if (now >= startTime && now <= startTime + fourHoursMs) {
+      if (now >= startTime && now <= startTime + gameDurationMs) {
         status = 'LIVE';
-      } else if (now > startTime + fourHoursMs) {
+      } else if (now > startTime + gameDurationMs) {
         status = 'ENDED';
       }
     }
@@ -645,6 +744,16 @@ export function extractKalshiEvent(
   
   // Normalize title for token-based matching
   const { normalizedTitle, tokens } = normalizeEventTitle(title, { sport: sportResult.sport });
+
+  // Calculate extraction confidence based on how we detected sports
+  let extractionConfidence = sportResult.confidence;
+  if (isSportsTicker || isSportsEvent) {
+    extractionConfidence = 0.95;
+  } else if (isSportsSeries || hasSportsHint) {
+    extractionConfidence = 0.9;
+  } else if (isSportsCategory) {
+    extractionConfidence = 0.85;
+  }
 
   return {
     platform: 'KALSHI',
@@ -662,7 +771,7 @@ export function extractKalshiEvent(
     normalizedTokens: tokens,
     extra: metadata,
     lastUpdatedAt: Date.now(),
-    extractionConfidence: (isSportsTicker || isSportsEvent) ? 0.9 : sportResult.confidence,
+    extractionConfidence,
   };
 }
 
@@ -672,8 +781,17 @@ function isKalshiMultiEventTicker(eventTicker?: string): boolean {
 
 function looksLikeKalshiSportsMarket(market: Market): boolean {
   if (market.platform !== 'kalshi') return false;
-  const target = market.eventTicker || market.ticker;
-  return Boolean(target && KALSHI_SPORTS_PATTERNS.some((pattern) => pattern.test(target)));
+  // Check ticker, event_ticker, and series_ticker
+  const vendorMeta = (market.vendorMetadata ?? {}) as Record<string, unknown>;
+  const targets = [
+    market.eventTicker,
+    market.ticker,
+    vendorMeta.kalshiSeriesTicker as string,
+  ].filter(Boolean);
+  
+  return targets.some(target => 
+    KALSHI_SPORTS_PATTERNS.some((pattern) => pattern.test(target!))
+  );
 }
 
 /**
@@ -723,11 +841,15 @@ export function createKalshiVendorEvent(market: Market): VendorEvent | null {
 
 /**
  * Process Kalshi markets into the registry
+ * 
+ * Phase 1: Enhanced debug visibility with detailed drop reasons
+ * Phase 4: Relaxed extraction - don't require teams.length >= 2
  */
 export function processKalshiMarkets(markets: Market[]): number {
   let added = 0;
   let combosSkipped = 0;
   let metadataMisses = 0;
+  let noTeamsButAdded = 0; // Phase 4: Track events added without teams
   const sampleEvents: VendorEvent[] = [];
   
   recordVendorEventsFetched('KALSHI', markets.length);
@@ -735,17 +857,30 @@ export function processKalshiMarkets(markets: Market[]): number {
   for (const market of markets) {
     if (market.platform !== 'kalshi') continue;
     const looksSports = looksLikeKalshiSportsMarket(market);
+    const vendorMeta = (market.vendorMetadata ?? {}) as Record<string, unknown>;
 
     if (isKalshiMultiEventTicker(market.eventTicker)) {
       combosSkipped++;
       recordVendorEventFiltered('kalshi_multi_event_ticker');
       recordKalshiFiltered('multi_event_ticker');
+      recordKalshiDropReason('multi_event_ticker');
+      recordKalshiDroppedItem({
+        ticker: market.ticker,
+        title: market.title?.substring(0, 80),
+        status: vendorMeta.kalshiMarketStatus as string,
+        event_ticker: market.eventTicker,
+        series_ticker: vendorMeta.kalshiSeriesTicker as string,
+        close_time: market.expiryDate,
+        open_time: vendorMeta.kalshiOpenTime as string,
+        reason: 'multi_event_ticker',
+      });
       continue;
     }
 
     const event = createKalshiVendorEvent(market);
 
     if (!event) {
+      const reason = looksSports ? 'sports_ticker_parse_failed' : 'not_sports_ticker';
       if (looksSports) {
         metadataMisses++;
         recordVendorEventFiltered('kalshi_missing_metadata_or_parse_failed');
@@ -753,17 +888,31 @@ export function processKalshiMarkets(markets: Market[]): number {
       } else {
         recordKalshiFiltered('not_sports_ticker');
       }
+      recordKalshiDropReason(reason);
+      recordKalshiDroppedItem({
+        ticker: market.ticker,
+        title: market.title?.substring(0, 80),
+        status: vendorMeta.kalshiMarketStatus as string,
+        event_ticker: market.eventTicker,
+        series_ticker: vendorMeta.kalshiSeriesTicker as string,
+        close_time: market.expiryDate,
+        open_time: vendorMeta.kalshiOpenTime as string,
+        reason,
+      });
       continue;
     }
 
+    // Phase 4: Relaxed requirement - still add events without parsed teams
+    // Log as warning but don't reject - matching can still work via event_ticker
     if (event.teams.length < 2) {
-      recordVendorEventFiltered('kalshi_missing_teams');
-      recordKalshiFiltered('missing_teams');
-      continue;
+      noTeamsButAdded++;
+      recordKalshiFiltered('missing_teams_warning');
+      // Don't continue - still add the event
     }
 
     recordKalshiParsedEvent();
     recordClassification(event.status);
+    recordKalshiEventClassification(event.status);
     addOrUpdateEvent(event);
     added++;
     if (sampleEvents.length < 5) {
@@ -778,11 +927,14 @@ export function processKalshiMarkets(markets: Market[]): number {
       sportsDetected: added,
       combosSkipped,
       metadataMisses,
+      noTeamsButAdded,
       sample: sampleEvents.map((event) => ({
         sport: event.sport,
         matchup: `${event.awayTeam ?? '?'} @ ${event.homeTeam ?? '?'}`.trim(),
         startTime: event.startTime ? new Date(event.startTime).toISOString() : 'unknown',
         ticker: event.vendorMarketId,
+        status: event.status,
+        teamsCount: event.teams.length,
       })),
     }
   );

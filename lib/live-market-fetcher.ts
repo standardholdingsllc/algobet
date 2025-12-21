@@ -1,14 +1,22 @@
 /**
  * Live Market Fetcher
  * 
- * Simple module for fetching live markets directly from platform APIs.
+ * Module for fetching live markets directly from platform APIs.
  * Used by the live-arb worker to populate the event registry.
  * 
- * Supports live-only filtering via the liveOnly flag from LiveArbRuntimeConfig.
+ * Supports two modes:
+ * 1. Standard mode: Fetches all markets and filters client-side
+ * 2. Live Discovery mode: Uses targeted API queries to find in-play games
+ *    - Polymarket: event_date filter for today's sports events
+ *    - Kalshi: series_ticker filter for known sports game series
+ * 
+ * @see docs/POLYMARKET_LIVE_SPORTS_DISCOVERY.md
+ * @see docs/KALSHI_API_LIVE_SPORTS.md
  */
 
 import { Market, MarketPlatform, BotConfig, MarketFilterInput } from '@/types';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
+import { VendorEvent } from '@/types/live-events';
 import {
   KalshiAPI,
   DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES,
@@ -23,6 +31,13 @@ import {
   recordPlatformFetchError,
   recordPlatformFetchSkipped,
 } from './live-events-debug';
+import {
+  discoverAllLiveSports,
+  discoveryResultsToVendorEvents,
+  filterToLiveMarkets,
+  hasKalshiCredentials as checkKalshiCredentials,
+} from './live-sports-discovery';
+import { CombinedLiveSportsResult } from '@/types/live-sports-discovery';
 
 const DAY_MS = 86_400_000;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
@@ -32,6 +47,15 @@ export interface FetchResult {
   markets: Market[];
   fetchedAt: string;
   error?: string;
+}
+
+/**
+ * Result from live sports discovery
+ */
+export interface LiveSportsDiscoveryFetchResult {
+  vendorEvents: VendorEvent[];
+  discoveryResult: CombinedLiveSportsResult;
+  fetchedAt: string;
 }
 
 export class LiveMarketFetcher {
@@ -254,6 +278,107 @@ export class LiveMarketFetcher {
       : 10;
     
     return this.sxbetApi.getOpenMarkets(maxDays);
+  }
+
+  // ============================================================================
+  // Live Sports Discovery Mode
+  // ============================================================================
+
+  /**
+   * Use targeted live sports discovery instead of fetching all markets.
+   * 
+   * This mode uses efficient API queries to find in-play games:
+   * - Polymarket: Uses event_date filter for today's sports events
+   * - Kalshi: Uses series_ticker filter for known sports game series
+   * 
+   * This is more efficient than fetching all markets when you only need
+   * currently-live sports events.
+   * 
+   * @returns VendorEvents ready for registry population
+   */
+  async discoverLiveSports(): Promise<LiveSportsDiscoveryFetchResult> {
+    console.log('[LiveMarketFetcher] Starting live sports discovery...');
+    
+    try {
+      const discoveryResult = await discoverAllLiveSports();
+      const vendorEvents = discoveryResultsToVendorEvents(discoveryResult);
+      
+      console.log(
+        `[LiveMarketFetcher] Discovery complete: ` +
+        `${vendorEvents.length} vendor events ` +
+        `(Polymarket: ${discoveryResult.polymarket.counts.liveMarketsFound}, ` +
+        `Kalshi: ${discoveryResult.kalshi.counts.liveMarketsFound})`
+      );
+      
+      return {
+        vendorEvents,
+        discoveryResult,
+        fetchedAt: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      console.error('[LiveMarketFetcher] Live sports discovery failed:', error.message);
+      return {
+        vendorEvents: [],
+        discoveryResult: {
+          polymarket: {
+            platform: 'polymarket',
+            discoveredAt: new Date().toISOString(),
+            liveMarkets: [],
+            counts: {
+              requestsMade: 0,
+              eventsFetched: 0,
+              eventsWithStartTimeInPast: 0,
+              marketsInspected: 0,
+              liveMarketsFound: 0,
+            },
+          },
+          kalshi: {
+            platform: 'kalshi',
+            discoveredAt: new Date().toISOString(),
+            liveMarkets: [],
+            counts: {
+              requestsMade: 0,
+              eventsFetched: 0,
+              eventsWithStartTimeInPast: 0,
+              marketsInspected: 0,
+              liveMarketsFound: 0,
+            },
+          },
+          totalLiveMarkets: 0,
+          discoveredAt: new Date().toISOString(),
+        },
+        fetchedAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * Fetch all platforms and apply live sports filtering using the discovery logic.
+   * 
+   * This combines the standard market fetching with the live detection heuristics
+   * from the discovery module.
+   */
+  async fetchAllPlatformsWithLiveFilter(
+    filters: MarketFilterInput
+  ): Promise<Record<MarketPlatform, FetchResult>> {
+    const results = await this.fetchAllPlatforms(filters);
+    
+    // Apply live sports filtering to each platform's results
+    for (const platform of Object.keys(results) as MarketPlatform[]) {
+      const result = results[platform];
+      if (result.markets.length > 0 && filters.liveOnly) {
+        result.markets = filterToLiveMarkets(result.markets);
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Check if Kalshi credentials are available
+   */
+  hasKalshiCredentials(): boolean {
+    return checkKalshiCredentials();
   }
 }
 

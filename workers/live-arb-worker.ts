@@ -25,6 +25,7 @@ import { KalshiAPI } from '../lib/markets/kalshi';
 import { PolymarketAPI } from '../lib/markets/polymarket';
 import { SXBetAPI } from '../lib/markets/sxbet';
 import { LivePriceCache } from '../lib/live-price-cache';
+import { addOrUpdateEvent, markPlatformSnapshot } from '../lib/live-event-registry';
 
 // ============================================================================
 // Configuration
@@ -526,6 +527,18 @@ class LiveArbWorker {
     this.refreshInProgress = true;
 
     try {
+      // LIVE SPORTS DISCOVERY MODE:
+      // When liveEventsOnly is enabled, use the efficient targeted discovery
+      // instead of fetching all markets and filtering client-side.
+      // This uses:
+      // - Polymarket: event_date filter for today's sports events
+      // - Kalshi: series_ticker filter for known sports game series
+      if (runtimeConfig.liveEventsOnly && runtimeConfig.sportsOnly) {
+        await this.refreshMarketsWithLiveDiscovery(botConfig, runtimeConfig, startTime);
+        return;
+      }
+
+      // STANDARD MODE: Fetch all markets and filter
       const filters = this.marketFetcher.buildFiltersFromConfig(botConfig, runtimeConfig);
       const results = await this.marketFetcher.fetchAllPlatforms(filters);
       
@@ -557,6 +570,89 @@ class LiveArbWorker {
       }
     } catch (error) {
       liveArbLog('error', WORKER_TAG, 'Registry refresh failed', error as Error);
+    } finally {
+      this.refreshInProgress = false;
+    }
+  }
+
+  /**
+   * Refresh markets using the live sports discovery mode.
+   * 
+   * This is more efficient than fetching all markets when you only need
+   * currently-live sports events. It uses targeted API queries:
+   * - Polymarket: event_date filter for today's sports events
+   * - Kalshi: series_ticker filter for known sports game series
+   */
+  private async refreshMarketsWithLiveDiscovery(
+    botConfig: BotConfig,
+    runtimeConfig: LiveArbRuntimeConfig,
+    startTime: number
+  ): Promise<void> {
+    try {
+      const discoveryResult = await this.marketFetcher.discoverLiveSports();
+      
+      // Populate registry directly with VendorEvents
+      const vendorEvents = discoveryResult.vendorEvents;
+      
+      // Group by platform for snapshot updates
+      const polymarketEvents = vendorEvents.filter(e => e.platform === 'POLYMARKET');
+      const kalshiEvents = vendorEvents.filter(e => e.platform === 'KALSHI');
+      
+      // Update registry with platform snapshots (replaces old events for each platform)
+      if (polymarketEvents.length > 0) {
+        markPlatformSnapshot('POLYMARKET', polymarketEvents);
+      }
+      if (kalshiEvents.length > 0) {
+        markPlatformSnapshot('KALSHI', kalshiEvents);
+      }
+      
+      // Also add/update individual events (for incremental updates)
+      for (let i = 0; i < vendorEvents.length; i++) {
+        addOrUpdateEvent(vendorEvents[i]);
+        // Yield periodically
+        if (i > 0 && i % YIELD_EVERY_N_ITEMS === 0) {
+          await yieldToEventLoop();
+        }
+      }
+
+      this.lastRefreshAt = new Date().toISOString();
+      this.lastRefreshDurationMs = Date.now() - startTime;
+      this.lastTotalMarkets = vendorEvents.length;
+
+      const polyCount = discoveryResult.discoveryResult.polymarket.counts.liveMarketsFound;
+      const kalshiCount = discoveryResult.discoveryResult.kalshi.counts.liveMarketsFound;
+      
+      liveArbLog('info', WORKER_TAG, 'Live sports discovery complete', {
+        mode: 'LIVE_DISCOVERY',
+        totalVendorEvents: vendorEvents.length,
+        polymarketLive: polyCount,
+        kalshiLive: kalshiCount,
+        polymarketRequests: discoveryResult.discoveryResult.polymarket.counts.requestsMade,
+        kalshiRequests: discoveryResult.discoveryResult.kalshi.counts.requestsMade,
+        durationMs: this.lastRefreshDurationMs,
+      });
+
+      if (vendorEvents.length === 0) {
+        liveArbLog('info', WORKER_TAG, 'No live sports events found at this time');
+      }
+    } catch (error) {
+      liveArbLog('error', WORKER_TAG, 'Live sports discovery failed', error as Error);
+      
+      // Fallback to standard refresh
+      liveArbLog('info', WORKER_TAG, 'Falling back to standard market refresh');
+      const filters = this.marketFetcher.buildFiltersFromConfig(botConfig, runtimeConfig);
+      const results = await this.marketFetcher.fetchAllPlatforms(filters);
+      
+      const markets: any[] = [];
+      for (const [platform, result] of Object.entries(results)) {
+        markets.push(...result.markets);
+      }
+      
+      await refreshRegistry(markets);
+      
+      this.lastRefreshAt = new Date().toISOString();
+      this.lastRefreshDurationMs = Date.now() - startTime;
+      this.lastTotalMarkets = markets.length;
     } finally {
       this.refreshInProgress = false;
     }
