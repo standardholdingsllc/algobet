@@ -164,11 +164,18 @@ interface PlatformStatus {
   connected: boolean;
   state: string;
   lastMessageAt: string | null;
+  /** Computed at read-time using server's Date.now() - NOT from worker's cached value */
+  lastMessageAgeMs: number | null;
+  /** Computed at read-time: true if connected but lastMessageAgeMs > STALE_THRESHOLD_MS */
+  isStale: boolean;
   subscribedMarkets: number;
   errorMessage?: string;
   disabled?: boolean;
   disabledReason?: string;
 }
+
+/** Threshold for marking a connected platform as "stale" (no message in 60s) */
+const PLATFORM_STALE_THRESHOLD_MS = 60_000;
 
 // ============================================================================
 // Handler
@@ -414,29 +421,57 @@ export default async function handler(
 // ============================================================================
 
 /**
+ * Compute lastMessageAgeMs at read-time using server's Date.now().
+ * 
+ * IMPORTANT: Do NOT trust the worker's pre-computed lastMessageAgeMs or isStale values.
+ * Those are computed at write-time and become stale by the time we read them.
+ */
+function computeMessageAge(lastMessageAt: string | null): number | null {
+  if (!lastMessageAt) return null;
+  try {
+    return Date.now() - new Date(lastMessageAt).getTime();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Build platform status for API response.
  * 
- * IMPORTANT: Vercel serverless does NOT have platform credentials (SXBET_WS_URL, etc).
+ * ============================================================================
+ * CRITICAL: NEVER gate platform status by Vercel's own env vars!
+ * ============================================================================
+ * 
+ * Vercel serverless does NOT have platform credentials (SXBET_WS_URL, etc).
  * The source of truth for platform status is the KV heartbeat written by the DO worker.
+ * 
+ * If you're tempted to add a check like `if (!process.env.SXBET_WS_URL)` here, DON'T.
+ * The worker decides if a platform is disabled and writes that to KV.
  * 
  * Logic:
  * - If worker has KV status for this platform, use it (including disabled state)
  * - If worker is not present (stale heartbeat), show "no_worker"
  * - If worker is present but no status for this platform, show "initializing"
  * 
- * We do NOT check Vercel's own env vars - the worker decides if a platform is disabled.
+ * Staleness (isStale) and lastMessageAgeMs are computed at READ-TIME using the
+ * server's Date.now(), not the worker's pre-computed values which become stale.
  */
 function buildPlatformStatus(
   kvStatus: WorkerPlatformStatus | undefined,
   platform: 'sxbet' | 'polymarket' | 'kalshi',
   workerPresent: boolean
 ): PlatformStatus {
+  // Compute message age at read-time (not from worker's cached value)
+  const lastMessageAgeMs = computeMessageAge(kvStatus?.lastMessageAt ?? null);
+  
   // If we have KV status and it shows disabled, use that (worker decided it's disabled)
   if (kvStatus?.disabled) {
     return {
       connected: false,
       state: 'disabled',
       lastMessageAt: kvStatus.lastMessageAt,
+      lastMessageAgeMs,
+      isStale: false, // Disabled platforms aren't "stale", they're disabled
       subscribedMarkets: 0,
       disabled: true,
       disabledReason: kvStatus.disabledReason || kvStatus.errorMessage,
@@ -449,6 +484,8 @@ function buildPlatformStatus(
       connected: false,
       state: 'no_worker',
       lastMessageAt: null,
+      lastMessageAgeMs: null,
+      isStale: false, // No worker = not "stale", just absent
       subscribedMarkets: 0,
       errorMessage: 'Worker heartbeat stale or missing',
     };
@@ -460,15 +497,24 @@ function buildPlatformStatus(
       connected: false,
       state: 'initializing',
       lastMessageAt: null,
+      lastMessageAgeMs: null,
+      isStale: false,
       subscribedMarkets: 0,
     };
   }
+
+  // Compute isStale at read-time: connected but no message in >60s
+  const isStale = kvStatus.connected && 
+    lastMessageAgeMs !== null && 
+    lastMessageAgeMs > PLATFORM_STALE_THRESHOLD_MS;
 
   // Worker is present and we have KV status - use it as source of truth
   return {
     connected: kvStatus.connected,
     state: kvStatus.state,
     lastMessageAt: kvStatus.lastMessageAt,
+    lastMessageAgeMs,
+    isStale,
     subscribedMarkets: kvStatus.subscribedMarkets,
     errorMessage: kvStatus.errorMessage,
   };

@@ -23,6 +23,10 @@ interface PlatformStatus {
   connected: boolean;
   state: string;
   lastMessageAt: string | null;
+  /** Computed at read-time by the API using server's Date.now() */
+  lastMessageAgeMs?: number | null;
+  /** Computed at read-time: true if connected but lastMessageAgeMs > 60s */
+  isStale?: boolean;
   subscribedMarkets: number;
   errorMessage?: string;
 }
@@ -1577,17 +1581,17 @@ export default function LiveArbPage() {
               <PlatformCard 
                 name="SX.bet" 
                 status={liveArbStatus.platforms.sxbet}
-                isStale={marketsData?.platformStats?.find(p => p.platform === 'sxbet')?.isStale}
+                isStale={liveArbStatus.platforms.sxbet.isStale}
               />
               <PlatformCard 
                 name="Polymarket" 
                 status={liveArbStatus.platforms.polymarket}
-                isStale={marketsData?.platformStats?.find(p => p.platform === 'polymarket')?.isStale}
+                isStale={liveArbStatus.platforms.polymarket.isStale}
               />
               <PlatformCard 
                 name="Kalshi" 
                 status={liveArbStatus.platforms.kalshi}
-                isStale={marketsData?.platformStats?.find(p => p.platform === 'kalshi')?.isStale}
+                isStale={liveArbStatus.platforms.kalshi.isStale}
               />
             </div>
           </div>
@@ -1628,8 +1632,10 @@ export default function LiveArbPage() {
             </div>
           )}
 
-          {/* Stale platform warning */}
-          {marketsData?.platformStats?.some(p => p.isStale) && (
+          {/* Stale platform warning - use status API's computed isStale */}
+          {(liveArbStatus?.platforms.sxbet.isStale || 
+            liveArbStatus?.platforms.polymarket.isStale || 
+            liveArbStatus?.platforms.kalshi.isStale) && (
             <div className="px-4 py-3 bg-orange-900/20 border-b border-orange-700/30">
               <div className="flex items-start gap-2 text-sm text-orange-300">
                 <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
