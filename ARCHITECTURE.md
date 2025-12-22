@@ -315,10 +315,65 @@ All live-arb endpoints read from **KV storage**, not in-memory state. This enabl
 | `GET /api/live-arb/status` | KV heartbeat | Worker presence, WS connections, circuit breaker |
 | `GET/POST /api/live-arb/config` | KV config | Read/write runtime configuration |
 | `GET/POST /api/live-arb/execution-mode` | KV config | Read/write execution mode |
-| `GET /api/live-arb/live-events` | KV snapshot | Registry events, matched groups, watchers |
+| `GET /api/live-arb/live-events` | KV snapshot | Registry events, matched groups, watchers, debug info |
 | `GET /api/live-arb/dry-fire-stats` | KV logs | Aggregated dry-fire statistics |
 
-### 9.2 Dashboard Endpoints
+### 9.2 Live Events API Response
+
+The `/api/live-arb/live-events` endpoint returns a comprehensive response for diagnosing matching issues:
+
+```typescript
+interface LiveEventsResponse {
+  enabled: boolean;                    // Rule-based matcher enabled
+  running: boolean;                    // Worker running and matcher enabled
+  workerPresent: boolean;              // Fresh heartbeat from DO worker
+  snapshotAge: number | null;          // Age of snapshot in ms
+  snapshotUpdatedAt: string | null;    // ISO timestamp of last snapshot
+  config: { ... };                     // Matcher configuration
+  registry: {                          // All tracked vendor events
+    totalEvents: number;
+    events: VendorEvent[];             // Capped at 200
+    countByPlatform: Record<Platform, number>;
+    countByStatus: Record<Status, number>;
+  };
+  matcher: {                           // Match statistics
+    totalGroups: number;
+    threeWayMatches: number;
+    twoWayMatches: number;
+    bySport: Record<string, number>;
+  };
+  matchedGroups: MatchedEventGroup[];  // Capped at 100
+  watchers: { active, list, stats };   // Active watchers
+  eventsByPlatform: { sxbet, polymarket, kalshi };
+  stats: { ... };                      // Summary statistics
+  debug: LiveEventsDebugInfo;          // Debug fields for diagnosing issues
+  generatedAt: number;                 // Response generation timestamp
+}
+
+interface LiveEventsDebugInfo {
+  schemaVersion: number;               // Increment when debug shape changes
+  matchupCountsByPlatform: Record<string, number>;  // MATCHUP events per platform
+  matchupKeyMissingByPlatform: Record<string, number>;  // Events missing matchupKey
+  sampleMatchupKeysByPlatform: Record<string, string[]>;  // Sample keys (up to 10)
+  sampleKalshiTitles: string[];        // First 10 Kalshi titles
+  eventFieldPresence: {                // Which fields exist on events
+    hasMarketKind, hasMatchupKey, hasNormalizedTitle, hasHomeTeam, hasAwayTeam
+  };
+  countsBySport: Record<string, number>;  // Events per sport
+  sampleEventsByPlatform: Record<string, EventSample[]>;  // 3 samples per platform
+  matchedGroupEventKeys: string[];     // First 50 matched group keys
+  snapshotAgeWarning: boolean;         // True if snapshot > 60s old
+}
+```
+
+**Diagnosing "0 groups" issues:**
+1. Check `snapshotAge` - should be < 60s if worker is healthy
+2. Check `registry.totalEvents` - should be > 0 if platforms are fetching
+3. Check `debug.matchupCountsByPlatform` - need events on 2+ platforms for matches
+4. Check `debug.matchupKeyMissingByPlatform` - events need matchupKey for matching
+5. Check `debug.sampleKalshiTitles` - verify Kalshi is fetching sports markets
+
+### 9.3 Dashboard Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|

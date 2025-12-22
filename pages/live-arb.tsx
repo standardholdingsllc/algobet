@@ -124,10 +124,39 @@ interface EventWatcherInfo {
   };
 }
 
+interface LiveEventsDebugInfo {
+  schemaVersion: number;
+  matchupCountsByPlatform: Record<string, number>;
+  matchupKeyMissingByPlatform: Record<string, number>;
+  sampleMatchupKeysByPlatform: Record<string, string[]>;
+  sampleKalshiTitles: string[];
+  eventFieldPresence: {
+    hasMarketKind: boolean;
+    hasMatchupKey: boolean;
+    hasNormalizedTitle: boolean;
+    hasHomeTeam: boolean;
+    hasAwayTeam: boolean;
+  };
+  countsBySport: Record<string, number>;
+  sampleEventsByPlatform: Record<string, Array<{
+    vendorMarketId: string;
+    rawTitle: string;
+    sport: string;
+    status: string;
+    homeTeam?: string;
+    awayTeam?: string;
+  }>>;
+  matchedGroupEventKeys: string[];
+  snapshotAgeWarning: boolean;
+}
+
 interface LiveEventsData {
   enabled: boolean;
   running: boolean;
   uptimeMs: number;
+  workerPresent: boolean;
+  snapshotAge: number | null;
+  snapshotUpdatedAt: string | null;
   config: {
     enabled: boolean;
     sportsOnly: boolean;
@@ -161,6 +190,7 @@ interface LiveEventsData {
     kalshi: number;
   };
   matchedGroups: MatchedEventGroup[];
+  debug?: LiveEventsDebugInfo;
 }
 
 interface LiveArbRuntimeConfigData {
@@ -502,6 +532,179 @@ function BotControlPanel({
   );
 }
 
+// Debug Panel for diagnosing matching issues
+function MatcherDebugPanel({ debug, snapshotAge }: { debug: LiveEventsDebugInfo | undefined; snapshotAge: number | null }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  if (!debug) {
+    return null;
+  }
+  
+  const snapshotAgeSeconds = snapshotAge ? Math.round(snapshotAge / 1000) : null;
+  const isStale = snapshotAge !== null && snapshotAge > 60000;
+  
+  return (
+    <div className="mt-4 border-t border-gray-700 pt-4">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+      >
+        <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+        <span>Debug Info (Schema v{debug.schemaVersion})</span>
+        {isStale && (
+          <span className="px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-300">
+            Stale ({snapshotAgeSeconds}s old)
+          </span>
+        )}
+      </button>
+      
+      {isExpanded && (
+        <div className="mt-3 space-y-4 text-xs">
+          {/* Snapshot Status */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Snapshot Status</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-gray-500">Age:</span>{' '}
+                <span className={isStale ? 'text-yellow-300' : 'text-green-300'}>
+                  {snapshotAgeSeconds !== null ? `${snapshotAgeSeconds}s` : 'N/A'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Warning:</span>{' '}
+                <span className={debug.snapshotAgeWarning ? 'text-yellow-300' : 'text-green-300'}>
+                  {debug.snapshotAgeWarning ? 'Yes (>60s)' : 'No'}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Field Presence */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Event Field Presence</div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(debug.eventFieldPresence).map(([field, present]) => (
+                <span
+                  key={field}
+                  className={`px-2 py-1 rounded ${
+                    present ? 'bg-green-900/30 text-green-300' : 'bg-red-900/30 text-red-300'
+                  }`}
+                >
+                  {field}: {present ? '✓' : '✗'}
+                </span>
+              ))}
+            </div>
+          </div>
+          
+          {/* Matchup Counts by Platform */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Matchup Counts by Platform</div>
+            <div className="grid grid-cols-3 gap-2">
+              {['SXBET', 'POLYMARKET', 'KALSHI'].map(platform => (
+                <div key={platform} className="text-center">
+                  <div className={`text-lg font-bold ${
+                    platform === 'SXBET' ? 'text-orange-300' :
+                    platform === 'POLYMARKET' ? 'text-purple-300' : 'text-blue-300'
+                  }`}>
+                    {debug.matchupCountsByPlatform[platform] || 0}
+                  </div>
+                  <div className="text-gray-500">{platform}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Missing MatchupKey Counts */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Events Missing MatchupKey</div>
+            <div className="grid grid-cols-3 gap-2">
+              {['SXBET', 'POLYMARKET', 'KALSHI'].map(platform => (
+                <div key={platform} className="text-center">
+                  <div className={`text-lg font-bold ${
+                    (debug.matchupKeyMissingByPlatform[platform] || 0) > 0 ? 'text-yellow-300' : 'text-green-300'
+                  }`}>
+                    {debug.matchupKeyMissingByPlatform[platform] || 0}
+                  </div>
+                  <div className="text-gray-500">{platform}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Counts by Sport */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Events by Sport</div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(debug.countsBySport).map(([sport, count]) => (
+                <span key={sport} className="px-2 py-1 rounded bg-cyan-900/30 text-cyan-300">
+                  {sport}: {count}
+                </span>
+              ))}
+              {Object.keys(debug.countsBySport).length === 0 && (
+                <span className="text-gray-500">No events</span>
+              )}
+            </div>
+          </div>
+          
+          {/* Sample Kalshi Titles */}
+          {debug.sampleKalshiTitles.length > 0 && (
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <div className="font-medium text-gray-300 mb-2">Sample Kalshi Titles</div>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {debug.sampleKalshiTitles.map((title, idx) => (
+                  <div key={idx} className="text-gray-400 truncate" title={title}>
+                    {idx + 1}. {title}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Sample MatchupKeys */}
+          {Object.values(debug.sampleMatchupKeysByPlatform).some(arr => arr.length > 0) && (
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <div className="font-medium text-gray-300 mb-2">Sample MatchupKeys</div>
+              {['SXBET', 'POLYMARKET', 'KALSHI'].map(platform => {
+                const keys = debug.sampleMatchupKeysByPlatform[platform] || [];
+                if (keys.length === 0) return null;
+                return (
+                  <div key={platform} className="mb-2">
+                    <div className={`text-xs font-medium ${
+                      platform === 'SXBET' ? 'text-orange-300' :
+                      platform === 'POLYMARKET' ? 'text-purple-300' : 'text-blue-300'
+                    }`}>{platform}:</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {keys.slice(0, 5).map((key, idx) => (
+                        <code key={idx} className="px-1 py-0.5 bg-gray-800 rounded text-gray-400 text-xs">
+                          {key.length > 40 ? key.slice(0, 40) + '...' : key}
+                        </code>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Matched Group Event Keys */}
+          {debug.matchedGroupEventKeys.length > 0 && (
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <div className="font-medium text-gray-300 mb-2">Matched Group Keys ({debug.matchedGroupEventKeys.length})</div>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                {debug.matchedGroupEventKeys.slice(0, 20).map((key, idx) => (
+                  <code key={idx} className="px-1 py-0.5 bg-green-900/30 rounded text-green-300 text-xs">
+                    {key.length > 30 ? key.slice(0, 30) + '...' : key}
+                  </code>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Rule-Based Matcher Card
 function RuleBasedMatcherCard({
   data,
@@ -525,6 +728,7 @@ function RuleBasedMatcherCard({
   const matcherEnabled =
     runtimeConfig?.ruleBasedMatcherEnabled ?? data.enabled;
   const uptimeMinutes = Math.floor((data.uptimeMs || 0) / 60000);
+  const snapshotAgeSeconds = data.snapshotAge ? Math.round(data.snapshotAge / 1000) : null;
 
   return (
     <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
@@ -534,6 +738,16 @@ function RuleBasedMatcherCard({
           Rule-Based Sports Matcher
         </h3>
         <div className="flex items-center gap-2">
+          {data.workerPresent && (
+            <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
+              WORKER OK
+            </span>
+          )}
+          {!data.workerPresent && (
+            <span className="px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300">
+              NO WORKER
+            </span>
+          )}
           {data.running && matcherEnabled && (
             <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
               RUNNING
@@ -548,6 +762,18 @@ function RuleBasedMatcherCard({
           </span>
         </div>
       </div>
+
+      {/* Snapshot Age Indicator */}
+      {snapshotAgeSeconds !== null && (
+        <div className={`mb-4 text-xs ${snapshotAgeSeconds > 60 ? 'text-yellow-400' : 'text-gray-500'}`}>
+          Snapshot age: {snapshotAgeSeconds}s
+          {data.snapshotUpdatedAt && (
+            <span className="ml-2">
+              (updated: {new Date(data.snapshotUpdatedAt).toLocaleTimeString()})
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Main Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -627,6 +853,9 @@ function RuleBasedMatcherCard({
           </div>
         </div>
       )}
+
+      {/* Debug Panel - Always available, especially useful when 0 groups */}
+      <MatcherDebugPanel debug={data.debug} snapshotAge={data.snapshotAge} />
     </div>
   );
 }

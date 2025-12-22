@@ -14,6 +14,7 @@
  * - Active watchers with timing stats
  * - Rate limiter status
  * - Statistics
+ * - Debug fields for diagnosing matching issues
  *
  * Query Parameters:
  * - liveOnly: Only return live events (not pre-game)
@@ -31,7 +32,7 @@ import {
   isHeartbeatFresh,
   LiveEventsSnapshot,
 } from '@/lib/kv-storage';
-import { Sport, VendorEventStatus } from '@/types/live-events';
+import { Sport, VendorEventStatus, LiveEventPlatform } from '@/types/live-events';
 
 /**
  * Heartbeat TTL - worker is considered "present" if heartbeat is fresher than this.
@@ -40,6 +41,183 @@ const WORKER_HEARTBEAT_STALE_MS = parseInt(
   process.env.WORKER_HEARTBEAT_STALE_MS || '60000',
   10
 );
+
+/**
+ * Schema version for debug fields - increment when debug shape changes.
+ */
+const DEBUG_SCHEMA_VERSION = 2;
+
+/**
+ * Debug fields computed from snapshot for diagnosing "0 groups" issues.
+ */
+interface LiveEventsDebugInfo {
+  /** Schema version - increment when debug shape changes */
+  schemaVersion: number;
+  
+  /** Counts of events with marketKind=MATCHUP per platform */
+  matchupCountsByPlatform: Record<string, number>;
+  
+  /** Events where marketKind=MATCHUP but matchupKey is missing, or events without marketKind/matchupKey */
+  matchupKeyMissingByPlatform: Record<string, number>;
+  
+  /** Sample matchupKeys per platform (up to 10 unique per platform) */
+  sampleMatchupKeysByPlatform: Record<string, string[]>;
+  
+  /** Sample Kalshi titles (first 10 rawTitle for KALSHI events) */
+  sampleKalshiTitles: string[];
+  
+  /** Field presence booleans */
+  eventFieldPresence: {
+    hasMarketKind: boolean;
+    hasMatchupKey: boolean;
+    hasNormalizedTitle: boolean;
+    hasHomeTeam: boolean;
+    hasAwayTeam: boolean;
+  };
+  
+  /** Counts of events per sport */
+  countsBySport: Record<string, number>;
+  
+  /** Sample events per platform (first 3 per platform for inspection) */
+  sampleEventsByPlatform: Record<string, Array<{
+    vendorMarketId: string;
+    rawTitle: string;
+    sport: string;
+    status: string;
+    homeTeam?: string;
+    awayTeam?: string;
+  }>>;
+  
+  /** Matched group summary - what eventKeys exist */
+  matchedGroupEventKeys: string[];
+  
+  /** Snapshot age warning if > 60s */
+  snapshotAgeWarning: boolean;
+}
+
+/**
+ * Compute debug info from snapshot events.
+ */
+function computeDebugInfo(
+  snapshot: LiveEventsSnapshot | null,
+  snapshotAge: number | null
+): LiveEventsDebugInfo {
+  const events = snapshot?.registry?.events ?? [];
+  
+  // Initialize per-platform counters
+  const platforms: LiveEventPlatform[] = ['SXBET', 'POLYMARKET', 'KALSHI'];
+  const matchupCountsByPlatform: Record<string, number> = {};
+  const matchupKeyMissingByPlatform: Record<string, number> = {};
+  const sampleMatchupKeysByPlatform: Record<string, string[]> = {};
+  const sampleEventsByPlatform: Record<string, Array<{
+    vendorMarketId: string;
+    rawTitle: string;
+    sport: string;
+    status: string;
+    homeTeam?: string;
+    awayTeam?: string;
+  }>> = {};
+  const countsBySport: Record<string, number> = {};
+  
+  for (const p of platforms) {
+    matchupCountsByPlatform[p] = 0;
+    matchupKeyMissingByPlatform[p] = 0;
+    sampleMatchupKeysByPlatform[p] = [];
+    sampleEventsByPlatform[p] = [];
+  }
+  
+  // Field presence tracking
+  let hasMarketKind = false;
+  let hasMatchupKey = false;
+  let hasNormalizedTitle = false;
+  let hasHomeTeam = false;
+  let hasAwayTeam = false;
+  
+  const sampleKalshiTitles: string[] = [];
+  
+  for (const event of events) {
+    const platform = event.platform;
+    const extra = (event as any).extra ?? {};
+    const marketKind = extra.marketKind;
+    const matchupKey = extra.matchupKey;
+    
+    // Track field presence
+    if (marketKind) hasMarketKind = true;
+    if (matchupKey) hasMatchupKey = true;
+    if (event.normalizedTitle) hasNormalizedTitle = true;
+    if (event.homeTeam) hasHomeTeam = true;
+    if (event.awayTeam) hasAwayTeam = true;
+    
+    // Count by sport
+    const sport = event.sport || 'UNKNOWN';
+    countsBySport[sport] = (countsBySport[sport] || 0) + 1;
+    
+    // Check for MATCHUP events
+    if (marketKind === 'MATCHUP') {
+      matchupCountsByPlatform[platform] = (matchupCountsByPlatform[platform] || 0) + 1;
+      
+      if (!matchupKey) {
+        matchupKeyMissingByPlatform[platform] = (matchupKeyMissingByPlatform[platform] || 0) + 1;
+      } else {
+        // Collect sample matchupKeys (up to 10 unique per platform)
+        const existing = sampleMatchupKeysByPlatform[platform] || [];
+        if (existing.length < 10 && !existing.includes(matchupKey)) {
+          existing.push(matchupKey);
+          sampleMatchupKeysByPlatform[platform] = existing;
+        }
+      }
+    } else {
+      // Events without marketKind or with non-MATCHUP kind
+      // Count these as "missing" if they have no matchupKey
+      if (!matchupKey) {
+        matchupKeyMissingByPlatform[platform] = (matchupKeyMissingByPlatform[platform] || 0) + 1;
+      }
+    }
+    
+    // Sample Kalshi titles
+    if (platform === 'KALSHI' && sampleKalshiTitles.length < 10) {
+      sampleKalshiTitles.push(event.rawTitle);
+    }
+    
+    // Sample events per platform (first 3)
+    const platformSamples = sampleEventsByPlatform[platform] || [];
+    if (platformSamples.length < 3) {
+      platformSamples.push({
+        vendorMarketId: event.vendorMarketId,
+        rawTitle: event.rawTitle,
+        sport: event.sport,
+        status: event.status,
+        homeTeam: event.homeTeam,
+        awayTeam: event.awayTeam,
+      });
+      sampleEventsByPlatform[platform] = platformSamples;
+    }
+  }
+  
+  // Extract matched group event keys
+  const matchedGroupEventKeys = (snapshot?.matchedGroups ?? [])
+    .slice(0, 50)
+    .map(g => g.eventKey);
+  
+  return {
+    schemaVersion: DEBUG_SCHEMA_VERSION,
+    matchupCountsByPlatform,
+    matchupKeyMissingByPlatform,
+    sampleMatchupKeysByPlatform,
+    sampleKalshiTitles,
+    eventFieldPresence: {
+      hasMarketKind,
+      hasMatchupKey,
+      hasNormalizedTitle,
+      hasHomeTeam,
+      hasAwayTeam,
+    },
+    countsBySport,
+    sampleEventsByPlatform,
+    matchedGroupEventKeys,
+    snapshotAgeWarning: snapshotAge !== null && snapshotAge > 60000,
+  };
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -69,6 +247,11 @@ export default async function handler(
     
     // Get live events snapshot from KV
     const snapshot = await getLiveEventsSnapshot();
+    
+    // Calculate snapshot age
+    const snapshotAge = snapshot?.updatedAt 
+      ? Date.now() - new Date(snapshot.updatedAt).getTime() 
+      : null;
     
     // Check if enabled
     const enabled = runtimeConfig.ruleBasedMatcherEnabled;
@@ -123,17 +306,19 @@ export default async function handler(
       bySport[group.sport] = (bySport[group.sport] || 0) + 1;
     }
 
-    // Calculate uptime from heartbeat if available
-    const uptimeMs = 0; // Uptime is tracked in-memory, not available from KV
+    // Calculate uptime from heartbeat if available (not available from KV)
+    const uptimeMs = 0;
+
+    // Compute debug info for diagnosing matching issues
+    const debug = computeDebugInfo(snapshot, snapshotAge);
 
     const response = {
       enabled,
       running,
       uptimeMs,
       workerPresent,
-      snapshotAge: snapshot?.updatedAt 
-        ? Date.now() - new Date(snapshot.updatedAt).getTime() 
-        : null,
+      snapshotAge,
+      snapshotUpdatedAt: snapshot?.updatedAt ?? null,
       config: {
         enabled: config.enabled,
         sportsOnly: config.sportsOnly,
@@ -147,7 +332,7 @@ export default async function handler(
         postGameWindowMinutes: config.postGameWindow / 60000,
       },
       registry: {
-        totalEvents: registryEvents.length,
+        totalEvents: snapshot?.registry?.totalEvents ?? registryEvents.length,
         events: registryEvents.slice(0, 200), // Limit for response size
         countByPlatform,
         countByStatus,
@@ -209,6 +394,7 @@ export default async function handler(
         arbChecksTotal: snapshot?.stats?.arbChecksTotal ?? 0,
         opportunitiesTotal: snapshot?.stats?.opportunitiesTotal ?? 0,
       },
+      debug,
       generatedAt: Date.now(),
     };
 
