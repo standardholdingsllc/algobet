@@ -299,6 +299,7 @@ The system uses a split architecture where the **worker runs on Digital Ocean** 
 |--------|--------|--------|---------|
 | `algobet:live-arb:worker-heartbeat` | Worker | API (`/status`) | Worker presence, platform connections, circuit breaker |
 | `algobet:live-arb:live-events-snapshot` | Worker | API (`/live-events`) | Registry events, matched groups, watcher stats |
+| `algobet:arbs:YYYY-MM-DD` | Worker | API (`/arb-logs`) | Daily arb opportunity logs with audit fields |
 | `algobet:data` | Both | Both | Config, balances, bets, opportunity logs |
 
 **Key Constants** (exported from `lib/kv-storage.ts`):
@@ -357,6 +358,7 @@ All live-arb endpoints read from **KV storage**, not in-memory state. This enabl
 | `GET /api/live-arb/live-events` | KV snapshot | Registry events, matched groups, watchers, debug info |
 | `GET /api/live-arb/markets` | KV snapshot + heartbeat | Watched markets from active watchers (NOT live prices) |
 | `GET /api/live-arb/dry-fire-stats` | KV logs | Aggregated dry-fire statistics |
+| `GET /api/arb-logs` | KV arb logs | Arb opportunities with audit fields (JSON or CSV) |
 | `GET /api/debug/kv` | KV probe | Debug endpoint for KV connectivity (requires `DEBUG_STATUS=1`) |
 
 ### 9.2 Live Markets API (KV-Backed)
@@ -521,7 +523,82 @@ Returns detailed KV probe information:
 
 **Important:** Vercel serverless does NOT need platform credentials (`SXBET_WS_URL`, `SXBET_API_KEY`, etc). These are only needed on the DO worker. The status API reads platform connection state from the KV heartbeat.
 
-### 9.5 Dashboard Endpoints
+### 9.5 Arb Logs API
+
+The `/api/arb-logs` endpoint provides access to logged arbitrage opportunities with full audit fields.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `date` | `YYYY-MM-DD` | Today | Date to fetch logs for |
+| `limit` | `1-1000` | 100 | Max records to return (JSON only) |
+| `cursor` | `>=0` | 0 | Pagination offset (JSON only) |
+| `format` | `json\|csv` | `json` | Output format |
+
+**JSON Response:**
+```typescript
+interface ArbLogsResponse {
+  logs: ArbOpportunityLog[];
+  total: number;
+  cursor?: number;       // Next cursor for pagination
+  hasMore: boolean;
+  date: string;
+  generatedAt: string;
+}
+
+interface ArbOpportunityLog {
+  detectedAt: string;    // ISO timestamp
+  opportunityId: string;
+  matchupKey: string;
+  marketKind: 'prediction' | 'sportsbook';
+
+  // Leg A
+  platformA: MarketPlatform;
+  marketIdA: string;
+  outcomeA: 'yes' | 'no';
+  sideA: 'yes' | 'no';
+  rawPriceA: number;
+  impliedProbA: number;
+  asOfA: string;         // Price timestamp
+  ageMsA: number;        // Price age at detection
+
+  // Leg B
+  platformB: MarketPlatform;
+  marketIdB: string;
+  outcomeB: 'yes' | 'no';
+  sideB: 'yes' | 'no';
+  rawPriceB: number;
+  impliedProbB: number;
+  asOfB: string;
+  ageMsB: number;
+
+  // Timing
+  timeSkewMs: number;    // |asOfA - asOfB|
+
+  // Financials
+  payoutTarget: number;
+  totalCost: number;
+  profitAbs: number;
+  profitPct: number;
+  feesA: number;
+  feesB: number;
+
+  workerVersion: string;
+}
+```
+
+**CSV Export:**
+- URL: `/api/arb-logs?format=csv&date=YYYY-MM-DD`
+- Headers: `Content-Type: text/csv`, `Content-Disposition: attachment`
+- All responses set `Cache-Control: no-store`
+- Empty KV returns CSV with headers only (no errors)
+
+**Dashboard Integration:**
+- "Recent Arb Logs" panel calls `/api/arb-logs?limit=20`
+- "Download CSV" button links to `/api/arb-logs?format=csv&date=YYYY-MM-DD`
+- Warning badges shown if any row violates thresholds (ageMsA/B > 2000ms or timeSkewMs > 500ms)
+
+### 9.6 Dashboard Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|

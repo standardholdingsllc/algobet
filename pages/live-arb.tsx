@@ -1250,15 +1250,15 @@ function ExportPanel() {
   );
 }
 
-// Arb Opportunities Export Panel
-function ArbOpportunitiesExportPanel() {
+// Arb Logs Export Panel
+function ArbLogsExportPanel() {
   const [isExporting, setIsExporting] = useState(false);
+  const today = new Date().toISOString().split('T')[0];
 
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await fetch(`/api/live-arb/opportunities-csv?date=${today}`);
+      const response = await fetch(`/api/arb-logs?format=csv&date=${today}`);
       if (!response.ok) throw new Error('Export failed');
 
       const blob = await response.blob();
@@ -1282,38 +1282,57 @@ function ArbOpportunitiesExportPanel() {
     <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
       <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
         <Download className="w-5 h-5 text-emerald-400" />
-        Export Arb Opportunities
+        Export Arb Logs
       </h3>
 
       <p className="text-sm text-gray-400 mb-4">
         Download all arb opportunities detected today with full audit fields (timestamps, skew, leg ages).
       </p>
 
-      <button
-        onClick={handleExport}
-        disabled={isExporting}
-        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 
-                   disabled:bg-emerald-800 disabled:cursor-not-allowed rounded-lg text-white font-medium"
-      >
-        {isExporting ? (
-          <>
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            Exporting...
-          </>
-        ) : (
-          <>
-            <Download className="w-4 h-4" />
-            Download Today's CSV
-          </>
-        )}
-      </button>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleExport}
+          disabled={isExporting}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 
+                     disabled:bg-emerald-800 disabled:cursor-not-allowed rounded-lg text-white font-medium"
+        >
+          {isExporting ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Exporting...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" />
+              Download CSV
+            </>
+          )}
+        </button>
+
+        <a
+          href={`/api/arb-logs?format=csv&date=${today}`}
+          className="text-sm text-emerald-400 hover:text-emerald-300 underline"
+          download={`arb-opportunities-${today}.csv`}
+        >
+          Direct link
+        </a>
+      </div>
     </div>
   );
 }
 
-// Recent Opportunities Table
-function RecentOpportunitiesTable({ opportunities }: { opportunities: ArbOpportunityLog[] }) {
-  if (opportunities.length === 0) {
+// Threshold constants for validation warnings
+const MAX_PRICE_AGE_MS = 2000;
+const MAX_SKEW_MS = 500;
+
+// Check if an opportunity violates any thresholds
+function hasThresholdViolation(opp: ArbOpportunityLog): boolean {
+  return opp.ageMsA > MAX_PRICE_AGE_MS || opp.ageMsB > MAX_PRICE_AGE_MS || opp.timeSkewMs > MAX_SKEW_MS;
+}
+
+// Recent Arb Logs Table
+function RecentArbLogsTable({ logs }: { logs: ArbOpportunityLog[] }) {
+  if (logs.length === 0) {
     return (
       <div className="p-8 text-center text-gray-400">
         No arb opportunities detected yet today.
@@ -1321,76 +1340,116 @@ function RecentOpportunitiesTable({ opportunities }: { opportunities: ArbOpportu
     );
   }
 
+  const violationCount = logs.filter(hasThresholdViolation).length;
+
   return (
     <div className="overflow-x-auto">
+      {violationCount > 0 && (
+        <div className="px-4 py-3 bg-red-900/20 border-b border-red-700/30">
+          <div className="flex items-center gap-2 text-sm text-red-300">
+            <AlertTriangle className="w-4 h-4" />
+            <span>
+              {violationCount} opportunit{violationCount === 1 ? 'y' : 'ies'} with threshold violations detected.
+              This should not happen with DO gating enabled.
+            </span>
+          </div>
+        </div>
+      )}
       <table className="w-full">
         <thead className="bg-gray-900/50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Detected</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Matchup</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Platforms</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Profit %</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Total Cost</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Time Skew</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Leg Ages</th>
+            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Detected</th>
+            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Matchup</th>
+            <th className="px-3 py-3 text-center text-xs font-medium text-gray-400 uppercase">Platforms</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Profit %</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Payout</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Cost</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Skew</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Leg Ages</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-700">
-          {opportunities.map((opp) => (
-            <tr key={opp.opportunityId} className="hover:bg-gray-700/30">
-              <td className="px-4 py-3 text-sm text-gray-200">
-                {formatTimeAgo(opp.detectedAt)}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-200 max-w-xs truncate" title={opp.matchupKey}>
-                {opp.matchupKey.length > 40 ? opp.matchupKey.slice(0, 40) + '...' : opp.matchupKey}
-              </td>
-              <td className="px-4 py-3 text-center">
-                <div className="flex justify-center gap-1">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    opp.platformA === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
-                    opp.platformA === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
-                    'bg-blue-900/30 text-blue-300'
+          {logs.map((opp) => {
+            const hasViolation = hasThresholdViolation(opp);
+            return (
+              <tr 
+                key={opp.opportunityId} 
+                className={`hover:bg-gray-700/30 ${hasViolation ? 'bg-red-900/10' : ''}`}
+              >
+                <td className="px-3 py-3 text-sm">
+                  {hasViolation ? (
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      WARN
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
+                      OK
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-3 text-sm text-gray-200">
+                  {formatTimeAgo(opp.detectedAt)}
+                </td>
+                <td className="px-3 py-3 text-sm text-gray-200 max-w-[200px] truncate" title={opp.matchupKey}>
+                  {opp.matchupKey.length > 30 ? opp.matchupKey.slice(0, 30) + '...' : opp.matchupKey}
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <div className="flex justify-center gap-1">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      opp.platformA === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                      opp.platformA === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                      'bg-blue-900/30 text-blue-300'
+                    }`}>
+                      {opp.platformA.toUpperCase().slice(0, 4)}
+                    </span>
+                    <span className="text-gray-500">/</span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      opp.platformB === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                      opp.platformB === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                      'bg-blue-900/30 text-blue-300'
+                    }`}>
+                      {opp.platformB.toUpperCase().slice(0, 4)}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-sm text-right">
+                  <span className={`font-medium ${
+                    opp.profitPct >= 1 ? 'text-green-400' :
+                    opp.profitPct >= 0.5 ? 'text-yellow-400' :
+                    'text-gray-400'
                   }`}>
-                    {opp.platformA.toUpperCase()}
+                    {opp.profitPct.toFixed(2)}%
                   </span>
-                  <span className="text-gray-500">vs</span>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    opp.platformB === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
-                    opp.platformB === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
-                    'bg-blue-900/30 text-blue-300'
+                </td>
+                <td className="px-3 py-3 text-sm text-right text-gray-300">
+                  ${opp.payoutTarget}
+                </td>
+                <td className="px-3 py-3 text-sm text-right text-gray-300">
+                  ${opp.totalCost.toFixed(2)}
+                </td>
+                <td className="px-3 py-3 text-sm text-right">
+                  <span className={`${
+                    opp.timeSkewMs > MAX_SKEW_MS ? 'text-red-400 font-medium' :
+                    opp.timeSkewMs > 200 ? 'text-yellow-400' :
+                    'text-green-400'
                   }`}>
-                    {opp.platformB.toUpperCase()}
+                    {opp.timeSkewMs}ms
                   </span>
-                </div>
-              </td>
-              <td className="px-4 py-3 text-sm text-right">
-                <span className={`font-medium ${
-                  opp.profitPct >= 1 ? 'text-green-400' :
-                  opp.profitPct >= 0.5 ? 'text-yellow-400' :
-                  'text-gray-400'
-                }`}>
-                  {opp.profitPct.toFixed(2)}%
-                </span>
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-300">
-                ${opp.totalCost.toFixed(2)}
-              </td>
-              <td className="px-4 py-3 text-sm text-right">
-                <span className={`${
-                  opp.timeSkewMs > 500 ? 'text-red-400' :
-                  opp.timeSkewMs > 200 ? 'text-yellow-400' :
-                  'text-green-400'
-                }`}>
-                  {opp.timeSkewMs}ms
-                </span>
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-400">
-                <span className={opp.ageMsA > 2000 ? 'text-red-400' : ''}>A:{opp.ageMsA}ms</span>
-                {' / '}
-                <span className={opp.ageMsB > 2000 ? 'text-red-400' : ''}>B:{opp.ageMsB}ms</span>
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td className="px-3 py-3 text-sm text-right text-gray-400">
+                  <span className={opp.ageMsA > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
+                    {opp.ageMsA}ms
+                  </span>
+                  {' / '}
+                  <span className={opp.ageMsB > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
+                    {opp.ageMsB}ms
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -1488,16 +1547,16 @@ export default function LiveArbPage() {
     }
   };
 
-  // Fetch recent arb opportunities
+  // Fetch recent arb logs
   const fetchRecentOpportunities = async () => {
     try {
-      const res = await fetch('/api/live-arb/opportunities?limit=20');
-      if (!res.ok) throw new Error('Failed to fetch opportunities');
+      const res = await fetch('/api/arb-logs?limit=20');
+      if (!res.ok) throw new Error('Failed to fetch arb logs');
       const data: OpportunitiesResponse = await res.json();
       setRecentOpportunities(data.logs);
       setOpportunitiesTotal(data.total);
     } catch (err: any) {
-      console.error('Failed to fetch opportunities:', err);
+      console.error('Failed to fetch arb logs:', err);
     }
   };
 
@@ -1686,17 +1745,17 @@ export default function LiveArbPage() {
             onStop={stopBot}
             isLoading={botActionLoading}
           />
-          <ArbOpportunitiesExportPanel />
+          <ArbLogsExportPanel />
         </div>
 
-        {/* Recent Opportunities Table */}
+        {/* Recent Arb Logs Table */}
         <div className="mb-6 bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-emerald-400" />
-                  Recent Arb Opportunities
+                  Recent Arb Logs
                 </h2>
                 <p className="text-sm text-gray-400">
                   Last 20 opportunities detected today ({opportunitiesTotal} total)
@@ -1704,7 +1763,7 @@ export default function LiveArbPage() {
               </div>
             </div>
           </div>
-          <RecentOpportunitiesTable opportunities={recentOpportunities} />
+          <RecentArbLogsTable logs={recentOpportunities} />
         </div>
 
         {/* Dry-Fire Export + Stats Row */}
