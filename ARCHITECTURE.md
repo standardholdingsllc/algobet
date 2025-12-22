@@ -301,6 +301,15 @@ The system uses a split architecture where the **worker runs on Digital Ocean** 
 | `algobet:live-arb:live-events-snapshot` | Worker | API (`/live-events`) | Registry events, matched groups, watcher stats |
 | `algobet:data` | Both | Both | Config, balances, bets, opportunity logs |
 
+**Key Constants** (exported from `lib/kv-storage.ts`):
+```typescript
+export const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
+export const LIVE_EVENTS_SNAPSHOT_KEY = 'algobet:live-arb:live-events-snapshot';
+export const STORAGE_KEY = 'algobet:data';
+```
+
+**CRITICAL**: Both the DO worker and Vercel must use the same Upstash instance. If the status API shows `no_heartbeat` while the worker is running, verify that both environments have identical `KV_REST_API_URL` and `KV_REST_API_TOKEN` values.
+
 **LiveEventsSnapshot** (`lib/kv-storage.ts`):
 ```typescript
 interface LiveEventsSnapshot {
@@ -342,12 +351,13 @@ All live-arb endpoints read from **KV storage**, not in-memory state. This enabl
 
 | Endpoint | Data Source | Purpose |
 |----------|-------------|---------|
-| `GET /api/live-arb/status` | KV heartbeat | Worker presence, WS connections, circuit breaker |
+| `GET /api/live-arb/status` | KV heartbeat | Worker presence, WS connections, circuit breaker, **KV diagnostics** |
 | `GET/POST /api/live-arb/config` | KV config | Read/write runtime configuration |
 | `GET/POST /api/live-arb/execution-mode` | KV config | Read/write execution mode |
 | `GET /api/live-arb/live-events` | KV snapshot | Registry events, matched groups, watchers, debug info |
 | `GET /api/live-arb/markets` | KV snapshot + heartbeat | Watched markets from active watchers (NOT live prices) |
 | `GET /api/live-arb/dry-fire-stats` | KV logs | Aggregated dry-fire statistics |
+| `GET /api/debug/kv` | KV probe | Debug endpoint for KV connectivity (requires `DEBUG_STATUS=1`) |
 
 ### 9.2 Live Markets API (KV-Backed)
 
@@ -447,7 +457,59 @@ interface LiveEventsDebugInfo {
 4. Check `debug.matchupKeyMissingByPlatform` - events need matchupKey for matching
 5. Check `debug.sampleKalshiTitles` - verify Kalshi is fetching sports markets
 
-### 9.4 Dashboard Endpoints
+### 9.4 KV Diagnostics & Status API
+
+The `/api/live-arb/status` endpoint now returns explicit KV status information to diagnose environment mismatches:
+
+```typescript
+interface LiveArbStatusResponse {
+  kvStatus: 'ok' | 'misconfigured' | 'no_heartbeat' | 'parse_error' | 'kv_unreachable';
+  kvStatusReason: string;  // Human-readable explanation
+  // ... other fields
+  kvDiagnostics?: KVDiagnostics;  // Only when ?debug=1
+}
+
+interface KVDiagnostics {
+  configured: boolean;       // KV env vars present
+  kvHost: string | null;     // Upstash hostname (no token leaked)
+  kvKeyRead: string;         // Key being read
+  kvReadResult: string;      // ok | null | error | misconfigured | parse_error
+  kvError?: string;          // Sanitized error message
+  kvRawSample?: string;      // First 200 chars if parse failed
+  vercelRegion?: string;     // Vercel region if available
+  isVercel: boolean;         // Running on Vercel
+}
+```
+
+**KV Status Values:**
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `ok` | Heartbeat read successfully | None needed |
+| `misconfigured` | Missing `KV_REST_API_URL` or `KV_REST_API_TOKEN` | Set env vars in Vercel |
+| `no_heartbeat` | Key not found in KV | Worker not running, or different KV instance |
+| `parse_error` | Data exists but failed validation | Check worker heartbeat format |
+| `kv_unreachable` | Network/auth error | Check Upstash credentials |
+
+**Debug Endpoint:** `GET /api/debug/kv` (requires `DEBUG_STATUS=1` env var)
+
+Returns detailed KV probe information:
+```typescript
+{
+  enabled: boolean;
+  kv: { configured, kvHost, isVercel, vercelRegion };
+  heartbeat: { key, exists, readResult, updatedAt, ageMs, state, error };
+  snapshot: { key, exists, updatedAt, ageMs, totalEvents };
+  timestamp: string;
+}
+```
+
+**Diagnosing "not_initialized" / missing platform status:**
+1. Call `/api/live-arb/status?debug=1` and check `kvDiagnostics.kvHost`
+2. Compare with the Upstash host the DO worker writes to
+3. If hosts differ, update Vercel env vars to match the worker's KV instance
+4. Use `/api/debug/kv` for a quick connectivity check
+
+### 9.5 Dashboard Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -505,6 +567,8 @@ The main entry point for live betting. Run via `npm run live-arb-worker`.
 | `LIVE_ARB_WORKER_REFRESH_MS` | `15000` | Market refresh interval |
 | `KALSHI_WS_URL` | `wss://api.elections.kalshi.com/trade-api/ws/v2` | Kalshi WebSocket |
 | `POLYMARKET_WS_URL` | `wss://ws-subscriptions-clob.polymarket.com/ws/market` | Polymarket WS |
+| `DEBUG_STATUS` | `0` | Set to `1` to enable KV diagnostics in `/api/live-arb/status` and `/api/debug/kv` |
+| `WORKER_HEARTBEAT_STALE_MS` | `60000` | Max age (ms) before heartbeat is considered stale |
 
 ---
 

@@ -28,10 +28,73 @@ function fixEnvQuotes(value: string | undefined): string | undefined {
 const kvUrl = fixEnvQuotes(process.env.KV_REST_API_URL);
 const kvToken = fixEnvQuotes(process.env.KV_REST_API_TOKEN);
 
-const redis = new Redis({
-  url: kvUrl!,
-  token: kvToken!,
-});
+// Export key constants for cross-process consistency
+export const STORAGE_KEY = 'algobet:data';
+export const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
+export const LIVE_EVENTS_SNAPSHOT_KEY = 'algobet:live-arb:live-events-snapshot';
+
+/**
+ * KV Configuration status for diagnostics.
+ * Used to surface the exact reason when KV reads fail.
+ */
+export type KVReadResult = 'ok' | 'null' | 'error' | 'misconfigured' | 'parse_error';
+
+export interface KVDiagnostics {
+  /** Whether KV is properly configured */
+  configured: boolean;
+  /** Hostname of the Upstash URL (no token leaked) */
+  kvHost: string | null;
+  /** The key being read */
+  kvKeyRead: string;
+  /** Result of the read operation */
+  kvReadResult: KVReadResult;
+  /** Sanitized error message if read failed */
+  kvError?: string;
+  /** First 200 chars of raw data if parse failed */
+  kvRawSample?: string;
+  /** Vercel region if available */
+  vercelRegion?: string;
+  /** Whether running on Vercel */
+  isVercel: boolean;
+}
+
+/**
+ * Extract hostname from KV URL without leaking credentials.
+ */
+export function getKvHost(): string | null {
+  if (!kvUrl) return null;
+  try {
+    const url = new URL(kvUrl);
+    return url.hostname;
+  } catch {
+    return 'invalid-url';
+  }
+}
+
+/**
+ * Check if KV is properly configured.
+ */
+export function isKvConfigured(): boolean {
+  return Boolean(kvUrl && kvToken);
+}
+
+/**
+ * Get diagnostic info about KV configuration.
+ * Safe to expose in API responses (no secrets).
+ */
+export function getKvConfigDiagnostics(): Pick<KVDiagnostics, 'configured' | 'kvHost' | 'isVercel' | 'vercelRegion'> {
+  return {
+    configured: isKvConfigured(),
+    kvHost: getKvHost(),
+    isVercel: Boolean(process.env.VERCEL),
+    vercelRegion: process.env.VERCEL_REGION,
+  };
+}
+
+// Only create Redis client if configured
+const redis = kvUrl && kvToken 
+  ? new Redis({ url: kvUrl, token: kvToken })
+  : null;
 
 interface StorageData {
   bets: Bet[];
@@ -89,9 +152,7 @@ function enforceLiveArbAlwaysOn(
   return config;
 }
 
-const STORAGE_KEY = 'algobet:data';
-const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
-const LIVE_EVENTS_SNAPSHOT_KEY = 'algobet:live-arb:live-events-snapshot';
+// Keys are now exported at the top of the file for cross-process consistency
 
 /**
  * Platform connection status as reported by the worker.
@@ -276,6 +337,10 @@ export class KVStorage {
    * Get all data from Redis store
    */
   static async getAllData(): Promise<StorageData> {
+    if (!redis) {
+      console.error('[KVStorage] Redis not configured (missing KV_REST_API_URL or KV_REST_API_TOKEN)');
+      return DEFAULT_DATA;
+    }
     try {
       const data = await redis.get<StorageData>(STORAGE_KEY);
       return data || DEFAULT_DATA;
@@ -289,6 +354,10 @@ export class KVStorage {
    * Update all data in Redis store
    */
   static async updateAllData(data: StorageData): Promise<void> {
+    if (!redis) {
+      console.error('[KVStorage] Redis not configured (missing KV_REST_API_URL or KV_REST_API_TOKEN)');
+      throw new Error('Redis not configured');
+    }
     try {
       await redis.set(STORAGE_KEY, data);
     } catch (error) {
@@ -566,6 +635,13 @@ function configsEqual(a?: BotConfig, b?: BotConfig): boolean {
 }
 
 export async function getOrSeedBotConfig(): Promise<BotConfig> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured; using safe defaults');
+    const fallback = cloneDefaultBotConfig();
+    cacheBotConfig(fallback);
+    return fallback;
+  }
+  
   try {
     const rawData = await redis.get<StorageData>(STORAGE_KEY);
 
@@ -604,6 +680,10 @@ export async function getOrSeedBotConfig(): Promise<BotConfig> {
 export async function updateWorkerHeartbeat(
   heartbeat: LiveArbWorkerHeartbeat
 ): Promise<void> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured - cannot update worker heartbeat');
+    return;
+  }
   try {
     await redis.set(WORKER_HEARTBEAT_KEY, heartbeat);
   } catch (error) {
@@ -611,13 +691,91 @@ export async function updateWorkerHeartbeat(
   }
 }
 
-export async function getWorkerHeartbeat(): Promise<LiveArbWorkerHeartbeat | null> {
-  try {
-    return (await redis.get<LiveArbWorkerHeartbeat>(WORKER_HEARTBEAT_KEY)) ?? null;
-  } catch (error) {
-    console.error('[KVStorage] Failed to read worker heartbeat', error);
-    return null;
+/**
+ * Result of reading worker heartbeat with diagnostic info.
+ */
+export interface HeartbeatReadResult {
+  heartbeat: LiveArbWorkerHeartbeat | null;
+  diagnostics: KVDiagnostics;
+}
+
+/**
+ * Get worker heartbeat with full diagnostics.
+ * Use this when you need to surface the exact reason for failures.
+ */
+export async function getWorkerHeartbeatWithDiagnostics(): Promise<HeartbeatReadResult> {
+  const baseDiagnostics: Omit<KVDiagnostics, 'kvReadResult'> = {
+    configured: isKvConfigured(),
+    kvHost: getKvHost(),
+    kvKeyRead: WORKER_HEARTBEAT_KEY,
+    isVercel: Boolean(process.env.VERCEL),
+    vercelRegion: process.env.VERCEL_REGION,
+  };
+
+  if (!redis) {
+    return {
+      heartbeat: null,
+      diagnostics: {
+        ...baseDiagnostics,
+        kvReadResult: 'misconfigured',
+        kvError: 'Missing KV_REST_API_URL or KV_REST_API_TOKEN environment variables',
+      },
+    };
   }
+
+  try {
+    const raw = await redis.get(WORKER_HEARTBEAT_KEY);
+    
+    if (raw === null || raw === undefined) {
+      return {
+        heartbeat: null,
+        diagnostics: {
+          ...baseDiagnostics,
+          kvReadResult: 'null',
+        },
+      };
+    }
+
+    // Validate the heartbeat structure
+    if (!isValidWorkerHeartbeat(raw)) {
+      const rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      return {
+        heartbeat: null,
+        diagnostics: {
+          ...baseDiagnostics,
+          kvReadResult: 'parse_error',
+          kvError: 'Heartbeat data failed validation (missing updatedAt or invalid state)',
+          kvRawSample: rawStr.substring(0, 200),
+        },
+      };
+    }
+
+    return {
+      heartbeat: raw as LiveArbWorkerHeartbeat,
+      diagnostics: {
+        ...baseDiagnostics,
+        kvReadResult: 'ok',
+      },
+    };
+  } catch (error: any) {
+    return {
+      heartbeat: null,
+      diagnostics: {
+        ...baseDiagnostics,
+        kvReadResult: 'error',
+        kvError: error?.message || 'Unknown KV read error',
+      },
+    };
+  }
+}
+
+/**
+ * Get worker heartbeat (simple version for backward compatibility).
+ * For diagnostics, use getWorkerHeartbeatWithDiagnostics().
+ */
+export async function getWorkerHeartbeat(): Promise<LiveArbWorkerHeartbeat | null> {
+  const { heartbeat } = await getWorkerHeartbeatWithDiagnostics();
+  return heartbeat;
 }
 
 // ============================================================================
@@ -697,6 +855,10 @@ export interface LiveEventsSnapshot {
 export async function updateLiveEventsSnapshot(
   snapshot: LiveEventsSnapshot
 ): Promise<void> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured - cannot update live events snapshot');
+    return;
+  }
   try {
     await redis.set(LIVE_EVENTS_SNAPSHOT_KEY, snapshot);
   } catch (error) {
@@ -709,6 +871,10 @@ export async function updateLiveEventsSnapshot(
  * Called by the API to display event data.
  */
 export async function getLiveEventsSnapshot(): Promise<LiveEventsSnapshot | null> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured - cannot read live events snapshot');
+    return null;
+  }
   try {
     return (await redis.get<LiveEventsSnapshot>(LIVE_EVENTS_SNAPSHOT_KEY)) ?? null;
   } catch (error) {

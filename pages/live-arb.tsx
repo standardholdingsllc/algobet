@@ -27,7 +27,14 @@ interface PlatformStatus {
   errorMessage?: string;
 }
 
+/** KV status - explicit reason when data is missing */
+type KVStatus = 'ok' | 'misconfigured' | 'no_heartbeat' | 'parse_error' | 'kv_unreachable';
+
 interface LiveArbStatus {
+  /** KV status - explicit reason when data is missing */
+  kvStatus?: KVStatus;
+  /** Human-readable explanation for kvStatus */
+  kvStatusReason?: string;
   workerPresent: boolean;
   workerState: WorkerState;
   workerHeartbeatAt: string | null;
@@ -248,7 +255,17 @@ function StatusIndicator({ status }: { status: PlatformStatus }) {
     return (
       <div className="flex items-center gap-2 text-gray-400">
         <WifiOff className="w-4 h-4" />
-        <span>No Worker</span>
+        <span>No Heartbeat</span>
+      </div>
+    );
+  }
+
+  // Handle initializing state (worker present but platform status not yet populated)
+  if (status.state === 'initializing') {
+    return (
+      <div className="flex items-center gap-2 text-blue-400">
+        <Activity className="w-4 h-4 animate-pulse" />
+        <span>Initializing</span>
       </div>
     );
   }
@@ -363,6 +380,61 @@ function formatTimeAgo(isoString: string): string {
   if (diffMs < 60000) return `${Math.floor(diffMs / 1000)}s ago`;
   if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)}m ago`;
   return `${Math.floor(diffMs / 3600000)}h ago`;
+}
+
+// KV Status Banner - shows diagnostic info when KV has issues
+function KVStatusBanner({ kvStatus, kvStatusReason }: { kvStatus?: KVStatus; kvStatusReason?: string }) {
+  if (!kvStatus || kvStatus === 'ok') return null;
+
+  const statusConfig: Record<KVStatus, { icon: React.ReactNode; bgClass: string; title: string }> = {
+    ok: { icon: <CheckCircle className="w-5 h-5" />, bgClass: 'bg-green-900/30 border-green-700/50 text-green-300', title: 'KV Connected' },
+    misconfigured: { 
+      icon: <AlertTriangle className="w-5 h-5" />, 
+      bgClass: 'bg-red-900/30 border-red-700/50 text-red-300', 
+      title: 'KV Misconfigured' 
+    },
+    no_heartbeat: { 
+      icon: <AlertTriangle className="w-5 h-5" />, 
+      bgClass: 'bg-yellow-900/30 border-yellow-700/50 text-yellow-300', 
+      title: 'No Worker Heartbeat' 
+    },
+    parse_error: { 
+      icon: <XCircle className="w-5 h-5" />, 
+      bgClass: 'bg-red-900/30 border-red-700/50 text-red-300', 
+      title: 'Heartbeat Parse Error' 
+    },
+    kv_unreachable: { 
+      icon: <WifiOff className="w-5 h-5" />, 
+      bgClass: 'bg-red-900/30 border-red-700/50 text-red-300', 
+      title: 'KV Unreachable' 
+    },
+  };
+
+  const config = statusConfig[kvStatus] || statusConfig.kv_unreachable;
+
+  return (
+    <div className={`rounded-lg p-4 border ${config.bgClass} mb-6`}>
+      <div className="flex items-start gap-3">
+        {config.icon}
+        <div className="flex-1">
+          <h4 className="font-semibold">{config.title}</h4>
+          <p className="text-sm opacity-90 mt-1">{kvStatusReason}</p>
+          {kvStatus === 'misconfigured' && (
+            <p className="text-xs opacity-75 mt-2">
+              Check that <code className="bg-black/20 px-1 rounded">KV_REST_API_URL</code> and{' '}
+              <code className="bg-black/20 px-1 rounded">KV_REST_API_TOKEN</code> are set in Vercel environment variables.
+            </p>
+          )}
+          {kvStatus === 'no_heartbeat' && (
+            <p className="text-xs opacity-75 mt-2">
+              The worker may not be running, or Vercel may be reading from a different KV instance than the DO worker writes to.
+              Use <code className="bg-black/20 px-1 rounded">/api/debug/kv</code> to diagnose.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Dry Fire Stats Card
@@ -1375,6 +1447,14 @@ export default function LiveArbPage() {
               <span>{error}</span>
             </div>
           </div>
+        )}
+
+        {/* KV Status Banner - shows when there are KV connectivity issues */}
+        {liveArbStatus && (
+          <KVStatusBanner 
+            kvStatus={liveArbStatus.kvStatus} 
+            kvStatusReason={liveArbStatus.kvStatusReason} 
+          />
         )}
 
         {/* Execution Mode Control */}

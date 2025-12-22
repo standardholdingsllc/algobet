@@ -12,16 +12,21 @@
  * This design ensures the Vercel serverless function can accurately
  * display worker status even though it cannot access the worker's
  * in-process WebSocket connections or price cache.
+ * 
+ * DIAGNOSTICS: Add ?debug=1 to get KV diagnostic info (kvHost, kvKeyRead, kvReadResult).
+ * This helps debug environment mismatches between DO worker and Vercel.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { loadLiveArbRuntimeConfig } from '@/lib/live-arb-runtime-config';
 import {
-  getWorkerHeartbeat,
+  getWorkerHeartbeatWithDiagnostics,
   LiveArbWorkerHeartbeat,
   WorkerPlatformStatus,
   WorkerState,
   isHeartbeatFresh,
+  KVDiagnostics,
+  WORKER_HEARTBEAT_KEY,
 } from '@/lib/kv-storage';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
 import { LiveEventsDebugCounters } from '@/lib/live-events-debug';
@@ -40,7 +45,23 @@ const WORKER_HEARTBEAT_STALE_MS = parseInt(
 // Response Types
 // ============================================================================
 
+/**
+ * KV status indicator for the UI.
+ * Surfaces the exact reason when data is missing.
+ */
+export type KVStatus = 
+  | 'ok'              // KV read succeeded, data present
+  | 'misconfigured'   // Missing KV_REST_API_URL or KV_REST_API_TOKEN
+  | 'no_heartbeat'    // KV configured but heartbeat key is missing/null
+  | 'parse_error'     // KV returned data but it failed validation
+  | 'kv_unreachable'; // KV configured but read failed (network/auth error)
+
 interface LiveArbStatusResponse {
+  /** KV status - explicit reason when data is missing */
+  kvStatus: KVStatus;
+  /** Human-readable explanation for kvStatus */
+  kvStatusReason: string;
+  
   workerPresent: boolean;
   workerState: WorkerState | null;
   workerHeartbeatAt: string | null;
@@ -129,6 +150,9 @@ interface LiveArbStatusResponse {
     blockedReasons: Record<string, number>;
   };
   liveEventsDebug: LiveEventsDebugCounters;
+  
+  /** KV diagnostics - only included when ?debug=1 */
+  kvDiagnostics?: KVDiagnostics;
 }
 
 interface PlatformStatus {
@@ -149,9 +173,17 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<LiveArbStatusResponse | { error: string }>
 ) {
+  // Disable caching - always return fresh data
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Check if debug mode is enabled
+  const debugMode = req.query.debug === '1' || process.env.DEBUG_STATUS === '1';
 
   try {
     // Load runtime config from KV
@@ -162,8 +194,39 @@ export default async function handler(
       console.error('[API] /api/live-arb/status failed to load runtime config:', configError);
     }
 
-    // Load worker heartbeat from KV - this is the SOURCE OF TRUTH
-    const heartbeat = await getWorkerHeartbeat();
+    // Load worker heartbeat from KV with diagnostics - this is the SOURCE OF TRUTH
+    const { heartbeat, diagnostics } = await getWorkerHeartbeatWithDiagnostics();
+    
+    // Determine KV status and reason based on diagnostics
+    let kvStatus: KVStatus;
+    let kvStatusReason: string;
+    
+    switch (diagnostics.kvReadResult) {
+      case 'ok':
+        kvStatus = 'ok';
+        kvStatusReason = 'Heartbeat read successfully';
+        break;
+      case 'misconfigured':
+        kvStatus = 'misconfigured';
+        kvStatusReason = diagnostics.kvError || 'Missing KV_REST_API_URL or KV_REST_API_TOKEN';
+        break;
+      case 'null':
+        kvStatus = 'no_heartbeat';
+        kvStatusReason = `Heartbeat key "${WORKER_HEARTBEAT_KEY}" not found in KV - worker may not be running or writing to different KV instance`;
+        break;
+      case 'parse_error':
+        kvStatus = 'parse_error';
+        kvStatusReason = diagnostics.kvError || 'Heartbeat data failed validation';
+        break;
+      case 'error':
+        kvStatus = 'kv_unreachable';
+        kvStatusReason = diagnostics.kvError || 'Failed to connect to KV';
+        break;
+      default:
+        kvStatus = 'kv_unreachable';
+        kvStatusReason = 'Unknown KV error';
+    }
+    
     const workerPresent = isHeartbeatFresh(heartbeat, WORKER_HEARTBEAT_STALE_MS);
     
     // Calculate heartbeat age for debugging
@@ -251,6 +314,10 @@ export default async function handler(
       (platforms.sxbet.connected || platforms.polymarket.connected || platforms.kalshi.connected);
 
     const response: LiveArbStatusResponse = {
+      // KV status - explicit reason when data is missing
+      kvStatus,
+      kvStatusReason,
+      
       workerPresent,
       workerState: heartbeat?.state ?? null,
       workerHeartbeatAt: heartbeat?.updatedAt ?? null,
@@ -318,6 +385,9 @@ export default async function handler(
         blockedReasons: {},
       },
       liveEventsDebug,
+      
+      // Include KV diagnostics in debug mode
+      ...(debugMode && { kvDiagnostics: diagnostics }),
     };
 
     return res.status(200).json(response);
