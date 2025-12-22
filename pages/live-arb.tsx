@@ -242,6 +242,47 @@ interface LiveArbRuntimeConfigData {
   liveEventsOnly: boolean;
 }
 
+// Arb Opportunity Log type (from API)
+interface ArbOpportunityLog {
+  detectedAt: string;
+  opportunityId: string;
+  matchupKey: string;
+  marketKind: 'prediction' | 'sportsbook';
+  platformA: string;
+  marketIdA: string;
+  outcomeA: string;
+  sideA: string;
+  rawPriceA: number;
+  impliedProbA: number;
+  asOfA: string;
+  ageMsA: number;
+  platformB: string;
+  marketIdB: string;
+  outcomeB: string;
+  sideB: string;
+  rawPriceB: number;
+  impliedProbB: number;
+  asOfB: string;
+  ageMsB: number;
+  timeSkewMs: number;
+  payoutTarget: number;
+  totalCost: number;
+  profitAbs: number;
+  profitPct: number;
+  feesA: number;
+  feesB: number;
+  workerVersion: string;
+}
+
+interface OpportunitiesResponse {
+  logs: ArbOpportunityLog[];
+  total: number;
+  cursor?: number;
+  hasMore: boolean;
+  date: string;
+  generatedAt: string;
+}
+
 // Status indicator component
 function StatusIndicator({ status }: { status: PlatformStatus }) {
   // Handle disabled state (e.g., missing env var)
@@ -1133,7 +1174,7 @@ function ExecutionModeCard({
   );
 }
 
-// CSV Export Panel
+// CSV Export Panel (Dry-Fire Trades)
 function ExportPanel() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportType, setExportType] = useState<'all' | 'simulated' | 'rejected'>('all');
@@ -1209,6 +1250,153 @@ function ExportPanel() {
   );
 }
 
+// Arb Opportunities Export Panel
+function ArbOpportunitiesExportPanel() {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await fetch(`/api/live-arb/opportunities-csv?date=${today}`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `arb-opportunities-${today}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export CSV');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+      <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+        <Download className="w-5 h-5 text-emerald-400" />
+        Export Arb Opportunities
+      </h3>
+
+      <p className="text-sm text-gray-400 mb-4">
+        Download all arb opportunities detected today with full audit fields (timestamps, skew, leg ages).
+      </p>
+
+      <button
+        onClick={handleExport}
+        disabled={isExporting}
+        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 
+                   disabled:bg-emerald-800 disabled:cursor-not-allowed rounded-lg text-white font-medium"
+      >
+        {isExporting ? (
+          <>
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            Exporting...
+          </>
+        ) : (
+          <>
+            <Download className="w-4 h-4" />
+            Download Today's CSV
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+// Recent Opportunities Table
+function RecentOpportunitiesTable({ opportunities }: { opportunities: ArbOpportunityLog[] }) {
+  if (opportunities.length === 0) {
+    return (
+      <div className="p-8 text-center text-gray-400">
+        No arb opportunities detected yet today.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead className="bg-gray-900/50">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Detected</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Matchup</th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Platforms</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Profit %</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Total Cost</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Time Skew</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Leg Ages</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-700">
+          {opportunities.map((opp) => (
+            <tr key={opp.opportunityId} className="hover:bg-gray-700/30">
+              <td className="px-4 py-3 text-sm text-gray-200">
+                {formatTimeAgo(opp.detectedAt)}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-200 max-w-xs truncate" title={opp.matchupKey}>
+                {opp.matchupKey.length > 40 ? opp.matchupKey.slice(0, 40) + '...' : opp.matchupKey}
+              </td>
+              <td className="px-4 py-3 text-center">
+                <div className="flex justify-center gap-1">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    opp.platformA === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                    opp.platformA === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                    'bg-blue-900/30 text-blue-300'
+                  }`}>
+                    {opp.platformA.toUpperCase()}
+                  </span>
+                  <span className="text-gray-500">vs</span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    opp.platformB === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                    opp.platformB === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                    'bg-blue-900/30 text-blue-300'
+                  }`}>
+                    {opp.platformB.toUpperCase()}
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-sm text-right">
+                <span className={`font-medium ${
+                  opp.profitPct >= 1 ? 'text-green-400' :
+                  opp.profitPct >= 0.5 ? 'text-yellow-400' :
+                  'text-gray-400'
+                }`}>
+                  {opp.profitPct.toFixed(2)}%
+                </span>
+              </td>
+              <td className="px-4 py-3 text-sm text-right text-gray-300">
+                ${opp.totalCost.toFixed(2)}
+              </td>
+              <td className="px-4 py-3 text-sm text-right">
+                <span className={`${
+                  opp.timeSkewMs > 500 ? 'text-red-400' :
+                  opp.timeSkewMs > 200 ? 'text-yellow-400' :
+                  'text-green-400'
+                }`}>
+                  {opp.timeSkewMs}ms
+                </span>
+              </td>
+              <td className="px-4 py-3 text-sm text-right text-gray-400">
+                <span className={opp.ageMsA > 2000 ? 'text-red-400' : ''}>A:{opp.ageMsA}ms</span>
+                {' / '}
+                <span className={opp.ageMsB > 2000 ? 'text-red-400' : ''}>B:{opp.ageMsB}ms</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // Main component
 export default function LiveArbPage() {
   const [liveArbStatus, setLiveArbStatus] = useState<LiveArbStatus | null>(null);
@@ -1217,6 +1405,8 @@ export default function LiveArbPage() {
   const [liveEventsData, setLiveEventsData] = useState<LiveEventsData | null>(null);
   const [executionMode, setExecutionMode] = useState<ExecutionModeData | null>(null);
   const [runtimeConfig, setRuntimeConfig] = useState<LiveArbRuntimeConfigData | null>(null);
+  const [recentOpportunities, setRecentOpportunities] = useState<ArbOpportunityLog[]>([]);
+  const [opportunitiesTotal, setOpportunitiesTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -1295,6 +1485,19 @@ export default function LiveArbPage() {
       setRuntimeConfig(data);
     } catch (err: any) {
       console.error('Failed to fetch live-arb config:', err);
+    }
+  };
+
+  // Fetch recent arb opportunities
+  const fetchRecentOpportunities = async () => {
+    try {
+      const res = await fetch('/api/live-arb/opportunities?limit=20');
+      if (!res.ok) throw new Error('Failed to fetch opportunities');
+      const data: OpportunitiesResponse = await res.json();
+      setRecentOpportunities(data.logs);
+      setOpportunitiesTotal(data.total);
+    } catch (err: any) {
+      console.error('Failed to fetch opportunities:', err);
     }
   };
 
@@ -1392,6 +1595,7 @@ export default function LiveArbPage() {
       fetchLiveEvents(),
       fetchExecutionMode(),
       fetchRuntimeConfig(),
+      fetchRecentOpportunities(),
     ]);
     setLastRefresh(new Date());
     setIsLoading(false);
@@ -1482,11 +1686,32 @@ export default function LiveArbPage() {
             onStop={stopBot}
             isLoading={botActionLoading}
           />
-          <ExportPanel />
+          <ArbOpportunitiesExportPanel />
         </div>
 
-        {/* Dry Fire Stats */}
-        {dryFireStats && <div className="mb-6"><DryFireStatsCard stats={dryFireStats} /></div>}
+        {/* Recent Opportunities Table */}
+        <div className="mb-6 bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-400" />
+                  Recent Arb Opportunities
+                </h2>
+                <p className="text-sm text-gray-400">
+                  Last 20 opportunities detected today ({opportunitiesTotal} total)
+                </p>
+              </div>
+            </div>
+          </div>
+          <RecentOpportunitiesTable opportunities={recentOpportunities} />
+        </div>
+
+        {/* Dry-Fire Export + Stats Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <ExportPanel />
+          {dryFireStats && <DryFireStatsCard stats={dryFireStats} />}
+        </div>
 
         {/* Rule-Based Sports Matcher */}
         <div className="mb-6">

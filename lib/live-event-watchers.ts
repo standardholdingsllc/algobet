@@ -38,6 +38,10 @@ import {
   recordWatcherCreatedByStatus,
   recordSubscriptionAttemptByStatus,
 } from './live-events-debug';
+import {
+  createArbOpportunityLog,
+  logArbOpportunity,
+} from './arb-opportunity-logger';
 
 const WATCHER_LOG_TAG = 'LiveWatcher';
 
@@ -223,6 +227,16 @@ function getMarketsForGroup(group: MatchedEventGroup): Market[] {
         continue;
       }
       
+      // Determine the most recent price timestamp
+      const yesUpdatedAt = livePrices.yes?.lastUpdatedAt;
+      const noUpdatedAt = livePrices.no?.lastUpdatedAt;
+      let oddsAsOf: string | undefined;
+      if (yesUpdatedAt && noUpdatedAt) {
+        oddsAsOf = new Date(yesUpdatedAt) > new Date(noUpdatedAt) ? yesUpdatedAt : noUpdatedAt;
+      } else {
+        oddsAsOf = yesUpdatedAt || noUpdatedAt;
+      }
+      
       // Build market object with live prices
       const market: Market = {
         id: ve.vendorMarketId,
@@ -237,6 +251,7 @@ function getMarketsForGroup(group: MatchedEventGroup): Market[] {
           : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         volume: 0,
         liquidity: 0,
+        oddsAsOf,
       };
       
       markets.push(market);
@@ -585,6 +600,22 @@ async function runArbCheck(eventKey: string): Promise<void> {
         profitBps: bestOpp.profitMargin,
         platforms: [bestOpp.market1.platform, bestOpp.market2.platform],
       });
+      
+      // Log the opportunity to KV for CSV export
+      try {
+        const arbLog = createArbOpportunityLog(bestOpp, {
+          matchupKey: group.eventKey,
+          priceTimestampA: bestOpp.market1.oddsAsOf,
+          priceTimestampB: bestOpp.market2.oddsAsOf,
+          betSizes: {
+            amount1: bestOpp.betSize1,
+            amount2: bestOpp.betSize2,
+          },
+        });
+        await logArbOpportunity(arbLog);
+      } catch (logError) {
+        liveArbLog('error', WATCHER_LOG_TAG, 'Failed to log opportunity', logError as Error);
+      }
       
       // Execute if we have adapters
       if (platformAdapters && executionOptionsTemplate) {
