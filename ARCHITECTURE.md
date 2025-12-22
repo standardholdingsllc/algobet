@@ -24,7 +24,7 @@ This document describes the live betting arbitrage system. AlgoBet is a **pure l
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **LiveArbManager** | `lib/live-arb-manager.ts` | Orchestrates WS clients, subscription management, and arb detection |
-| **LivePriceCache** | `lib/live-price-cache.ts` | In-memory cache for real-time prices from WebSocket feeds |
+| **LivePriceCache** | `lib/live-price-cache.ts` | In-memory cache for real-time prices from WebSocket feeds (DO worker only) |
 | **LiveEventRegistry** | `lib/live-event-registry.ts` | In-memory store of vendor events from all platforms |
 | **LiveEventMatcher** | `lib/live-event-matcher.ts` | Token-based matching with connected components algorithm |
 | **LiveEventWatchers** | `lib/live-event-watchers.ts` | Per-event arb monitoring triggered by price updates |
@@ -33,6 +33,36 @@ This document describes the live betting arbitrage system. AlgoBet is a **pure l
 | **LiveArbSafetyChecker** | `lib/live-arb-safety.ts` | Circuit breakers and safety checks for live execution |
 | **ExecutionWrapper** | `lib/execution-wrapper.ts` | Routes between real execution and dry-fire mode |
 | **DryFireLogger** | `lib/dry-fire-logger.ts` | Persistence layer for paper trade logs |
+
+### 2.2 Serverless Architecture Limitations
+
+**CRITICAL**: The system uses a split architecture:
+- **Digital Ocean Worker**: Long-running process with WebSocket connections and in-memory `LivePriceCache`
+- **Vercel Serverless**: Stateless API routes and dashboard that CANNOT access DO worker memory
+
+**Why LivePriceCache cannot be used on Vercel:**
+```
+┌─────────────────────┐     ┌─────────────────────┐
+│   Digital Ocean     │     │   Vercel Serverless │
+│                     │     │                     │
+│  ┌───────────────┐  │     │  ┌───────────────┐  │
+│  │ LivePriceCache│  │     │  │ LivePriceCache│  │
+│  │  (populated)  │  │     │  │   (EMPTY!)    │  │
+│  └───────────────┘  │     │  └───────────────┘  │
+│         ▲           │     │                     │
+│    WebSockets       │     │   Reads from KV     │
+│    ┌───┴───┐        │     │         │           │
+│    │Kalshi │        │     │         ▼           │
+│    │Poly   │        │     │  ┌───────────────┐  │
+│    │SXbet  │        │     │  │  Upstash KV   │◄─┼──┐
+│    └───────┘        │     │  └───────────────┘  │  │
+│         │           │     │                     │  │
+│         ▼           │     └─────────────────────┘  │
+│  Writes to KV ──────┼─────────────────────────────┘
+└─────────────────────┘
+```
+
+`LivePriceCache` is a **per-process singleton**. Each Vercel serverless function invocation has its own empty instance with no WebSocket connections. All Vercel API routes must read from KV storage.
 
 ### 2.2 WebSocket Clients
 
@@ -316,9 +346,53 @@ All live-arb endpoints read from **KV storage**, not in-memory state. This enabl
 | `GET/POST /api/live-arb/config` | KV config | Read/write runtime configuration |
 | `GET/POST /api/live-arb/execution-mode` | KV config | Read/write execution mode |
 | `GET /api/live-arb/live-events` | KV snapshot | Registry events, matched groups, watchers, debug info |
+| `GET /api/live-arb/markets` | KV snapshot + heartbeat | Watched markets from active watchers (NOT live prices) |
 | `GET /api/live-arb/dry-fire-stats` | KV logs | Aggregated dry-fire statistics |
 
-### 9.2 Live Events API Response
+### 9.2 Live Markets API (KV-Backed)
+
+The `/api/live-arb/markets` endpoint returns watched markets derived from the KV snapshot.
+
+**IMPORTANT**: This endpoint does NOT return live prices. `LivePriceCache` is in-memory on the DO worker and cannot be accessed from Vercel serverless. Instead, it returns:
+
+- Which markets are being watched by active watchers
+- Platform connection status and staleness indicators
+- Price cache statistics (counts, not actual prices)
+
+```typescript
+interface LiveMarketsResponse {
+  watchedMarkets: WatchedMarketInfo[];  // Markets from matched groups with active watchers
+  totalWatchedMarkets: number;
+  filteredCount: number;
+  platformStats: PlatformStats[];       // Per-platform staleness detection
+  priceCacheStats: {                    // Stats from worker heartbeat
+    totalEntries: number;
+    entriesByPlatform: Record<string, number>;
+    totalPriceUpdates: number;
+  };
+  workerPresent: boolean;
+  snapshotUpdatedAt: string | null;
+  notice?: string;                      // Explanation when no live prices available
+}
+
+interface PlatformStats {
+  platform: string;
+  watchedMarkets: number;
+  connected: boolean;
+  lastMessageAt: string | null;
+  lastMessageAgeMs: number | null;
+  isStale: boolean;                     // True if connected but no message in >60s
+  subscribedMarkets: number;
+}
+```
+
+**Staleness Detection**: A platform is marked "stale" if:
+- `connected === true` (WebSocket reports connected)
+- `lastMessageAgeMs > 60000` (no message received in 60+ seconds)
+
+This indicates the WebSocket may be connected but not receiving updates (subscription drift, network issues, etc.).
+
+### 9.3 Live Events API Response
 
 The `/api/live-arb/live-events` endpoint returns a comprehensive response for diagnosing matching issues:
 
@@ -373,7 +447,7 @@ interface LiveEventsDebugInfo {
 4. Check `debug.matchupKeyMissingByPlatform` - events need matchupKey for matching
 5. Check `debug.sampleKalshiTitles` - verify Kalshi is fetching sports markets
 
-### 9.3 Dashboard Endpoints
+### 9.4 Dashboard Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|

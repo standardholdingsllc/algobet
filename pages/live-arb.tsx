@@ -74,24 +74,55 @@ interface DryFireStats {
   generatedAt: string;
 }
 
-interface LiveMarket {
+/**
+ * Watched market info from KV-backed API.
+ * Note: Live prices are NOT available on Vercel serverless.
+ * The DO worker maintains prices in-memory via LivePriceCache.
+ */
+interface WatchedMarket {
   id: string;
-  displayTitle: string;
-  isLive: boolean;
-  platforms: {
-    platform: string;
-    marketId: string;
-    yesPrice?: number;
-    noPrice?: number;
-    priceSource: string;
-    priceAgeMs?: number;
-  }[];
+  platform: string;
+  vendorMarketId: string;
+  eventKey: string;
+  sport: string;
+  status: 'PRE' | 'LIVE' | 'ENDED';
+  rawTitle: string;
+  homeTeam?: string;
+  awayTeam?: string;
+}
+
+interface PlatformStats {
+  platform: string;
+  watchedMarkets: number;
+  connected: boolean;
+  lastMessageAt: string | null;
+  lastMessageAgeMs: number | null;
+  isStale: boolean;
+  subscribedMarkets: number;
 }
 
 interface LiveMarketsResponse {
-  markets: LiveMarket[];
-  totalCount: number;
+  watchedMarkets: WatchedMarket[];
+  totalWatchedMarkets: number;
   filteredCount: number;
+  platformStats: PlatformStats[];
+  priceCacheStats: {
+    totalEntries: number;
+    entriesByPlatform: Record<string, number>;
+    totalPriceUpdates: number;
+    lastPriceUpdateAt?: string;
+  };
+  workerPresent: boolean;
+  workerState: string | null;
+  snapshotUpdatedAt: string | null;
+  snapshotAgeMs: number | null;
+  timestamp: string;
+  filters: {
+    platform?: string;
+    liveOnly?: boolean;
+    limit: number;
+  };
+  notice?: string;
 }
 
 interface ExecutionModeData {
@@ -235,25 +266,37 @@ function StatusIndicator({ status }: { status: PlatformStatus }) {
   );
 }
 
-// Platform card component
+// Platform card component with staleness detection
 function PlatformCard({
   name,
   status,
+  isStale,
 }: {
   name: string;
   status: PlatformStatus;
+  /** True if connected but no message in >60s */
+  isStale?: boolean;
 }) {
   const isDisabled = status.state === 'disabled';
   const borderClass = isDisabled 
     ? 'border-yellow-700/50' 
-    : status.connected 
-      ? 'border-green-700/50' 
-      : 'border-gray-700';
+    : isStale
+      ? 'border-orange-700/50'
+      : status.connected 
+        ? 'border-green-700/50' 
+        : 'border-gray-700';
 
   return (
     <div className={`bg-gray-800 rounded-lg p-4 border ${borderClass}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-white capitalize">{name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-white capitalize">{name}</h3>
+          {isStale && (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-900/30 text-orange-300 border border-orange-700/50">
+              Stale
+            </span>
+          )}
+        </div>
         <StatusIndicator status={status} />
       </div>
 
@@ -273,8 +316,9 @@ function PlatformCard({
         {status.lastMessageAt && (
           <div className="flex justify-between">
             <span className="text-gray-400">Last Message</span>
-            <span className="text-gray-200">
+            <span className={`${isStale ? 'text-orange-300' : 'text-gray-200'}`}>
               {formatTimeAgo(status.lastMessageAt)}
+              {isStale && ' ⚠️'}
             </span>
           </div>
         )}
@@ -1093,7 +1137,7 @@ function ExportPanel() {
 export default function LiveArbPage() {
   const [liveArbStatus, setLiveArbStatus] = useState<LiveArbStatus | null>(null);
   const [dryFireStats, setDryFireStats] = useState<DryFireStats | null>(null);
-  const [markets, setMarkets] = useState<LiveMarket[]>([]);
+  const [marketsData, setMarketsData] = useState<LiveMarketsResponse | null>(null);
   const [liveEventsData, setLiveEventsData] = useState<LiveEventsData | null>(null);
   const [executionMode, setExecutionMode] = useState<ExecutionModeData | null>(null);
   const [runtimeConfig, setRuntimeConfig] = useState<LiveArbRuntimeConfigData | null>(null);
@@ -1131,13 +1175,13 @@ export default function LiveArbPage() {
     }
   };
 
-  // Fetch markets
+  // Fetch markets (KV-backed watched markets, not live prices)
   const fetchMarkets = async () => {
     try {
-      const res = await fetch('/api/live-arb/markets?limit=20');
+      const res = await fetch('/api/live-arb/markets?limit=50');
       if (!res.ok) throw new Error('Failed to fetch markets');
       const data: LiveMarketsResponse = await res.json();
-      setMarkets(data.markets);
+      setMarketsData(data);
     } catch (err: any) {
       console.error('Failed to fetch markets:', err);
     }
@@ -1445,28 +1489,88 @@ export default function LiveArbPage() {
           </div>
         )}
 
-        {/* Platform Status Cards */}
+        {/* Platform Status Cards with Staleness Detection */}
         {liveArbStatus && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-white mb-3">Platform Connections</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <PlatformCard name="SX.bet" status={liveArbStatus.platforms.sxbet} />
-              <PlatformCard name="Polymarket" status={liveArbStatus.platforms.polymarket} />
-              <PlatformCard name="Kalshi" status={liveArbStatus.platforms.kalshi} />
+              <PlatformCard 
+                name="SX.bet" 
+                status={liveArbStatus.platforms.sxbet}
+                isStale={marketsData?.platformStats?.find(p => p.platform === 'sxbet')?.isStale}
+              />
+              <PlatformCard 
+                name="Polymarket" 
+                status={liveArbStatus.platforms.polymarket}
+                isStale={marketsData?.platformStats?.find(p => p.platform === 'polymarket')?.isStale}
+              />
+              <PlatformCard 
+                name="Kalshi" 
+                status={liveArbStatus.platforms.kalshi}
+                isStale={marketsData?.platformStats?.find(p => p.platform === 'kalshi')?.isStale}
+              />
             </div>
           </div>
         )}
 
-        {/* Live Markets Table */}
+        {/* Watched Markets Table (KV-backed) */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-700">
-            <h2 className="text-lg font-semibold text-white">Live Markets</h2>
-            <p className="text-sm text-gray-400">Markets with cached live prices</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Live Markets</h2>
+                <p className="text-sm text-gray-400">
+                  Markets being watched by the Digital Ocean worker
+                </p>
+              </div>
+              {marketsData && (
+                <div className="text-right text-sm">
+                  <div className="text-gray-400">
+                    {marketsData.priceCacheStats.totalEntries} prices cached
+                  </div>
+                  {marketsData.snapshotUpdatedAt && (
+                    <div className="text-gray-500 text-xs">
+                      Snapshot: {formatTimeAgo(marketsData.snapshotUpdatedAt)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {markets.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">
-              No live price data available. Check WebSocket connections.
+          {/* Architecture notice when no data */}
+          {marketsData?.notice && (
+            <div className="px-4 py-3 bg-blue-900/20 border-b border-blue-700/30">
+              <div className="flex items-start gap-2 text-sm text-blue-300">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{marketsData.notice}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Stale platform warning */}
+          {marketsData?.platformStats?.some(p => p.isStale) && (
+            <div className="px-4 py-3 bg-orange-900/20 border-b border-orange-700/30">
+              <div className="flex items-start gap-2 text-sm text-orange-300">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  Some platforms have stale connections (no message in &gt;60s). 
+                  Check WebSocket health on the Digital Ocean worker.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {(!marketsData || marketsData.watchedMarkets.length === 0) ? (
+            <div className="p-8 text-center">
+              <div className="text-gray-400 mb-2">
+                {!marketsData?.workerPresent 
+                  ? 'Worker is not running. Start the Digital Ocean worker to begin monitoring.'
+                  : 'No markets are currently being watched.'}
+              </div>
+              <div className="text-gray-500 text-sm">
+                The worker maintains live prices in-memory. This dashboard shows which markets are being monitored.
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1477,62 +1581,66 @@ export default function LiveArbPage() {
                       Platform
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
-                      Market ID
+                      Event
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                      Yes Price
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                      No Price
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Sport
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                      Age
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Market ID
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {markets.map((market) => (
-                    market.platforms.map((p, idx) => (
-                      <tr key={`${market.id}-${idx}`} className="hover:bg-gray-700/30">
-                        <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-1 rounded text-xs font-medium 
-                            ${p.platform === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
-                              p.platform === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
-                              'bg-blue-900/30 text-blue-300'}`}>
-                            {p.platform}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-300 font-mono">
-                          {p.marketId.substring(0, 20)}...
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-green-400">
-                          {p.yesPrice !== undefined ? p.yesPrice.toFixed(2) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-red-400">
-                          {p.noPrice !== undefined ? p.noPrice.toFixed(2) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {market.isLive ? (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
-                              LIVE
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-400">
-                              Pre
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-400">
-                          {p.priceAgeMs !== undefined ? `${(p.priceAgeMs / 1000).toFixed(1)}s` : '-'}
-                        </td>
-                      </tr>
-                    ))
+                  {marketsData.watchedMarkets.map((market) => (
+                    <tr key={market.id} className="hover:bg-gray-700/30">
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`px-2 py-1 rounded text-xs font-medium 
+                          ${market.platform === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                            market.platform === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                            'bg-blue-900/30 text-blue-300'}`}>
+                          {market.platform}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-200">
+                        {market.homeTeam && market.awayTeam 
+                          ? `${market.homeTeam} vs ${market.awayTeam}`
+                          : market.rawTitle.substring(0, 40)}
+                        {market.rawTitle.length > 40 && '...'}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-cyan-900/30 text-cyan-300">
+                          {market.sport}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          market.status === 'LIVE' 
+                            ? 'bg-green-900/30 text-green-300' 
+                            : market.status === 'PRE'
+                              ? 'bg-gray-700 text-gray-400'
+                              : 'bg-red-900/30 text-red-300'
+                        }`}>
+                          {market.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-400 font-mono">
+                        {market.vendorMarketId.substring(0, 16)}...
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
+              
+              {/* Summary footer */}
+              <div className="px-4 py-3 bg-gray-900/30 border-t border-gray-700 text-sm text-gray-400">
+                Showing {marketsData.watchedMarkets.length} of {marketsData.totalWatchedMarkets} watched markets
+                {marketsData.filteredCount !== marketsData.totalWatchedMarkets && 
+                  ` (${marketsData.filteredCount} after filters)`}
+              </div>
             </div>
           )}
         </div>
