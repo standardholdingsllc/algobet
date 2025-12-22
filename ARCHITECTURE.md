@@ -478,6 +478,8 @@ interface KVDiagnostics {
   kvRawSample?: string;      // First 200 chars if parse failed
   vercelRegion?: string;     // Vercel region if available
   isVercel: boolean;         // Running on Vercel
+  rawSxbetFromKv?: object;   // Raw SX.bet status from KV heartbeat
+  heartbeatUpdatedAt?: string; // When heartbeat was last written
 }
 ```
 
@@ -508,6 +510,14 @@ Returns detailed KV probe information:
 2. Compare with the Upstash host the DO worker writes to
 3. If hosts differ, update Vercel env vars to match the worker's KV instance
 4. Use `/api/debug/kv` for a quick connectivity check
+
+**Diagnosing "Disabled (Config)" for SX.bet:**
+1. Call `/api/live-arb/status?debug=1` and check `kvDiagnostics.rawSxbetFromKv`
+2. If `rawSxbetFromKv.connected === true`, the worker is connected but Vercel was incorrectly gating
+3. The status API now trusts the KV heartbeat - Vercel does NOT check its own `SXBET_WS_URL` env var
+4. Platform status is determined solely by the DO worker's heartbeat in KV
+
+**Important:** Vercel serverless does NOT need platform credentials (`SXBET_WS_URL`, `SXBET_API_KEY`, etc). These are only needed on the DO worker. The status API reads platform connection state from the KV heartbeat.
 
 ### 9.5 Dashboard Endpoints
 

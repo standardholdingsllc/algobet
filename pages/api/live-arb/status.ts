@@ -152,7 +152,12 @@ interface LiveArbStatusResponse {
   liveEventsDebug: LiveEventsDebugCounters;
   
   /** KV diagnostics - only included when ?debug=1 */
-  kvDiagnostics?: KVDiagnostics;
+  kvDiagnostics?: KVDiagnostics & {
+    /** Raw SX.bet status from KV heartbeat (for debugging) */
+    rawSxbetFromKv?: WorkerPlatformStatus | null;
+    /** Raw heartbeat updatedAt timestamp */
+    heartbeatUpdatedAt?: string | null;
+  };
 }
 
 interface PlatformStatus {
@@ -387,7 +392,14 @@ export default async function handler(
       liveEventsDebug,
       
       // Include KV diagnostics in debug mode
-      ...(debugMode && { kvDiagnostics: diagnostics }),
+      ...(debugMode && { 
+        kvDiagnostics: {
+          ...diagnostics,
+          // Include raw SX.bet status from KV for debugging
+          rawSxbetFromKv: heartbeat?.platforms?.sxbet ?? null,
+          heartbeatUpdatedAt: heartbeat?.updatedAt ?? null,
+        }
+      }),
     };
 
     return res.status(200).json(response);
@@ -404,29 +416,22 @@ export default async function handler(
 /**
  * Build platform status for API response.
  * 
+ * IMPORTANT: Vercel serverless does NOT have platform credentials (SXBET_WS_URL, etc).
+ * The source of truth for platform status is the KV heartbeat written by the DO worker.
+ * 
  * Logic:
- * - If platform is disabled (e.g., SXBET_WS_URL missing), show "disabled" regardless of worker state
- * - If worker is present and heartbeat is fresh, use the KV values
- * - If worker is stale/missing, show "no_worker"
+ * - If worker has KV status for this platform, use it (including disabled state)
+ * - If worker is not present (stale heartbeat), show "no_worker"
+ * - If worker is present but no status for this platform, show "initializing"
+ * 
+ * We do NOT check Vercel's own env vars - the worker decides if a platform is disabled.
  */
 function buildPlatformStatus(
   kvStatus: WorkerPlatformStatus | undefined,
   platform: 'sxbet' | 'polymarket' | 'kalshi',
   workerPresent: boolean
 ): PlatformStatus {
-  // Check if platform is disabled at the API level (for when no heartbeat exists)
-  if (platform === 'sxbet' && !process.env.SXBET_WS_URL) {
-    return {
-      connected: false,
-      state: 'disabled',
-      lastMessageAt: null,
-      subscribedMarkets: 0,
-      disabled: true,
-      disabledReason: 'SXBET_WS_URL not configured',
-    };
-  }
-
-  // If we have KV status and it shows disabled, always use that
+  // If we have KV status and it shows disabled, use that (worker decided it's disabled)
   if (kvStatus?.disabled) {
     return {
       connected: false,
@@ -459,7 +464,7 @@ function buildPlatformStatus(
     };
   }
 
-  // Worker is present and we have KV status - use it
+  // Worker is present and we have KV status - use it as source of truth
   return {
     connected: kvStatus.connected,
     state: kvStatus.state,
