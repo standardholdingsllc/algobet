@@ -402,6 +402,8 @@ interface PlatformStats {
 
 This indicates the WebSocket may be connected but not receiving updates (subscription drift, network issues, etc.).
 
+**IMPORTANT**: `lastMessageAgeMs` and `isStale` are computed at **read-time** by the Vercel API using `Date.now()`, NOT from the worker's pre-computed values. This ensures consistency - the worker's cached values become stale by the time they're read.
+
 ### 9.3 Live Events API Response
 
 The `/api/live-arb/live-events` endpoint returns a comprehensive response for diagnosing matching issues:
