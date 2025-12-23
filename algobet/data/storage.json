@@ -1,0 +1,42 @@
+{
+  "bets": [],
+  "arbitrageGroups": [],
+  "config": {
+    "maxBetPercentage": 4,
+    "maxDaysToExpiry": 5,
+    "minProfitMargin": 0.5,
+    "balanceThresholds": {
+      "kalshi": 100,
+      "polymarket": 100
+    },
+    "emailAlerts": {
+      "enabled": true,
+      "lowBalanceAlert": true
+    },
+    "simulationMode": true
+  },
+  "dailyStats": [],
+  "balances": [
+    {
+      "platform": "kalshi",
+      "balance": 0.83,
+      "availableCash": 0.83,
+      "positionsValue": 0,
+      "lastUpdated": "2025-11-19T02:15:34.926Z"
+    },
+    {
+      "platform": "polymarket",
+      "balance": 26.649,
+      "availableCash": 26.649,
+      "positionsValue": 0,
+      "lastUpdated": "2025-11-19T02:15:34.926Z"
+    },
+    {
+      "platform": "sxbet",
+      "balance": 0,
+      "availableCash": 0,
+      "positionsValue": 0,
+      "lastUpdated": "2025-11-19T02:15:34.926Z"
+    }
+  ]
+}
