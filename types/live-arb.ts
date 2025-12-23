@@ -233,6 +233,10 @@ export interface LiveArbRuntimeConfig {
   ruleBasedMatcherEnabled: boolean;
   sportsOnly: boolean;
   liveEventsOnly: boolean;
+  /** Phase 6: Allow creating watchers for PRE events (bring-up mode) */
+  allowPreWatchers?: boolean;
+  /** Phase 6: Maximum subscriptions for PRE watchers */
+  maxPreWatcherSubscriptions?: number;
 }
 
 export const DEFAULT_LIVE_ARB_RUNTIME_CONFIG: LiveArbRuntimeConfig = {
@@ -240,6 +244,8 @@ export const DEFAULT_LIVE_ARB_RUNTIME_CONFIG: LiveArbRuntimeConfig = {
   ruleBasedMatcherEnabled: true,
   sportsOnly: true,
   liveEventsOnly: true,
+  allowPreWatchers: false,  // Phase 6: Default disabled
+  maxPreWatcherSubscriptions: 10,
 };
 
 // ============================================================================

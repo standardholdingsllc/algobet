@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-import { KalshiAPI } from '@/lib/markets/kalshi';
+import {
+  KalshiAPI,
+  DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES,
+} from '@/lib/markets/kalshi';
 import { createKalshiVendorEvent } from '@/lib/live-event-extractors';
 import { VendorEvent } from '@/types/live-events';
 
@@ -8,7 +11,12 @@ async function main(): Promise<void> {
   const windowDays = 30;
   console.log(`🔍 Fetching Kalshi markets for sports debug (next ${windowDays} days)...\n`);
 
-  const markets = await kalshiApi.getOpenMarkets(windowDays);
+  const markets = await kalshiApi.getOpenMarkets({
+    maxCloseMinutes: windowDays * 24 * 60,
+    minCloseMinutes: DEFAULT_KALSHI_MIN_CLOSE_WINDOW_MINUTES,
+    status: 'open',
+    sportsOnly: true,
+  });
   const events: VendorEvent[] = [];
 
   for (const market of markets) {

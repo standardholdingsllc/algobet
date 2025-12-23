@@ -23,11 +23,22 @@ interface PlatformStatus {
   connected: boolean;
   state: string;
   lastMessageAt: string | null;
+  /** Computed at read-time by the API using server's Date.now() */
+  lastMessageAgeMs?: number | null;
+  /** Computed at read-time: true if connected but lastMessageAgeMs > 60s */
+  isStale?: boolean;
   subscribedMarkets: number;
   errorMessage?: string;
 }
 
+/** KV status - explicit reason when data is missing */
+type KVStatus = 'ok' | 'misconfigured' | 'no_heartbeat' | 'parse_error' | 'kv_unreachable';
+
 interface LiveArbStatus {
+  /** KV status - explicit reason when data is missing */
+  kvStatus?: KVStatus;
+  /** Human-readable explanation for kvStatus */
+  kvStatusReason?: string;
   workerPresent: boolean;
   workerState: WorkerState;
   workerHeartbeatAt: string | null;
@@ -74,24 +85,55 @@ interface DryFireStats {
   generatedAt: string;
 }
 
-interface LiveMarket {
+/**
+ * Watched market info from KV-backed API.
+ * Note: Live prices are NOT available on Vercel serverless.
+ * The DO worker maintains prices in-memory via LivePriceCache.
+ */
+interface WatchedMarket {
   id: string;
-  displayTitle: string;
-  isLive: boolean;
-  platforms: {
-    platform: string;
-    marketId: string;
-    yesPrice?: number;
-    noPrice?: number;
-    priceSource: string;
-    priceAgeMs?: number;
-  }[];
+  platform: string;
+  vendorMarketId: string;
+  eventKey: string;
+  sport: string;
+  status: 'PRE' | 'LIVE' | 'ENDED';
+  rawTitle: string;
+  homeTeam?: string;
+  awayTeam?: string;
+}
+
+interface PlatformStats {
+  platform: string;
+  watchedMarkets: number;
+  connected: boolean;
+  lastMessageAt: string | null;
+  lastMessageAgeMs: number | null;
+  isStale: boolean;
+  subscribedMarkets: number;
 }
 
 interface LiveMarketsResponse {
-  markets: LiveMarket[];
-  totalCount: number;
+  watchedMarkets: WatchedMarket[];
+  totalWatchedMarkets: number;
   filteredCount: number;
+  platformStats: PlatformStats[];
+  priceCacheStats: {
+    totalEntries: number;
+    entriesByPlatform: Record<string, number>;
+    totalPriceUpdates: number;
+    lastPriceUpdateAt?: string;
+  };
+  workerPresent: boolean;
+  workerState: string | null;
+  snapshotUpdatedAt: string | null;
+  snapshotAgeMs: number | null;
+  timestamp: string;
+  filters: {
+    platform?: string;
+    liveOnly?: boolean;
+    limit: number;
+  };
+  notice?: string;
 }
 
 interface ExecutionModeData {
@@ -124,10 +166,39 @@ interface EventWatcherInfo {
   };
 }
 
+interface LiveEventsDebugInfo {
+  schemaVersion: number;
+  matchupCountsByPlatform: Record<string, number>;
+  matchupKeyMissingByPlatform: Record<string, number>;
+  sampleMatchupKeysByPlatform: Record<string, string[]>;
+  sampleKalshiTitles: string[];
+  eventFieldPresence: {
+    hasMarketKind: boolean;
+    hasMatchupKey: boolean;
+    hasNormalizedTitle: boolean;
+    hasHomeTeam: boolean;
+    hasAwayTeam: boolean;
+  };
+  countsBySport: Record<string, number>;
+  sampleEventsByPlatform: Record<string, Array<{
+    vendorMarketId: string;
+    rawTitle: string;
+    sport: string;
+    status: string;
+    homeTeam?: string;
+    awayTeam?: string;
+  }>>;
+  matchedGroupEventKeys: string[];
+  snapshotAgeWarning: boolean;
+}
+
 interface LiveEventsData {
   enabled: boolean;
   running: boolean;
   uptimeMs: number;
+  workerPresent: boolean;
+  snapshotAge: number | null;
+  snapshotUpdatedAt: string | null;
   config: {
     enabled: boolean;
     sportsOnly: boolean;
@@ -161,6 +232,7 @@ interface LiveEventsData {
     kalshi: number;
   };
   matchedGroups: MatchedEventGroup[];
+  debug?: LiveEventsDebugInfo;
 }
 
 interface LiveArbRuntimeConfigData {
@@ -170,9 +242,80 @@ interface LiveArbRuntimeConfigData {
   liveEventsOnly: boolean;
 }
 
+// Arb Opportunity Log type (from API)
+interface ArbOpportunityLog {
+  detectedAt: string;
+  opportunityId: string;
+  matchupKey: string;
+  marketKind: 'prediction' | 'sportsbook';
+  platformA: string;
+  marketIdA: string;
+  outcomeA: string;
+  sideA: string;
+  rawPriceA: number;
+  impliedProbA: number;
+  asOfA: string;
+  ageMsA: number;
+  platformB: string;
+  marketIdB: string;
+  outcomeB: string;
+  sideB: string;
+  rawPriceB: number;
+  impliedProbB: number;
+  asOfB: string;
+  ageMsB: number;
+  timeSkewMs: number;
+  payoutTarget: number;
+  totalCost: number;
+  profitAbs: number;
+  profitPct: number;
+  feesA: number;
+  feesB: number;
+  workerVersion: string;
+}
+
+interface OpportunitiesResponse {
+  logs: ArbOpportunityLog[];
+  total: number;
+  cursor?: number;
+  hasMore: boolean;
+  date: string;
+  generatedAt: string;
+}
+
 // Status indicator component
-function StatusIndicator({ connected }: { connected: boolean }) {
-  return connected ? (
+function StatusIndicator({ status }: { status: PlatformStatus }) {
+  // Handle disabled state (e.g., missing env var)
+  if (status.state === 'disabled') {
+    return (
+      <div className="flex items-center gap-2 text-yellow-400">
+        <AlertTriangle className="w-4 h-4" />
+        <span>Disabled</span>
+      </div>
+    );
+  }
+
+  // Handle no_worker state (no heartbeat from worker)
+  if (status.state === 'no_worker') {
+    return (
+      <div className="flex items-center gap-2 text-gray-400">
+        <WifiOff className="w-4 h-4" />
+        <span>No Heartbeat</span>
+      </div>
+    );
+  }
+
+  // Handle initializing state (worker present but platform status not yet populated)
+  if (status.state === 'initializing') {
+    return (
+      <div className="flex items-center gap-2 text-blue-400">
+        <Activity className="w-4 h-4 animate-pulse" />
+        <span>Initializing</span>
+      </div>
+    );
+  }
+
+  return status.connected ? (
     <div className="flex items-center gap-2 text-green-400">
       <Wifi className="w-4 h-4" />
       <span>Connected</span>
@@ -185,46 +328,91 @@ function StatusIndicator({ connected }: { connected: boolean }) {
   );
 }
 
-// Platform card component
+// Platform card component with staleness detection
 function PlatformCard({
   name,
   status,
+  isStale,
 }: {
   name: string;
   status: PlatformStatus;
+  /** True if connected but no message in >60s */
+  isStale?: boolean;
 }) {
+  const isDisabled = status.state === 'disabled';
+  const borderClass = isDisabled 
+    ? 'border-yellow-700/50' 
+    : isStale
+      ? 'border-orange-700/50'
+      : status.connected 
+        ? 'border-green-700/50' 
+        : 'border-gray-700';
+
   return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+    <div className={`bg-gray-800 rounded-lg p-4 border ${borderClass}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-white capitalize">{name}</h3>
-        <StatusIndicator connected={status.connected} />
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-white capitalize">{name}</h3>
+          {isStale && (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-900/30 text-orange-300 border border-orange-700/50">
+              Stale
+            </span>
+          )}
+        </div>
+        <StatusIndicator status={status} />
       </div>
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-400">State</span>
-          <span className="text-gray-200">{status.state}</span>
+          <span className={`${isDisabled ? 'text-yellow-300' : 'text-gray-200'}`}>
+            {formatStateLabel(status.state)}
+          </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Subscribed Markets</span>
-          <span className="text-gray-200">{status.subscribedMarkets}</span>
-        </div>
+        {!isDisabled && (
+          <div className="flex justify-between">
+            <span className="text-gray-400">Subscribed Markets</span>
+            <span className="text-gray-200">{status.subscribedMarkets}</span>
+          </div>
+        )}
         {status.lastMessageAt && (
           <div className="flex justify-between">
             <span className="text-gray-400">Last Message</span>
-            <span className="text-gray-200">
+            <span className={`${isStale ? 'text-orange-300' : 'text-gray-200'}`}>
               {formatTimeAgo(status.lastMessageAt)}
+              {isStale && ' ⚠️'}
             </span>
           </div>
         )}
         {status.errorMessage && (
-          <div className="mt-2 p-2 bg-red-900/20 border border-red-700/50 rounded text-red-300 text-xs">
+          <div className={`mt-2 p-2 rounded text-xs ${
+            isDisabled 
+              ? 'bg-yellow-900/20 border border-yellow-700/50 text-yellow-300'
+              : 'bg-red-900/20 border border-red-700/50 text-red-300'
+          }`}>
             {status.errorMessage}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+// Format state label for better readability
+function formatStateLabel(state: string): string {
+  switch (state) {
+    case 'disabled': return 'Disabled (Config)';
+    case 'no_worker': return 'No Worker';
+    case 'not_initialized': return 'Not Initialized';
+    case 'idle': return 'Idle';
+    case 'initializing': return 'Initializing...';
+    case 'connecting': return 'Connecting...';
+    case 'connected': return 'Connected';
+    case 'disconnected': return 'Disconnected';
+    case 'reconnecting': return 'Reconnecting...';
+    case 'error': return 'Error';
+    default: return state;
+  }
 }
 
 // Format time ago
@@ -237,6 +425,61 @@ function formatTimeAgo(isoString: string): string {
   if (diffMs < 60000) return `${Math.floor(diffMs / 1000)}s ago`;
   if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)}m ago`;
   return `${Math.floor(diffMs / 3600000)}h ago`;
+}
+
+// KV Status Banner - shows diagnostic info when KV has issues
+function KVStatusBanner({ kvStatus, kvStatusReason }: { kvStatus?: KVStatus; kvStatusReason?: string }) {
+  if (!kvStatus || kvStatus === 'ok') return null;
+
+  const statusConfig: Record<KVStatus, { icon: React.ReactNode; bgClass: string; title: string }> = {
+    ok: { icon: <CheckCircle className="w-5 h-5" />, bgClass: 'bg-green-900/30 border-green-700/50 text-green-300', title: 'KV Connected' },
+    misconfigured: { 
+      icon: <AlertTriangle className="w-5 h-5" />, 
+      bgClass: 'bg-red-900/30 border-red-700/50 text-red-300', 
+      title: 'KV Misconfigured' 
+    },
+    no_heartbeat: { 
+      icon: <AlertTriangle className="w-5 h-5" />, 
+      bgClass: 'bg-yellow-900/30 border-yellow-700/50 text-yellow-300', 
+      title: 'No Worker Heartbeat' 
+    },
+    parse_error: { 
+      icon: <XCircle className="w-5 h-5" />, 
+      bgClass: 'bg-red-900/30 border-red-700/50 text-red-300', 
+      title: 'Heartbeat Parse Error' 
+    },
+    kv_unreachable: { 
+      icon: <WifiOff className="w-5 h-5" />, 
+      bgClass: 'bg-red-900/30 border-red-700/50 text-red-300', 
+      title: 'KV Unreachable' 
+    },
+  };
+
+  const config = statusConfig[kvStatus] || statusConfig.kv_unreachable;
+
+  return (
+    <div className={`rounded-lg p-4 border ${config.bgClass} mb-6`}>
+      <div className="flex items-start gap-3">
+        {config.icon}
+        <div className="flex-1">
+          <h4 className="font-semibold">{config.title}</h4>
+          <p className="text-sm opacity-90 mt-1">{kvStatusReason}</p>
+          {kvStatus === 'misconfigured' && (
+            <p className="text-xs opacity-75 mt-2">
+              Check that <code className="bg-black/20 px-1 rounded">KV_REST_API_URL</code> and{' '}
+              <code className="bg-black/20 px-1 rounded">KV_REST_API_TOKEN</code> are set in Vercel environment variables.
+            </p>
+          )}
+          {kvStatus === 'no_heartbeat' && (
+            <p className="text-xs opacity-75 mt-2">
+              The worker may not be running, or Vercel may be reading from a different KV instance than the DO worker writes to.
+              Use <code className="bg-black/20 px-1 rounded">/api/debug/kv</code> to diagnose.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Dry Fire Stats Card
@@ -299,7 +542,7 @@ function DryFireStatsCard({ stats }: { stats: DryFireStats }) {
 }
 
 // Bot Control Panel
-type WorkerState = 'RUNNING' | 'STOPPED' | 'IDLE' | null;
+type WorkerState = 'STARTING' | 'RUNNING' | 'IDLE' | 'STOPPING' | 'STOPPED' | null;
 
 function BotControlPanel({
   liveArbEnabled,
@@ -321,16 +564,38 @@ function BotControlPanel({
   isLoading: boolean;
 }) {
   const isDryFire = executionMode?.isDryFire ?? true;
-  const statusLabel = liveArbEnabled
-    ? workerPresent
-      ? 'RUNNING'
-      : 'ENABLED (NO HEARTBEAT)'
-    : 'STOPPED';
-  const statusStyle = liveArbEnabled
-    ? workerPresent
-      ? 'bg-green-900/30 text-green-300 border border-green-700/50'
-      : 'bg-yellow-900/30 text-yellow-300 border border-yellow-700/50'
-    : 'bg-gray-700 text-gray-400';
+  const isStopping = workerState === 'STOPPING';
+  const isStarting = workerState === 'STARTING';
+  
+  // Determine status label based on worker lifecycle state
+  const getStatusLabel = () => {
+    if (isStopping) return 'STOPPING';
+    if (isStarting) return 'STARTING';
+    if (liveArbEnabled) {
+      if (workerPresent) {
+        return workerState === 'RUNNING' ? 'RUNNING' : 'IDLE';
+      }
+      return 'ENABLED (NO HEARTBEAT)';
+    }
+    return 'STOPPED';
+  };
+  
+  const statusLabel = getStatusLabel();
+  
+  // Status style - purple for transitional states
+  const getStatusStyle = () => {
+    if (isStopping || isStarting) {
+      return 'bg-purple-900/30 text-purple-300 border border-purple-700/50';
+    }
+    if (liveArbEnabled) {
+      return workerPresent
+        ? 'bg-green-900/30 text-green-300 border border-green-700/50'
+        : 'bg-yellow-900/30 text-yellow-300 border border-yellow-700/50';
+    }
+    return 'bg-gray-700 text-gray-400';
+  };
+  
+  const statusStyle = getStatusStyle();
 
   return (
     <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
@@ -353,7 +618,25 @@ function BotControlPanel({
         </div>
       )}
 
-      {liveArbEnabled && !workerPresent && (
+      {isStopping && (
+        <div className="mb-4 p-3 bg-purple-900/20 border border-purple-700/50 rounded-lg text-sm text-purple-200">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>Worker is shutting down gracefully...</span>
+          </div>
+        </div>
+      )}
+      
+      {isStarting && (
+        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg text-sm text-blue-200">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>Worker is starting up...</span>
+          </div>
+        </div>
+      )}
+      
+      {liveArbEnabled && !workerPresent && !isStopping && (
         <div className="mb-4 p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-sm text-red-200">
           Live Arb is enabled in KV, but no worker heartbeat has been detected. Make sure
           `npm run live-arb-worker` is running.
@@ -363,9 +646,9 @@ function BotControlPanel({
       <div className="flex items-center gap-4">
         <button
           onClick={onStart}
-          disabled={isLoading || liveArbEnabled}
+          disabled={isLoading || liveArbEnabled || isStopping || isStarting}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            liveArbEnabled
+            liveArbEnabled || isStopping || isStarting
               ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
               : isDryFire
                 ? 'bg-amber-600 hover:bg-amber-700 text-white'
@@ -378,15 +661,15 @@ function BotControlPanel({
 
         <button
           onClick={onStop}
-          disabled={isLoading || !liveArbEnabled}
+          disabled={isLoading || !liveArbEnabled || isStopping}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            !liveArbEnabled
+            !liveArbEnabled || isStopping
               ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
               : 'bg-red-600 hover:bg-red-700 text-white'
           }`}
         >
           <Square className="w-4 h-4" />
-          Stop Bot
+          {isStopping ? 'Stopping...' : 'Stop Bot'}
         </button>
       </div>
 
@@ -402,6 +685,179 @@ function BotControlPanel({
             <div className="flex justify-between mt-1">
               <span>Worker State</span>
               <span className="text-gray-200">{workerState}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Debug Panel for diagnosing matching issues
+function MatcherDebugPanel({ debug, snapshotAge }: { debug: LiveEventsDebugInfo | undefined; snapshotAge: number | null }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  if (!debug) {
+    return null;
+  }
+  
+  const snapshotAgeSeconds = snapshotAge ? Math.round(snapshotAge / 1000) : null;
+  const isStale = snapshotAge !== null && snapshotAge > 60000;
+  
+  return (
+    <div className="mt-4 border-t border-gray-700 pt-4">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+      >
+        <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+        <span>Debug Info (Schema v{debug.schemaVersion})</span>
+        {isStale && (
+          <span className="px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-300">
+            Stale ({snapshotAgeSeconds}s old)
+          </span>
+        )}
+      </button>
+      
+      {isExpanded && (
+        <div className="mt-3 space-y-4 text-xs">
+          {/* Snapshot Status */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Snapshot Status</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-gray-500">Age:</span>{' '}
+                <span className={isStale ? 'text-yellow-300' : 'text-green-300'}>
+                  {snapshotAgeSeconds !== null ? `${snapshotAgeSeconds}s` : 'N/A'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Warning:</span>{' '}
+                <span className={debug.snapshotAgeWarning ? 'text-yellow-300' : 'text-green-300'}>
+                  {debug.snapshotAgeWarning ? 'Yes (>60s)' : 'No'}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Field Presence */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Event Field Presence</div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(debug.eventFieldPresence).map(([field, present]) => (
+                <span
+                  key={field}
+                  className={`px-2 py-1 rounded ${
+                    present ? 'bg-green-900/30 text-green-300' : 'bg-red-900/30 text-red-300'
+                  }`}
+                >
+                  {field}: {present ? '✓' : '✗'}
+                </span>
+              ))}
+            </div>
+          </div>
+          
+          {/* Matchup Counts by Platform */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Matchup Counts by Platform</div>
+            <div className="grid grid-cols-3 gap-2">
+              {['SXBET', 'POLYMARKET', 'KALSHI'].map(platform => (
+                <div key={platform} className="text-center">
+                  <div className={`text-lg font-bold ${
+                    platform === 'SXBET' ? 'text-orange-300' :
+                    platform === 'POLYMARKET' ? 'text-purple-300' : 'text-blue-300'
+                  }`}>
+                    {debug.matchupCountsByPlatform[platform] || 0}
+                  </div>
+                  <div className="text-gray-500">{platform}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Missing MatchupKey Counts */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Events Missing MatchupKey</div>
+            <div className="grid grid-cols-3 gap-2">
+              {['SXBET', 'POLYMARKET', 'KALSHI'].map(platform => (
+                <div key={platform} className="text-center">
+                  <div className={`text-lg font-bold ${
+                    (debug.matchupKeyMissingByPlatform[platform] || 0) > 0 ? 'text-yellow-300' : 'text-green-300'
+                  }`}>
+                    {debug.matchupKeyMissingByPlatform[platform] || 0}
+                  </div>
+                  <div className="text-gray-500">{platform}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Counts by Sport */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="font-medium text-gray-300 mb-2">Events by Sport</div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(debug.countsBySport).map(([sport, count]) => (
+                <span key={sport} className="px-2 py-1 rounded bg-cyan-900/30 text-cyan-300">
+                  {sport}: {count}
+                </span>
+              ))}
+              {Object.keys(debug.countsBySport).length === 0 && (
+                <span className="text-gray-500">No events</span>
+              )}
+            </div>
+          </div>
+          
+          {/* Sample Kalshi Titles */}
+          {debug.sampleKalshiTitles.length > 0 && (
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <div className="font-medium text-gray-300 mb-2">Sample Kalshi Titles</div>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {debug.sampleKalshiTitles.map((title, idx) => (
+                  <div key={idx} className="text-gray-400 truncate" title={title}>
+                    {idx + 1}. {title}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Sample MatchupKeys */}
+          {Object.values(debug.sampleMatchupKeysByPlatform).some(arr => arr.length > 0) && (
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <div className="font-medium text-gray-300 mb-2">Sample MatchupKeys</div>
+              {['SXBET', 'POLYMARKET', 'KALSHI'].map(platform => {
+                const keys = debug.sampleMatchupKeysByPlatform[platform] || [];
+                if (keys.length === 0) return null;
+                return (
+                  <div key={platform} className="mb-2">
+                    <div className={`text-xs font-medium ${
+                      platform === 'SXBET' ? 'text-orange-300' :
+                      platform === 'POLYMARKET' ? 'text-purple-300' : 'text-blue-300'
+                    }`}>{platform}:</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {keys.slice(0, 5).map((key, idx) => (
+                        <code key={idx} className="px-1 py-0.5 bg-gray-800 rounded text-gray-400 text-xs">
+                          {key.length > 40 ? key.slice(0, 40) + '...' : key}
+                        </code>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Matched Group Event Keys */}
+          {debug.matchedGroupEventKeys.length > 0 && (
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <div className="font-medium text-gray-300 mb-2">Matched Group Keys ({debug.matchedGroupEventKeys.length})</div>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                {debug.matchedGroupEventKeys.slice(0, 20).map((key, idx) => (
+                  <code key={idx} className="px-1 py-0.5 bg-green-900/30 rounded text-green-300 text-xs">
+                    {key.length > 30 ? key.slice(0, 30) + '...' : key}
+                  </code>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -433,6 +889,7 @@ function RuleBasedMatcherCard({
   const matcherEnabled =
     runtimeConfig?.ruleBasedMatcherEnabled ?? data.enabled;
   const uptimeMinutes = Math.floor((data.uptimeMs || 0) / 60000);
+  const snapshotAgeSeconds = data.snapshotAge ? Math.round(data.snapshotAge / 1000) : null;
 
   return (
     <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
@@ -442,6 +899,16 @@ function RuleBasedMatcherCard({
           Rule-Based Sports Matcher
         </h3>
         <div className="flex items-center gap-2">
+          {data.workerPresent && (
+            <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
+              WORKER OK
+            </span>
+          )}
+          {!data.workerPresent && (
+            <span className="px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300">
+              NO WORKER
+            </span>
+          )}
           {data.running && matcherEnabled && (
             <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
               RUNNING
@@ -456,6 +923,18 @@ function RuleBasedMatcherCard({
           </span>
         </div>
       </div>
+
+      {/* Snapshot Age Indicator */}
+      {snapshotAgeSeconds !== null && (
+        <div className={`mb-4 text-xs ${snapshotAgeSeconds > 60 ? 'text-yellow-400' : 'text-gray-500'}`}>
+          Snapshot age: {snapshotAgeSeconds}s
+          {data.snapshotUpdatedAt && (
+            <span className="ml-2">
+              (updated: {new Date(data.snapshotUpdatedAt).toLocaleTimeString()})
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Main Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -535,6 +1014,9 @@ function RuleBasedMatcherCard({
           </div>
         </div>
       )}
+
+      {/* Debug Panel - Always available, especially useful when 0 groups */}
+      <MatcherDebugPanel debug={data.debug} snapshotAge={data.snapshotAge} />
     </div>
   );
 }
@@ -692,7 +1174,7 @@ function ExecutionModeCard({
   );
 }
 
-// CSV Export Panel
+// CSV Export Panel (Dry-Fire Trades)
 function ExportPanel() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportType, setExportType] = useState<'all' | 'simulated' | 'rejected'>('all');
@@ -768,14 +1250,222 @@ function ExportPanel() {
   );
 }
 
+// Arb Logs Export Panel
+function ArbLogsExportPanel() {
+  const [isExporting, setIsExporting] = useState(false);
+  const today = new Date().toISOString().split('T')[0];
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch(`/api/arb-logs?format=csv&date=${today}`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `arb-opportunities-${today}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export CSV');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+      <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+        <Download className="w-5 h-5 text-emerald-400" />
+        Export Arb Logs
+      </h3>
+
+      <p className="text-sm text-gray-400 mb-4">
+        Download all arb opportunities detected today with full audit fields (timestamps, skew, leg ages).
+      </p>
+
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleExport}
+          disabled={isExporting}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 
+                     disabled:bg-emerald-800 disabled:cursor-not-allowed rounded-lg text-white font-medium"
+        >
+          {isExporting ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Exporting...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" />
+              Download CSV
+            </>
+          )}
+        </button>
+
+        <a
+          href={`/api/arb-logs?format=csv&date=${today}`}
+          className="text-sm text-emerald-400 hover:text-emerald-300 underline"
+          download={`arb-opportunities-${today}.csv`}
+        >
+          Direct link
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// Threshold constants for validation warnings
+const MAX_PRICE_AGE_MS = 2000;
+const MAX_SKEW_MS = 500;
+
+// Check if an opportunity violates any thresholds
+function hasThresholdViolation(opp: ArbOpportunityLog): boolean {
+  return opp.ageMsA > MAX_PRICE_AGE_MS || opp.ageMsB > MAX_PRICE_AGE_MS || opp.timeSkewMs > MAX_SKEW_MS;
+}
+
+// Recent Arb Logs Table
+function RecentArbLogsTable({ logs }: { logs: ArbOpportunityLog[] }) {
+  if (logs.length === 0) {
+    return (
+      <div className="p-8 text-center text-gray-400">
+        No arb opportunities detected yet today.
+      </div>
+    );
+  }
+
+  const violationCount = logs.filter(hasThresholdViolation).length;
+
+  return (
+    <div className="overflow-x-auto">
+      {violationCount > 0 && (
+        <div className="px-4 py-3 bg-red-900/20 border-b border-red-700/30">
+          <div className="flex items-center gap-2 text-sm text-red-300">
+            <AlertTriangle className="w-4 h-4" />
+            <span>
+              {violationCount} opportunit{violationCount === 1 ? 'y' : 'ies'} with threshold violations detected.
+              This should not happen with DO gating enabled.
+            </span>
+          </div>
+        </div>
+      )}
+      <table className="w-full">
+        <thead className="bg-gray-900/50">
+          <tr>
+            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Detected</th>
+            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Matchup</th>
+            <th className="px-3 py-3 text-center text-xs font-medium text-gray-400 uppercase">Platforms</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Profit %</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Payout</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Cost</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Skew</th>
+            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Leg Ages</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-700">
+          {logs.map((opp) => {
+            const hasViolation = hasThresholdViolation(opp);
+            return (
+              <tr 
+                key={opp.opportunityId} 
+                className={`hover:bg-gray-700/30 ${hasViolation ? 'bg-red-900/10' : ''}`}
+              >
+                <td className="px-3 py-3 text-sm">
+                  {hasViolation ? (
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      WARN
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
+                      OK
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-3 text-sm text-gray-200">
+                  {formatTimeAgo(opp.detectedAt)}
+                </td>
+                <td className="px-3 py-3 text-sm text-gray-200 max-w-[200px] truncate" title={opp.matchupKey}>
+                  {opp.matchupKey.length > 30 ? opp.matchupKey.slice(0, 30) + '...' : opp.matchupKey}
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <div className="flex justify-center gap-1">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      opp.platformA === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                      opp.platformA === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                      'bg-blue-900/30 text-blue-300'
+                    }`}>
+                      {opp.platformA.toUpperCase().slice(0, 4)}
+                    </span>
+                    <span className="text-gray-500">/</span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      opp.platformB === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                      opp.platformB === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                      'bg-blue-900/30 text-blue-300'
+                    }`}>
+                      {opp.platformB.toUpperCase().slice(0, 4)}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-sm text-right">
+                  <span className={`font-medium ${
+                    opp.profitPct >= 1 ? 'text-green-400' :
+                    opp.profitPct >= 0.5 ? 'text-yellow-400' :
+                    'text-gray-400'
+                  }`}>
+                    {opp.profitPct.toFixed(2)}%
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-sm text-right text-gray-300">
+                  ${opp.payoutTarget}
+                </td>
+                <td className="px-3 py-3 text-sm text-right text-gray-300">
+                  ${opp.totalCost.toFixed(2)}
+                </td>
+                <td className="px-3 py-3 text-sm text-right">
+                  <span className={`${
+                    opp.timeSkewMs > MAX_SKEW_MS ? 'text-red-400 font-medium' :
+                    opp.timeSkewMs > 200 ? 'text-yellow-400' :
+                    'text-green-400'
+                  }`}>
+                    {opp.timeSkewMs}ms
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-sm text-right text-gray-400">
+                  <span className={opp.ageMsA > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
+                    {opp.ageMsA}ms
+                  </span>
+                  {' / '}
+                  <span className={opp.ageMsB > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
+                    {opp.ageMsB}ms
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // Main component
 export default function LiveArbPage() {
   const [liveArbStatus, setLiveArbStatus] = useState<LiveArbStatus | null>(null);
   const [dryFireStats, setDryFireStats] = useState<DryFireStats | null>(null);
-  const [markets, setMarkets] = useState<LiveMarket[]>([]);
+  const [marketsData, setMarketsData] = useState<LiveMarketsResponse | null>(null);
   const [liveEventsData, setLiveEventsData] = useState<LiveEventsData | null>(null);
   const [executionMode, setExecutionMode] = useState<ExecutionModeData | null>(null);
   const [runtimeConfig, setRuntimeConfig] = useState<LiveArbRuntimeConfigData | null>(null);
+  const [recentOpportunities, setRecentOpportunities] = useState<ArbOpportunityLog[]>([]);
+  const [opportunitiesTotal, setOpportunitiesTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -810,13 +1500,13 @@ export default function LiveArbPage() {
     }
   };
 
-  // Fetch markets
+  // Fetch markets (KV-backed watched markets, not live prices)
   const fetchMarkets = async () => {
     try {
-      const res = await fetch('/api/live-arb/markets?limit=20');
+      const res = await fetch('/api/live-arb/markets?limit=50');
       if (!res.ok) throw new Error('Failed to fetch markets');
       const data: LiveMarketsResponse = await res.json();
-      setMarkets(data.markets);
+      setMarketsData(data);
     } catch (err: any) {
       console.error('Failed to fetch markets:', err);
     }
@@ -854,6 +1544,19 @@ export default function LiveArbPage() {
       setRuntimeConfig(data);
     } catch (err: any) {
       console.error('Failed to fetch live-arb config:', err);
+    }
+  };
+
+  // Fetch recent arb logs
+  const fetchRecentOpportunities = async () => {
+    try {
+      const res = await fetch('/api/arb-logs?limit=20');
+      if (!res.ok) throw new Error('Failed to fetch arb logs');
+      const data: OpportunitiesResponse = await res.json();
+      setRecentOpportunities(data.logs);
+      setOpportunitiesTotal(data.total);
+    } catch (err: any) {
+      console.error('Failed to fetch arb logs:', err);
     }
   };
 
@@ -951,6 +1654,7 @@ export default function LiveArbPage() {
       fetchLiveEvents(),
       fetchExecutionMode(),
       fetchRuntimeConfig(),
+      fetchRecentOpportunities(),
     ]);
     setLastRefresh(new Date());
     setIsLoading(false);
@@ -1012,6 +1716,14 @@ export default function LiveArbPage() {
           </div>
         )}
 
+        {/* KV Status Banner - shows when there are KV connectivity issues */}
+        {liveArbStatus && (
+          <KVStatusBanner 
+            kvStatus={liveArbStatus.kvStatus} 
+            kvStatusReason={liveArbStatus.kvStatusReason} 
+          />
+        )}
+
         {/* Execution Mode Control */}
         <div className="mb-6">
           <ExecutionModeCard
@@ -1033,11 +1745,32 @@ export default function LiveArbPage() {
             onStop={stopBot}
             isLoading={botActionLoading}
           />
-          <ExportPanel />
+          <ArbLogsExportPanel />
         </div>
 
-        {/* Dry Fire Stats */}
-        {dryFireStats && <div className="mb-6"><DryFireStatsCard stats={dryFireStats} /></div>}
+        {/* Recent Arb Logs Table */}
+        <div className="mb-6 bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-400" />
+                  Recent Arb Logs
+                </h2>
+                <p className="text-sm text-gray-400">
+                  Last 20 opportunities detected today ({opportunitiesTotal} total)
+                </p>
+              </div>
+            </div>
+          </div>
+          <RecentArbLogsTable logs={recentOpportunities} />
+        </div>
+
+        {/* Dry-Fire Export + Stats Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <ExportPanel />
+          {dryFireStats && <DryFireStatsCard stats={dryFireStats} />}
+        </div>
 
         {/* Rule-Based Sports Matcher */}
         <div className="mb-6">
@@ -1124,28 +1857,90 @@ export default function LiveArbPage() {
           </div>
         )}
 
-        {/* Platform Status Cards */}
+        {/* Platform Status Cards with Staleness Detection */}
         {liveArbStatus && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-white mb-3">Platform Connections</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <PlatformCard name="SX.bet" status={liveArbStatus.platforms.sxbet} />
-              <PlatformCard name="Polymarket" status={liveArbStatus.platforms.polymarket} />
-              <PlatformCard name="Kalshi" status={liveArbStatus.platforms.kalshi} />
+              <PlatformCard 
+                name="SX.bet" 
+                status={liveArbStatus.platforms.sxbet}
+                isStale={liveArbStatus.platforms.sxbet.isStale}
+              />
+              <PlatformCard 
+                name="Polymarket" 
+                status={liveArbStatus.platforms.polymarket}
+                isStale={liveArbStatus.platforms.polymarket.isStale}
+              />
+              <PlatformCard 
+                name="Kalshi" 
+                status={liveArbStatus.platforms.kalshi}
+                isStale={liveArbStatus.platforms.kalshi.isStale}
+              />
             </div>
           </div>
         )}
 
-        {/* Live Markets Table */}
+        {/* Watched Markets Table (KV-backed) */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-700">
-            <h2 className="text-lg font-semibold text-white">Live Markets</h2>
-            <p className="text-sm text-gray-400">Markets with cached live prices</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Live Markets</h2>
+                <p className="text-sm text-gray-400">
+                  Markets being watched by the Digital Ocean worker
+                </p>
+              </div>
+              {marketsData && (
+                <div className="text-right text-sm">
+                  <div className="text-gray-400">
+                    {marketsData.priceCacheStats.totalEntries} prices cached
+                  </div>
+                  {marketsData.snapshotUpdatedAt && (
+                    <div className="text-gray-500 text-xs">
+                      Snapshot: {formatTimeAgo(marketsData.snapshotUpdatedAt)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {markets.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">
-              No live price data available. Check WebSocket connections.
+          {/* Architecture notice when no data */}
+          {marketsData?.notice && (
+            <div className="px-4 py-3 bg-blue-900/20 border-b border-blue-700/30">
+              <div className="flex items-start gap-2 text-sm text-blue-300">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{marketsData.notice}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Stale platform warning - use status API's computed isStale */}
+          {(liveArbStatus?.platforms.sxbet.isStale || 
+            liveArbStatus?.platforms.polymarket.isStale || 
+            liveArbStatus?.platforms.kalshi.isStale) && (
+            <div className="px-4 py-3 bg-orange-900/20 border-b border-orange-700/30">
+              <div className="flex items-start gap-2 text-sm text-orange-300">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  Some platforms have stale connections (no message in &gt;60s). 
+                  Check WebSocket health on the Digital Ocean worker.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {(!marketsData || marketsData.watchedMarkets.length === 0) ? (
+            <div className="p-8 text-center">
+              <div className="text-gray-400 mb-2">
+                {!marketsData?.workerPresent 
+                  ? 'Worker is not running. Start the Digital Ocean worker to begin monitoring.'
+                  : 'No markets are currently being watched.'}
+              </div>
+              <div className="text-gray-500 text-sm">
+                The worker maintains live prices in-memory. This dashboard shows which markets are being monitored.
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1156,62 +1951,66 @@ export default function LiveArbPage() {
                       Platform
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
-                      Market ID
+                      Event
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                      Yes Price
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                      No Price
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Sport
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                      Age
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                      Market ID
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {markets.map((market) => (
-                    market.platforms.map((p, idx) => (
-                      <tr key={`${market.id}-${idx}`} className="hover:bg-gray-700/30">
-                        <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-1 rounded text-xs font-medium 
-                            ${p.platform === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
-                              p.platform === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
-                              'bg-blue-900/30 text-blue-300'}`}>
-                            {p.platform}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-300 font-mono">
-                          {p.marketId.substring(0, 20)}...
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-green-400">
-                          {p.yesPrice !== undefined ? p.yesPrice.toFixed(2) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-red-400">
-                          {p.noPrice !== undefined ? p.noPrice.toFixed(2) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {market.isLive ? (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
-                              LIVE
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-400">
-                              Pre
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-400">
-                          {p.priceAgeMs !== undefined ? `${(p.priceAgeMs / 1000).toFixed(1)}s` : '-'}
-                        </td>
-                      </tr>
-                    ))
+                  {marketsData.watchedMarkets.map((market) => (
+                    <tr key={market.id} className="hover:bg-gray-700/30">
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`px-2 py-1 rounded text-xs font-medium 
+                          ${market.platform === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+                            market.platform === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+                            'bg-blue-900/30 text-blue-300'}`}>
+                          {market.platform}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-200">
+                        {market.homeTeam && market.awayTeam 
+                          ? `${market.homeTeam} vs ${market.awayTeam}`
+                          : market.rawTitle.substring(0, 40)}
+                        {market.rawTitle.length > 40 && '...'}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-cyan-900/30 text-cyan-300">
+                          {market.sport}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          market.status === 'LIVE' 
+                            ? 'bg-green-900/30 text-green-300' 
+                            : market.status === 'PRE'
+                              ? 'bg-gray-700 text-gray-400'
+                              : 'bg-red-900/30 text-red-300'
+                        }`}>
+                          {market.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-400 font-mono">
+                        {market.vendorMarketId.substring(0, 16)}...
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
+              
+              {/* Summary footer */}
+              <div className="px-4 py-3 bg-gray-900/30 border-t border-gray-700 text-sm text-gray-400">
+                Showing {marketsData.watchedMarkets.length} of {marketsData.totalWatchedMarkets} watched markets
+                {marketsData.filteredCount !== marketsData.totalWatchedMarkets && 
+                  ` (${marketsData.filteredCount} after filters)`}
+              </div>
             </div>
           )}
         </div>

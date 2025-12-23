@@ -49,6 +49,14 @@ openssl rand -hex 32
 
 **Documentation**: https://docs.kalshi.com/getting_started/authentication
 
+Additional Kalshi discovery controls:
+- `KALSHI_LIVE_CLOSE_WINDOW_MINUTES` (default: `360`) — only fetch markets closing within the next N minutes.
+- `KALSHI_MIN_CLOSE_WINDOW_MINUTES` (default: `120`) — include markets that closed/started recently (lookback).
+- `KALSHI_MAX_PAGES_PER_SERIES` (default: `2`) — pagination cap per series ticker to avoid crawling thousands of pages.
+- `KALSHI_MAX_TOTAL_MARKETS` (default: `2000`) — hard cap per refresh across all series.
+- `KALSHI_SERIES_CACHE_TTL_MS` (default: `3600000`) — cache sports series discovery.
+- `KALSHI_SPORTS_SERIES_TICKERS_OVERRIDE` — optional comma-separated fallback list if discovery fails.
+
 ### Polymarket API
 
 1. Log in to [Polymarket](https://polymarket.com)
@@ -144,6 +152,14 @@ ADMIN_PASSWORD_HASH=<from generate-password-hash.js>
 KALSHI_API_KEY=your-kalshi-api-key
 KALSHI_PRIVATE_KEY=your-kalshi-private-key
 KALSHI_EMAIL=your-kalshi-account@email.com
+# Sports series discovery + fetch bounds
+KALSHI_LIVE_CLOSE_WINDOW_MINUTES=360
+KALSHI_MIN_CLOSE_WINDOW_MINUTES=120
+KALSHI_MAX_PAGES_PER_SERIES=2
+KALSHI_MAX_TOTAL_MARKETS=2000
+KALSHI_SERIES_CACHE_TTL_MS=3600000
+# Optional fallback list if discovery fails (comma separated)
+KALSHI_SPORTS_SERIES_TICKERS_OVERRIDE=
 
 # ===================================
 # POLYMARKET API
@@ -179,6 +195,48 @@ MIN_PROFIT_MARGIN=0.5
 # CRON (Optional - for securing cron endpoint)
 # ===================================
 CRON_SECRET=<openssl rand -hex 32>
+
+# ===================================
+# LIVE ARB WORKER (Optional - for live betting)
+# ===================================
+# SX.bet WebSocket URL (leave empty to disable SX.bet WS)
+# When empty, SX.bet shows as "disabled" in dashboard (not an error)
+SXBET_WS_URL=wss://ably.sx.bet/...
+
+# Worker refresh interval in milliseconds (default: 15000)
+# This is how often the worker fetches market data (can be slow)
+LIVE_ARB_WORKER_REFRESH_MS=15000
+
+# Idle polling interval when bot is stopped (default: 5000)
+LIVE_ARB_IDLE_POLL_MS=5000
+
+# CRITICAL: Heartbeat interval in milliseconds (default: 5000)
+# This is DECOUPLED from refresh - heartbeat writes every 5s even if refresh takes minutes
+# This ensures workerPresent stays true as long as the worker process is alive
+WORKER_HEARTBEAT_INTERVAL_MS=5000
+
+# How long before a heartbeat is considered stale (default: 60000)
+# If heartbeat is older than this, workerPresent becomes false
+# Should be much larger than WORKER_HEARTBEAT_INTERVAL_MS to allow for temporary failures
+WORKER_HEARTBEAT_STALE_MS=60000
+
+# Graceful shutdown timeout in milliseconds (default: 25000)
+# Worker will force-exit after this if shutdown takes too long
+# MUST be less than pm2 kill_timeout (30000)
+WORKER_SHUTDOWN_GRACE_MS=25000
+
+# Delay before final STOPPED write during shutdown (default: 1500)
+# This ensures STOPPING state is observable during pm2 restart
+WORKER_SHUTDOWN_STOPPING_DELAY_MS=1500
+
+# Minimum profit in basis points (default: 50)
+LIVE_ARB_MIN_PROFIT_BPS=50
+
+# Max price age in milliseconds (default: 2000)
+LIVE_ARB_MAX_PRICE_AGE_MS=2000
+
+# Log level: 'info' or 'debug' (default: info)
+LIVE_ARB_LOG_LEVEL=info
 ```
 
 ## Vercel Environment Variables
@@ -268,6 +326,35 @@ Should output:
 - ✅ Enable 2FA on all accounts
 
 ## Troubleshooting
+
+### Worker Shows "No Heartbeat" or workerPresent=false
+
+**Symptom**: Dashboard shows "ENABLED (NO HEARTBEAT)" even though worker is running.
+
+**Diagnosis**:
+```bash
+curl https://your-app.vercel.app/api/live-arb/status | jq '{workerPresent, workerState, workerHeartbeatAt, workerHeartbeatAgeMs}'
+```
+
+**Causes & Solutions**:
+1. **Worker not running**: Start with `npm run live-arb-worker` or `pm2 restart live-arb-worker`
+2. **KV connection issues**: Check Upstash credentials (`KV_REST_API_URL`, `KV_REST_API_TOKEN`)
+3. **Heartbeat interval too slow**: Ensure `WORKER_HEARTBEAT_INTERVAL_MS` ≤ 10000
+4. **Stale threshold too short**: Ensure `WORKER_HEARTBEAT_STALE_MS` ≥ 60000
+
+### Platforms Show "No Worker" When Worker Is Running
+
+**Symptom**: Kalshi/Polymarket show "no_worker" state but worker is alive.
+
+**Cause**: Heartbeat is stale (workerPresent=false triggers "no_worker" for all non-disabled platforms).
+
+**Solution**: Same as above - ensure heartbeat is writing frequently.
+
+### SX.bet Shows "Disabled"
+
+**Expected behavior** when `SXBET_WS_URL` is not set. This is informational, not an error.
+
+To enable SX.bet: Set `SXBET_WS_URL` to the SX.bet Ably WebSocket endpoint.
 
 ### Variable Not Found
 
@@ -392,6 +479,111 @@ Before running the app:
 - Test each service independently
 - Consult service documentation
 - Open GitHub issue with details (never share actual keys!)
+
+## PM2 Operations (Production Worker)
+
+The live-arb-worker is designed to run with PM2 for production stability.
+
+### Initial Setup
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start the worker
+pm2 start ecosystem.config.js
+
+# Save PM2 process list (survives reboot)
+pm2 save
+
+# Set up PM2 to run on startup
+pm2 startup
+```
+
+### Common Commands
+
+```bash
+# View status
+pm2 status live-arb-worker
+
+# View logs
+pm2 logs live-arb-worker
+
+# Restart (graceful)
+pm2 restart live-arb-worker
+
+# Stop
+pm2 stop live-arb-worker
+
+# Delete from PM2
+pm2 delete live-arb-worker
+```
+
+### Log Rotation
+
+Install pm2-logrotate to prevent logs from filling disk:
+
+```bash
+# Install logrotate module
+pm2 install pm2-logrotate
+
+# Configure rotation settings
+pm2 set pm2-logrotate:max_size 50M       # Rotate when log exceeds 50MB
+pm2 set pm2-logrotate:retain 7           # Keep 7 rotated logs
+pm2 set pm2-logrotate:compress true      # Compress old logs
+pm2 set pm2-logrotate:dateFormat YYYY-MM-DD_HH-mm-ss
+pm2 set pm2-logrotate:rotateModule true  # Also rotate PM2 module logs
+```
+
+### Monitoring
+
+```bash
+# Real-time monitoring
+pm2 monit
+
+# JSON status output
+pm2 jlist
+
+# Check restart count
+pm2 show live-arb-worker | grep restarts
+```
+
+### Graceful Shutdown Verification
+
+When you run `pm2 restart live-arb-worker`:
+
+1. Worker receives SIGINT/SIGTERM
+2. Writes `STOPPING` state to KV immediately
+3. Closes WebSocket connections
+4. Writes `STOPPED` state to KV
+5. Exits cleanly (exit code 0)
+6. PM2 starts new instance
+7. New instance writes `STARTING` then `RUNNING`/`IDLE`
+
+Check via:
+```bash
+# Watch status endpoint during restart
+watch -n 1 'curl -s https://your-app.vercel.app/api/live-arb/status | jq "{workerState, workerHeartbeatAt, shutdown}"'
+```
+
+### Troubleshooting PM2
+
+**Worker keeps restarting:**
+```bash
+pm2 logs live-arb-worker --lines 100  # Check for crash reasons
+```
+
+**Memory issues:**
+```bash
+pm2 show live-arb-worker  # Check memory usage
+# Adjust max_memory_restart in ecosystem.config.js if needed
+```
+
+**Config changes not applied:**
+```bash
+pm2 delete live-arb-worker
+pm2 start ecosystem.config.js
+```
 
 ## Summary
 

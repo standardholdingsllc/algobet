@@ -31,6 +31,17 @@ import { executeOpportunityWithMode, ExecutionOptions, PlatformAdapters, isDryFi
 import { getOrSeedBotConfig } from './kv-storage';
 import { LiveArbManager } from './live-arb-manager';
 import { liveArbLog } from './live-arb-logger';
+import {
+  recordSubscriptionAttempt,
+  recordWatcherCreated,
+  recordWatcherSkipped,
+  recordWatcherCreatedByStatus,
+  recordSubscriptionAttemptByStatus,
+} from './live-events-debug';
+import {
+  createArbOpportunityLog,
+  logArbOpportunity,
+} from './arb-opportunity-logger';
 
 const WATCHER_LOG_TAG = 'LiveWatcher';
 
@@ -216,6 +227,16 @@ function getMarketsForGroup(group: MatchedEventGroup): Market[] {
         continue;
       }
       
+      // Determine the most recent price timestamp
+      const yesUpdatedAt = livePrices.yes?.lastUpdatedAt;
+      const noUpdatedAt = livePrices.no?.lastUpdatedAt;
+      let oddsAsOf: string | undefined;
+      if (yesUpdatedAt && noUpdatedAt) {
+        oddsAsOf = new Date(yesUpdatedAt) > new Date(noUpdatedAt) ? yesUpdatedAt : noUpdatedAt;
+      } else {
+        oddsAsOf = yesUpdatedAt || noUpdatedAt;
+      }
+      
       // Build market object with live prices
       const market: Market = {
         id: ve.vendorMarketId,
@@ -230,6 +251,7 @@ function getMarketsForGroup(group: MatchedEventGroup): Market[] {
           : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         volume: 0,
         liquidity: 0,
+        oddsAsOf,
       };
       
       markets.push(market);
@@ -305,6 +327,7 @@ function registerWatcherMarkets(watcher: ActiveWatcher): void {
     for (const ve of vendorEvents) {
       watcher.marketIdToEventKey.set(ve.vendorMarketId, watcher.group.eventKey);
       marketIdToWatcher.set(ve.vendorMarketId, watcher.group.eventKey);
+      recordSubscriptionAttempt();
       LiveArbManager.subscribeToMarket(marketPlatform, ve.vendorMarketId);
     }
   }
@@ -338,12 +361,14 @@ export function startWatcher(group: MatchedEventGroup): boolean {
   // Check if already watching
   if (activeWatchers.has(group.eventKey)) {
     watcherDebug('Already watching event', { eventKey: group.eventKey });
+    recordWatcherSkipped('already_watching');
     return false;
   }
   
   // Check max watchers
   if (activeWatchers.size >= config.maxWatchers) {
     watcherWarn('Max watcher limit reached', { maxWatchers: config.maxWatchers });
+    recordWatcherSkipped('max_watchers');
     return false;
   }
   
@@ -354,6 +379,7 @@ export function startWatcher(group: MatchedEventGroup): boolean {
       platformCount: group.platformCount,
       minPlatforms: config.minPlatforms,
     });
+    recordWatcherSkipped('not_enough_platforms');
     return false;
   }
   
@@ -389,6 +415,9 @@ export function startWatcher(group: MatchedEventGroup): boolean {
     }
   }, FALLBACK_POLL_INTERVAL_MS);
   
+  // Phase 6: Track PRE vs LIVE watcher creation
+  const watcherStatus = group.status === 'LIVE' ? 'LIVE' : 'PRE';
+  
   watcherInfo('Started watcher', {
     eventKey: group.eventKey,
     sport: group.sport,
@@ -396,7 +425,9 @@ export function startWatcher(group: MatchedEventGroup): boolean {
     awayTeam: group.awayTeam,
     platforms: group.platformCount,
     markets: watcher.marketIdToEventKey.size,
+    status: watcherStatus,
   });
+  recordWatcherCreatedByStatus(watcherStatus);
   
   return true;
 }
@@ -569,6 +600,22 @@ async function runArbCheck(eventKey: string): Promise<void> {
         profitBps: bestOpp.profitMargin,
         platforms: [bestOpp.market1.platform, bestOpp.market2.platform],
       });
+      
+      // Log the opportunity to KV for CSV export
+      try {
+        const arbLog = createArbOpportunityLog(bestOpp, {
+          matchupKey: group.eventKey,
+          priceTimestampA: bestOpp.market1.oddsAsOf,
+          priceTimestampB: bestOpp.market2.oddsAsOf,
+          betSizes: {
+            amount1: bestOpp.betSize1,
+            amount2: bestOpp.betSize2,
+          },
+        });
+        await logArbOpportunity(arbLog);
+      } catch (logError) {
+        liveArbLog('error', WATCHER_LOG_TAG, 'Failed to log opportunity', logError as Error);
+      }
       
       // Execute if we have adapters
       if (platformAdapters && executionOptionsTemplate) {

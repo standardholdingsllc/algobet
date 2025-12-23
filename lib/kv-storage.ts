@@ -9,14 +9,92 @@ import {
   LiveArbRuntimeConfig,
 } from '@/types';
 import { DEFAULT_LIVE_ARB_RUNTIME_CONFIG } from '@/types/live-arb';
+import { LiveEventPlatform, VendorEventStatus } from '@/types/live-events';
+import { LiveEventsDebugCounters } from './live-events-debug';
 import { buildLiveArbRuntimeSeed } from './live-arb-runtime-seed';
+
+// Helper to fix double-quoted env vars (common .env parsing issue)
+function fixEnvQuotes(value: string | undefined): string | undefined {
+  if (!value) return value;
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
 
 // Initialize Upstash Redis client
 // Using Vercel's KV environment variables (set by Upstash integration)
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
+const kvUrl = fixEnvQuotes(process.env.KV_REST_API_URL);
+const kvToken = fixEnvQuotes(process.env.KV_REST_API_TOKEN);
+
+// Export key constants for cross-process consistency
+export const STORAGE_KEY = 'algobet:data';
+export const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
+export const LIVE_EVENTS_SNAPSHOT_KEY = 'algobet:live-arb:live-events-snapshot';
+
+/**
+ * KV Configuration status for diagnostics.
+ * Used to surface the exact reason when KV reads fail.
+ */
+export type KVReadResult = 'ok' | 'null' | 'error' | 'misconfigured' | 'parse_error';
+
+export interface KVDiagnostics {
+  /** Whether KV is properly configured */
+  configured: boolean;
+  /** Hostname of the Upstash URL (no token leaked) */
+  kvHost: string | null;
+  /** The key being read */
+  kvKeyRead: string;
+  /** Result of the read operation */
+  kvReadResult: KVReadResult;
+  /** Sanitized error message if read failed */
+  kvError?: string;
+  /** First 200 chars of raw data if parse failed */
+  kvRawSample?: string;
+  /** Vercel region if available */
+  vercelRegion?: string;
+  /** Whether running on Vercel */
+  isVercel: boolean;
+}
+
+/**
+ * Extract hostname from KV URL without leaking credentials.
+ */
+export function getKvHost(): string | null {
+  if (!kvUrl) return null;
+  try {
+    const url = new URL(kvUrl);
+    return url.hostname;
+  } catch {
+    return 'invalid-url';
+  }
+}
+
+/**
+ * Check if KV is properly configured.
+ */
+export function isKvConfigured(): boolean {
+  return Boolean(kvUrl && kvToken);
+}
+
+/**
+ * Get diagnostic info about KV configuration.
+ * Safe to expose in API responses (no secrets).
+ */
+export function getKvConfigDiagnostics(): Pick<KVDiagnostics, 'configured' | 'kvHost' | 'isVercel' | 'vercelRegion'> {
+  return {
+    configured: isKvConfigured(),
+    kvHost: getKvHost(),
+    isVercel: Boolean(process.env.VERCEL),
+    vercelRegion: process.env.VERCEL_REGION,
+  };
+}
+
+// Only create Redis client if configured
+const redis = kvUrl && kvToken 
+  ? new Redis({ url: kvUrl, token: kvToken })
+  : null;
 
 interface StorageData {
   bets: Bet[];
@@ -63,39 +141,175 @@ const DEFAULT_DATA: StorageData = {
   liveArbRuntimeConfig: DEFAULT_LIVE_ARB_RUNTIME_CONFIG,
 };
 
+/**
+ * Previously this function forced all toggles to true (operational lock).
+ * Now it just passes through the config to allow dashboard control.
+ */
 function enforceLiveArbAlwaysOn(
   config: LiveArbRuntimeConfig
 ): LiveArbRuntimeConfig {
-  if (
-    config.liveArbEnabled &&
-    config.ruleBasedMatcherEnabled &&
-    config.sportsOnly &&
-    config.liveEventsOnly
-  ) {
-    return config;
-  }
-
-  return {
-    ...config,
-    liveArbEnabled: true,
-    ruleBasedMatcherEnabled: true,
-    sportsOnly: true,
-    liveEventsOnly: true,
-  };
+  // No longer enforcing - allow dashboard to control start/stop
+  return config;
 }
 
-const STORAGE_KEY = 'algobet:data';
-const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
+// Keys are now exported at the top of the file for cross-process consistency
 
+/**
+ * Platform connection status as reported by the worker.
+ * This is persisted to KV so the serverless status API can read it.
+ */
+export interface WorkerPlatformStatus {
+  connected: boolean;
+  state: string;
+  lastMessageAt: string | null;
+  subscribedMarkets: number;
+  errorMessage?: string;
+  /** If the platform is disabled due to missing config */
+  disabled?: boolean;
+  disabledReason?: string;
+}
+
+/**
+ * Price cache stats as reported by the worker.
+ */
+export interface WorkerPriceCacheStats {
+  totalEntries: number;
+  entriesByPlatform: Record<string, number>;
+  totalPriceUpdates: number;
+  oldestUpdateMs?: number;
+  newestUpdateMs?: number;
+  lastPriceUpdateAt?: string;
+}
+
+/**
+ * Worker lifecycle states.
+ * - STARTING: Worker is initializing (brief, during startup)
+ * - RUNNING: Arb system is active
+ * - IDLE: Worker is alive but arb is disabled (waiting for dashboard enable)
+ * - STOPPING: Graceful shutdown in progress (SIGTERM/SIGINT received)
+ * - STOPPED: Worker has stopped (final heartbeat before exit)
+ */
+export type WorkerState = 'STARTING' | 'RUNNING' | 'IDLE' | 'STOPPING' | 'STOPPED';
+
+/**
+ * Comprehensive worker heartbeat persisted to KV.
+ * This is the source of truth for the serverless status API.
+ * 
+ * IMPORTANT: The heartbeat is written by a dedicated timer (every 5-10s)
+ * that is DECOUPLED from the heavy refresh cycle. This ensures workerPresent
+ * stays true even when refresh takes minutes.
+ */
 export interface LiveArbWorkerHeartbeat {
+  /** ISO timestamp of when this heartbeat was written */
   updatedAt: string;
-  state: 'RUNNING' | 'STOPPED' | 'IDLE';
+  /** Worker lifecycle state */
+  state: WorkerState;
+  /** Configured heartbeat interval in ms (for diagnostics) */
+  heartbeatIntervalMs?: number;
+  /** Monotonically increasing tick count - proves heartbeat loop is advancing */
+  heartbeatTickCount?: number;
+  
+  // Shutdown metadata (populated during graceful shutdown)
+  /** Reason for shutdown: SIGTERM, SIGINT, uncaughtException, unhandledRejection */
+  shutdownReason?: string;
+  /** ISO timestamp when shutdown began */
+  shutdownStartedAt?: string;
+  
+  // Runtime config snapshot
   liveArbEnabled?: boolean;
   ruleBasedMatcherEnabled?: boolean;
   liveEventsOnly?: boolean;
   sportsOnly?: boolean;
+  
+  // Refresh cycle metadata (decoupled from heartbeat timing)
+  /** Configured refresh interval in ms */
   refreshIntervalMs?: number;
+  /** Whether a refresh is currently in progress */
+  refreshInProgress?: boolean;
+  /** ISO timestamp of last completed refresh */
+  lastRefreshAt?: string;
+  /** Duration of last refresh in ms */
+  lastRefreshDurationMs?: number;
+  /** Total markets from last refresh */
   totalMarkets?: number;
+  
+  /** Platform connection statuses - source of truth for dashboard */
+  platforms?: {
+    sxbet: WorkerPlatformStatus;
+    polymarket: WorkerPlatformStatus;
+    kalshi: WorkerPlatformStatus;
+  };
+  /** Price cache stats - source of truth for dashboard */
+  priceCacheStats?: WorkerPriceCacheStats;
+  /** Circuit breaker state */
+  circuitBreaker?: {
+    isOpen: boolean;
+    consecutiveFailures: number;
+    openReason?: string;
+    openedAt?: string;
+  };
+  /** Live events pipeline statistics and debug counters */
+  liveEventsStats?: {
+    registry: {
+      totalEvents: number;
+      byPlatform: Record<LiveEventPlatform, number>;
+      byStatus: Record<VendorEventStatus, number>;
+      bySport: Record<string, number>;
+      totalAdded: number;
+      totalUpdated: number;
+      totalRemoved: number;
+    };
+    matcher: {
+      totalGroups: number;
+      liveGroups: number;
+      preGroups: number;
+      by3Platforms: number;
+      by2Platforms: number;
+      bySport: Record<string, number>;
+      lastRunAt: number;
+    };
+    watcher: {
+      activeWatchers: number;
+      totalArbChecks: number;
+      totalOpportunities: number;
+      avgChecksPerSecond: number;
+      avgCheckTimeMs: number;
+      maxCheckTimeMs: number;
+      totalMarketsWatched: number;
+    };
+  };
+  liveEventsDebug?: LiveEventsDebugCounters;
+}
+
+/** All valid worker states */
+const VALID_WORKER_STATES: WorkerState[] = ['STARTING', 'RUNNING', 'IDLE', 'STOPPING', 'STOPPED'];
+
+/**
+ * Validate that a heartbeat payload has the required fields.
+ * Used for runtime sanity checks.
+ */
+export function isValidWorkerHeartbeat(obj: unknown): obj is LiveArbWorkerHeartbeat {
+  if (!obj || typeof obj !== 'object') return false;
+  const hb = obj as Record<string, unknown>;
+  return (
+    typeof hb.updatedAt === 'string' &&
+    typeof hb.state === 'string' &&
+    VALID_WORKER_STATES.includes(hb.state as WorkerState)
+  );
+}
+
+/**
+ * Check if a heartbeat is fresh (within staleness threshold).
+ * @param heartbeat The heartbeat to check
+ * @param staleMs Maximum age in ms before considered stale (default 60000)
+ */
+export function isHeartbeatFresh(
+  heartbeat: LiveArbWorkerHeartbeat | null,
+  staleMs: number = 60000
+): boolean {
+  if (!heartbeat?.updatedAt) return false;
+  const age = Date.now() - new Date(heartbeat.updatedAt).getTime();
+  return age <= staleMs;
 }
 
 /**
@@ -123,6 +337,10 @@ export class KVStorage {
    * Get all data from Redis store
    */
   static async getAllData(): Promise<StorageData> {
+    if (!redis) {
+      console.error('[KVStorage] Redis not configured (missing KV_REST_API_URL or KV_REST_API_TOKEN)');
+      return DEFAULT_DATA;
+    }
     try {
       const data = await redis.get<StorageData>(STORAGE_KEY);
       return data || DEFAULT_DATA;
@@ -136,6 +354,10 @@ export class KVStorage {
    * Update all data in Redis store
    */
   static async updateAllData(data: StorageData): Promise<void> {
+    if (!redis) {
+      console.error('[KVStorage] Redis not configured (missing KV_REST_API_URL or KV_REST_API_TOKEN)');
+      throw new Error('Redis not configured');
+    }
     try {
       await redis.set(STORAGE_KEY, data);
     } catch (error) {
@@ -413,6 +635,13 @@ function configsEqual(a?: BotConfig, b?: BotConfig): boolean {
 }
 
 export async function getOrSeedBotConfig(): Promise<BotConfig> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured; using safe defaults');
+    const fallback = cloneDefaultBotConfig();
+    cacheBotConfig(fallback);
+    return fallback;
+  }
+  
   try {
     const rawData = await redis.get<StorageData>(STORAGE_KEY);
 
@@ -451,6 +680,10 @@ export async function getOrSeedBotConfig(): Promise<BotConfig> {
 export async function updateWorkerHeartbeat(
   heartbeat: LiveArbWorkerHeartbeat
 ): Promise<void> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured - cannot update worker heartbeat');
+    return;
+  }
   try {
     await redis.set(WORKER_HEARTBEAT_KEY, heartbeat);
   } catch (error) {
@@ -458,11 +691,194 @@ export async function updateWorkerHeartbeat(
   }
 }
 
-export async function getWorkerHeartbeat(): Promise<LiveArbWorkerHeartbeat | null> {
+/**
+ * Result of reading worker heartbeat with diagnostic info.
+ */
+export interface HeartbeatReadResult {
+  heartbeat: LiveArbWorkerHeartbeat | null;
+  diagnostics: KVDiagnostics;
+}
+
+/**
+ * Get worker heartbeat with full diagnostics.
+ * Use this when you need to surface the exact reason for failures.
+ */
+export async function getWorkerHeartbeatWithDiagnostics(): Promise<HeartbeatReadResult> {
+  const baseDiagnostics: Omit<KVDiagnostics, 'kvReadResult'> = {
+    configured: isKvConfigured(),
+    kvHost: getKvHost(),
+    kvKeyRead: WORKER_HEARTBEAT_KEY,
+    isVercel: Boolean(process.env.VERCEL),
+    vercelRegion: process.env.VERCEL_REGION,
+  };
+
+  if (!redis) {
+    return {
+      heartbeat: null,
+      diagnostics: {
+        ...baseDiagnostics,
+        kvReadResult: 'misconfigured',
+        kvError: 'Missing KV_REST_API_URL or KV_REST_API_TOKEN environment variables',
+      },
+    };
+  }
+
   try {
-    return (await redis.get<LiveArbWorkerHeartbeat>(WORKER_HEARTBEAT_KEY)) ?? null;
+    const raw = await redis.get(WORKER_HEARTBEAT_KEY);
+    
+    if (raw === null || raw === undefined) {
+      return {
+        heartbeat: null,
+        diagnostics: {
+          ...baseDiagnostics,
+          kvReadResult: 'null',
+        },
+      };
+    }
+
+    // Validate the heartbeat structure
+    if (!isValidWorkerHeartbeat(raw)) {
+      const rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      return {
+        heartbeat: null,
+        diagnostics: {
+          ...baseDiagnostics,
+          kvReadResult: 'parse_error',
+          kvError: 'Heartbeat data failed validation (missing updatedAt or invalid state)',
+          kvRawSample: rawStr.substring(0, 200),
+        },
+      };
+    }
+
+    return {
+      heartbeat: raw as LiveArbWorkerHeartbeat,
+      diagnostics: {
+        ...baseDiagnostics,
+        kvReadResult: 'ok',
+      },
+    };
+  } catch (error: any) {
+    return {
+      heartbeat: null,
+      diagnostics: {
+        ...baseDiagnostics,
+        kvReadResult: 'error',
+        kvError: error?.message || 'Unknown KV read error',
+      },
+    };
+  }
+}
+
+/**
+ * Get worker heartbeat (simple version for backward compatibility).
+ * For diagnostics, use getWorkerHeartbeatWithDiagnostics().
+ */
+export async function getWorkerHeartbeat(): Promise<LiveArbWorkerHeartbeat | null> {
+  const { heartbeat } = await getWorkerHeartbeatWithDiagnostics();
+  return heartbeat;
+}
+
+// ============================================================================
+// Live Events Snapshot (for cross-process visibility)
+// ============================================================================
+
+/**
+ * Snapshot of live events data written by the worker for the API to read.
+ * This enables the Vercel serverless API to display event data that only
+ * exists in the worker's memory on Digital Ocean.
+ */
+export interface LiveEventsSnapshot {
+  /** ISO timestamp when this snapshot was written */
+  updatedAt: string;
+  
+  /** Registry snapshot - all tracked vendor events */
+  registry: {
+    totalEvents: number;
+    events: Array<{
+      platform: LiveEventPlatform;
+      vendorMarketId: string;
+      sport: string;
+      status: VendorEventStatus;
+      rawTitle: string;
+      normalizedTitle?: string;
+      startTime?: number;
+      homeTeam?: string;
+      awayTeam?: string;
+    }>;
+    countByPlatform: Record<LiveEventPlatform, number>;
+    countByStatus: Record<VendorEventStatus, number>;
+  };
+  
+  /** Matched event groups - cross-platform matches */
+  matchedGroups: Array<{
+    eventKey: string;
+    sport: string;
+    status: VendorEventStatus;
+    homeTeam?: string;
+    awayTeam?: string;
+    platformCount: number;
+    matchQuality: number;
+    vendors: {
+      SXBET?: Array<{ vendorMarketId: string; rawTitle: string }>;
+      POLYMARKET?: Array<{ vendorMarketId: string; rawTitle: string }>;
+      KALSHI?: Array<{ vendorMarketId: string; rawTitle: string }>;
+    };
+  }>;
+  
+  /** Active watchers */
+  watchers: Array<{
+    eventKey: string;
+    sport: string;
+    marketCount: number;
+    lastCheckAt?: number;
+  }>;
+  
+  /** Summary stats */
+  stats: {
+    totalVendorEvents: number;
+    liveEvents: number;
+    preEvents: number;
+    endedEvents: number;
+    matchedGroups: number;
+    threeWayMatches: number;
+    twoWayMatches: number;
+    activeWatchers: number;
+    arbChecksTotal: number;
+    opportunitiesTotal: number;
+  };
+}
+
+/**
+ * Update the live events snapshot in KV.
+ * Called by the worker after each registry refresh.
+ */
+export async function updateLiveEventsSnapshot(
+  snapshot: LiveEventsSnapshot
+): Promise<void> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured - cannot update live events snapshot');
+    return;
+  }
+  try {
+    await redis.set(LIVE_EVENTS_SNAPSHOT_KEY, snapshot);
   } catch (error) {
-    console.error('[KVStorage] Failed to read worker heartbeat', error);
+    console.error('[KVStorage] Failed to update live events snapshot', error);
+  }
+}
+
+/**
+ * Get the live events snapshot from KV.
+ * Called by the API to display event data.
+ */
+export async function getLiveEventsSnapshot(): Promise<LiveEventsSnapshot | null> {
+  if (!redis) {
+    console.error('[KVStorage] Redis not configured - cannot read live events snapshot');
+    return null;
+  }
+  try {
+    return (await redis.get<LiveEventsSnapshot>(LIVE_EVENTS_SNAPSHOT_KEY)) ?? null;
+  } catch (error) {
+    console.error('[KVStorage] Failed to read live events snapshot', error);
     return null;
   }
 }

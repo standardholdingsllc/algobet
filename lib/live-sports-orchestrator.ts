@@ -33,6 +33,10 @@ import {
 import { processAllMarkets } from './live-event-extractors';
 import { ExecutionOptions, PlatformAdapters } from './execution-wrapper';
 import { getRateLimiterStats, logRateLimiterStatus } from './rate-limiter';
+import {
+  getLiveEventsDebug,
+  resetLiveEventsDebug,
+} from './live-events-debug';
 
 // ============================================================================
 // State
@@ -193,6 +197,7 @@ export async function refreshRegistry(markets?: Market[]): Promise<void> {
   if (!config) config = getConfig();
 
   try {
+    resetLiveEventsDebug();
     // Load runtime config for liveEventsOnly filter
     const runtimeConfig = await loadLiveArbRuntimeConfig();
     
@@ -263,8 +268,12 @@ export async function runMatcherCycle(): Promise<void> {
     // Get registry snapshot
     const snapshot = getSnapshot();
 
+    // Phase 6: If allowPreWatchers is enabled, don't filter to liveOnly
+    // This allows PRE events to create watchers for bring-up/testing
+    const effectiveLiveOnly = runtimeConfig.liveEventsOnly && !runtimeConfig.allowPreWatchers;
+    
     // Update matches with liveOnly consideration
-    updateMatches(snapshot, { liveOnly: runtimeConfig.liveEventsOnly });
+    updateMatches(snapshot, { liveOnly: effectiveLiveOnly });
 
     // Update watchers based on matches
     updateWatchers();
@@ -345,6 +354,15 @@ export function getOrchestratorStatus(): LiveEventsApiResponse & {
     },
     rateLimiterStats,
     generatedAt: Date.now(),
+  };
+}
+
+export function getLiveEventsDebugSnapshot() {
+  return {
+    registry: getRegistryStats(),
+    matcher: getMatcherStats(),
+    watcher: getWatcherStats(),
+    debug: getLiveEventsDebug(),
   };
 }
 

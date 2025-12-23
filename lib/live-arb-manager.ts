@@ -35,6 +35,7 @@ import { getPolymarketWsClient, PolymarketWsClient } from '@/services/polymarket
 import { getKalshiWsClient, KalshiWsClient } from '@/services/kalshi-ws';
 import { scanArbitrageOpportunities } from './arbitrage';
 import { liveArbLog } from './live-arb-logger';
+import { recordSubscriptionFailed } from './live-events-debug';
 
 // ============================================================================
 // Subscription Management Configuration
@@ -559,17 +560,26 @@ class LiveArbManagerImpl {
    * Subscribe to a single market on a specific platform
    */
   subscribeToMarket(platform: MarketPlatform, marketId: string): void {
-    if (!this.isInitialized) return;
+    if (!this.isInitialized) {
+      recordSubscriptionFailed('manager_not_initialized');
+      return;
+    }
+
+    const client = this.getWsClient(platform);
+    if (!client || !client.isConnected()) {
+      recordSubscriptionFailed(`${platform}_ws_not_connected`);
+      return;
+    }
 
     switch (platform) {
       case 'sxbet':
-        this.sxBetWs?.subscribeToMarket(marketId);
+        (client as SxBetWsClient).subscribeToMarket(marketId);
         break;
       case 'polymarket':
-        this.polymarketWs?.subscribeToMarket(marketId);
+        (client as PolymarketWsClient).subscribeToMarket(marketId);
         break;
       case 'kalshi':
-        this.kalshiWs?.subscribeToMarket(marketId);
+        (client as KalshiWsClient).subscribeToMarket(marketId);
         break;
     }
   }

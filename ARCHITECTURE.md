@@ -11,6 +11,7 @@ This document describes the live betting arbitrage system. AlgoBet is a **pure l
 | **Dashboard** | `pages/`, `components/` | Next.js 14 + React UI for balances, configuration, exports, and live-arb controls. |
 | **Live Arb API** | `pages/api/live-arb/**/*` | Control plane for live-arb configuration, execution mode, dry-fire stats, and status. |
 | **Live Arb Worker** | `workers/live-arb-worker.ts` | Long-running process that orchestrates WebSocket connections, event registry, and arb detection. |
+| **Live Sports Discovery** | `lib/live-sports-discovery*.ts` | Platform-specific logic for detecting currently-live sports events. |
 | **Platform Integrations** | `lib/markets/{kalshi,polymarket,sxbet}.ts`, `services/` | REST APIs and WebSocket clients for each platform. |
 | **Storage** | `lib/kv-storage.ts` | Upstash KV for runtime state, config, bets, balances, and dry-fire logs. |
 
@@ -23,79 +24,177 @@ This document describes the live betting arbitrage system. AlgoBet is a **pure l
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **LiveArbManager** | `lib/live-arb-manager.ts` | Orchestrates WS clients, subscription management, and arb detection |
-| **LivePriceCache** | `lib/live-price-cache.ts` | In-memory cache for real-time prices from WebSocket feeds |
+| **LivePriceCache** | `lib/live-price-cache.ts` | In-memory cache for real-time prices from WebSocket feeds (DO worker only) |
 | **LiveEventRegistry** | `lib/live-event-registry.ts` | In-memory store of vendor events from all platforms |
 | **LiveEventMatcher** | `lib/live-event-matcher.ts` | Token-based matching with connected components algorithm |
 | **LiveEventWatchers** | `lib/live-event-watchers.ts` | Per-event arb monitoring triggered by price updates |
 | **LiveSportsOrchestrator** | `lib/live-sports-orchestrator.ts` | Main coordination module for the rule-based matcher |
+| **LiveSportsDiscovery** | `lib/live-sports-discovery.ts` | Central orchestrator for platform-specific live detection |
 | **LiveArbSafetyChecker** | `lib/live-arb-safety.ts` | Circuit breakers and safety checks for live execution |
 | **ExecutionWrapper** | `lib/execution-wrapper.ts` | Routes between real execution and dry-fire mode |
 | **DryFireLogger** | `lib/dry-fire-logger.ts` | Persistence layer for paper trade logs |
 
+### 2.2 Serverless Architecture Limitations
+
+**CRITICAL**: The system uses a split architecture:
+- **Digital Ocean Worker**: Long-running process with WebSocket connections and in-memory `LivePriceCache`
+- **Vercel Serverless**: Stateless API routes and dashboard that CANNOT access DO worker memory
+
+**Why LivePriceCache cannot be used on Vercel:**
+```
+┌─────────────────────┐     ┌─────────────────────┐
+│   Digital Ocean     │     │   Vercel Serverless │
+│                     │     │                     │
+│  ┌───────────────┐  │     │  ┌───────────────┐  │
+│  │ LivePriceCache│  │     │  │ LivePriceCache│  │
+│  │  (populated)  │  │     │  │   (EMPTY!)    │  │
+│  └───────────────┘  │     │  └───────────────┘  │
+│         ▲           │     │                     │
+│    WebSockets       │     │   Reads from KV     │
+│    ┌───┴───┐        │     │         │           │
+│    │Kalshi │        │     │         ▼           │
+│    │Poly   │        │     │  ┌───────────────┐  │
+│    │SXbet  │        │     │  │  Upstash KV   │◄─┼──┐
+│    └───────┘        │     │  └───────────────┘  │  │
+│         │           │     │                     │  │
+│         ▼           │     └─────────────────────┘  │
+│  Writes to KV ──────┼─────────────────────────────┘
+└─────────────────────┘
+```
+
+`LivePriceCache` is a **per-process singleton**. Each Vercel serverless function invocation has its own empty instance with no WebSocket connections. All Vercel API routes must read from KV storage.
+
 ### 2.2 WebSocket Clients
 
-Each platform has a dedicated WebSocket client following the same pattern:
-
-**Common features:**
+Each platform has a dedicated WebSocket client with common features:
 - Connection state machine: `disconnected` → `connecting` → `connected` → `reconnecting` → `error`
 - Exponential backoff reconnection
 - Heartbeat/ping to detect stale connections
 - Subscription management with pending queue for pre-connection subscriptions
-- State change handlers for monitoring
 
 | Platform | Location | Features |
 |----------|----------|----------|
-| **SX.bet** | `services/sxbet-ws.ts` | Best-odds, live-scores, line-changes feeds; configurable WS endpoint via `SXBET_WS_URL` (empty = REST-only fallback) |
+| **SX.bet** | `services/sxbet-ws.ts` | Best-odds, live-scores, line-changes feeds |
 | **Polymarket** | `services/polymarket-ws.ts` | Orderbook updates and last trade prices per market |
-| **Kalshi** | `services/kalshi-ws.ts` | Orderbook deltas and ticker updates (WS handshake reuses RSA-PSS headers via `buildKalshiAuthHeaders`; defaults to `wss://api.elections.kalshi.com/trade-api/ws/v2` unless `KALSHI_WS_URL` is set) |
-
-### 2.3 Market Fetching
-
-The `LiveMarketFetcher` (`lib/live-market-fetcher.ts`) provides a simple interface to fetch markets from all platforms:
-
-```typescript
-const fetcher = new LiveMarketFetcher();
-const filters = fetcher.buildFiltersFromConfig(botConfig, runtimeConfig);
-const results = await fetcher.fetchAllPlatforms(filters);
-```
-
-**Filter Parameters** (from `MarketFilterInput`):
-- `liveOnly`: When true, only fetch markets expiring within 3 hours (derived from `LiveArbRuntimeConfig.liveEventsOnly`)
-- `sportsOnly`: When true, only fetch sports-related markets
-- `windowStart` / `windowEnd`: Time window for market expiry
-
-**Live-Only Filtering Logic**:
-When `liveEventsOnly` is enabled in runtime config:
-1. Markets are filtered to those expiring within 3 hours (likely in-play)
-2. Sports markets use the `sportsbook` market type or title pattern matching
-3. Each platform's response is filtered before populating the registry
-
-This calls the platform-specific APIs:
-- **Kalshi**: `KalshiAPI.getOpenMarkets(maxDays)`
-- **Polymarket**: `PolymarketAPI.getOpenMarkets(maxDays)`
-- **SX.bet**: `SXBetAPI.getOpenMarkets(maxDays)`
+| **Kalshi** | `services/kalshi-ws.ts` | Orderbook deltas and ticker updates (RSA-PSS auth) |
 
 ---
 
-## 3. Rule-Based Live Sports Matcher
+## 3. Live Sports Discovery
 
-The rule-based matcher provides deterministic cross-platform event matching for live sporting events using simple, reliable heuristics.
+The Live Sports Discovery system provides accurate detection of **currently-live** sporting events on each platform. This is critical for a pure live-betting engine.
 
-### 3.1 Token-Based Matching Algorithm
+### 3.1 Architecture
+
+| Module | Location | Purpose |
+|--------|----------|---------|
+| **LiveSportsDiscovery** | `lib/live-sports-discovery.ts` | Central orchestrator, exposes `fetchPolymarketLiveMarkets()` and `fetchKalshiLiveMarkets()` |
+| **PolymarketDiscovery** | `lib/live-sports-discovery-polymarket.ts` | Gamma API event_date-based discovery |
+| **KalshiDiscovery** | `lib/live-sports-discovery-kalshi.ts` | Series ticker + expected_expiration_time discovery |
+| **Types** | `types/live-sports-discovery.ts` | `PolymarketLiveMarket`, `KalshiLiveMarket` interfaces |
+
+### 3.2 Polymarket Live Detection
+
+Uses the Gamma API `/events` endpoint with `event_date` filter strategy:
+
+**API Strategy:**
+- Query `/events?event_date=YYYY-MM-DD` for today and yesterday (UTC boundary handling)
+- Paginate with `offset` and `limit` parameters
+- Early-stop optimization when sufficient live markets found
+
+**Live Detection Criteria:**
+1. Market has `sportsMarketType` (confirms sports market)
+2. `gameStartTime` is in the past (with 15-minute future tolerance for clock skew)
+3. `gameStartTime` is within the last 6 hours (game hasn't ended)
+4. Market is `active=true` and `closed=false` (still tradable)
+
+**Unreliable Indicators (NOT used):**
+- `enableOrderBook` - can be false for active markets
+- `acceptingOrders` - not consistently set
+- `startDate`/`endDate` on parent event - too coarse
+
+```typescript
+// Example usage
+import { LiveSportsDiscovery } from '@/lib/live-sports-discovery';
+
+const liveMarkets = await LiveSportsDiscovery.fetchPolymarketLiveMarkets();
+// Returns Market[] with vendorMetadata containing gameStartTime, sportsMarketType, etc.
+```
+
+### 3.3 Kalshi Live Detection
+
+Uses the `/trade-api/v2/events` endpoint with `series_ticker` filters:
+
+**API Strategy:**
+- Query events by sports series: `KXNFL`, `KXNBA`, `KXNHL`, `KXMLB`, `KXCFB`, `KXCBB`, `KXSOCCER`
+- RSA-PSS signature authentication for all requests
+- Rate limiting with configurable delays between requests
+
+**Live Detection Criteria:**
+1. Parse `expected_expiration_time` from market (indicates game end time)
+2. Calculate estimated start: `expected_expiration_time - sport_duration`
+   - NFL/CFB: 4 hours
+   - NBA/CBB/NHL: 3 hours
+   - MLB: 4 hours
+   - Soccer: 2.5 hours
+3. Apply 30-minute buffer to both start and end times
+4. Market is live if: `now > estimatedStart - buffer` AND `now < expectedEnd + buffer`
+
+**Key Fields:**
+- `expected_expiration_time` - When the game/market is expected to settle
+- `series_ticker` - Sports series identifier (e.g., `KXNFL`)
+- `event_ticker` - Specific game identifier
+
+```typescript
+// Example usage
+import { LiveSportsDiscovery } from '@/lib/live-sports-discovery';
+
+const liveMarkets = await LiveSportsDiscovery.fetchKalshiLiveMarkets();
+// Returns Market[] with eventTicker, eventStartTime derived from expected_expiration_time
+```
+
+### 3.4 Integration with Market Fetcher
+
+The `LiveMarketFetcher` integrates live sports discovery when `liveEventsOnly` is enabled:
+
+```typescript
+// lib/live-market-fetcher.ts
+async fetchPolymarketMarkets(filters: MarketFilterInput): Promise<Market[]> {
+  if (filters.liveOnly) {
+    return LiveSportsDiscovery.fetchPolymarketLiveMarkets();
+  }
+  // ... standard fetch logic
+}
+
+async fetchKalshiMarkets(filters: MarketFilterInput): Promise<Market[]> {
+  if (filters.liveOnly) {
+    return LiveSportsDiscovery.fetchKalshiLiveMarkets();
+  }
+  // ... standard fetch logic
+}
+```
+
+---
+
+## 4. Rule-Based Live Sports Matcher
+
+The rule-based matcher provides deterministic cross-platform event matching using token-based heuristics.
+
+### 4.1 Token-Based Matching Algorithm
 
 **No AI/ML, No Large Alias Maps** - Pure deterministic token overlap:
 
-1. **Token Normalization**: Titles are normalized to token arrays (stopwords/sport keywords removed)
-2. **Sport + Time Bucketing**: Events are grouped by sport and time bucket (default 15 min tolerance)
+1. **Token Normalization**: Titles normalized to token arrays (stopwords removed)
+2. **Sport + Time Bucketing**: Events grouped by sport and time bucket (15 min tolerance)
 3. **Token Overlap Scoring**: Score `overlap`, `coverage`, and `jaccard` between token sets
-4. **Connected Components**: Events with sufficient overlap form graph edges; matched groups are connected components
+4. **Connected Components**: Events with sufficient overlap form matched groups
 
 **Key Functions (`lib/text-normalizer.ts`):**
 - `normalizeEventTitle(rawTitle, opts)`: Returns `{ normalizedTitle, tokens }`
 - `scoreTokenOverlap(tokensA, tokensB)`: Returns `{ overlap, coverage, jaccard }`
 - `tokensMatch(tokensA, tokensB, minOverlap, minCoverage)`: Boolean match check
 
-### 3.2 Key Types
+### 4.2 Key Types
 
 ```typescript
 interface VendorEvent {
@@ -104,19 +203,16 @@ interface VendorEvent {
   sport: Sport;
   homeTeam?: string;
   awayTeam?: string;
-  teams: string[];
-  normalizedTitle?: string;
-  normalizedTokens?: string[];
   startTime?: number;
   status: 'PRE' | 'LIVE' | 'ENDED';
   rawTitle: string;
+  normalizedTitle?: string;
+  normalizedTokens?: string[];
 }
 
 interface MatchedEventGroup {
   eventKey: string;
   sport: Sport;
-  homeTeam?: string;
-  awayTeam?: string;
   vendors: {
     SXBET?: VendorEvent[];
     POLYMARKET?: VendorEvent[];
@@ -127,23 +223,17 @@ interface MatchedEventGroup {
 }
 ```
 
-### 3.3 Event Watchers
+### 4.3 Event Watchers
 
 Watchers are event-driven and scoped:
-- **Event-driven**: Triggered by `LivePriceCache` price update callbacks, not blind polling
+- **Event-driven**: Triggered by `LivePriceCache` price update callbacks
 - **Scoped scans**: Each watcher ONLY evaluates markets in its `MatchedEventGroup`
-- **Debounced**: Rapid price updates are debounced (50ms) to prevent check storms
+- **Debounced**: Rapid price updates debounced (50ms) to prevent check storms
 - **Fallback polling**: 5-second safety net if WS is spotty
-
-### 3.4 File Persistence
-
-Matched event groups are automatically persisted for debugging:
-- **Production/Vercel**: `/tmp/live-event-groups.json`
-- **Local development**: `data/live-event-groups.json`
 
 ---
 
-## 4. Safety Checks & Circuit Breaker
+## 5. Safety Checks & Circuit Breaker
 
 The `LiveArbSafetyChecker` provides layered protection:
 
@@ -153,220 +243,409 @@ The `LiveArbSafetyChecker` provides layered protection:
 | Slippage | `LIVE_ARB_MAX_SLIPPAGE_BPS` (default 100 bps) | Critical |
 | Profit Margin | `LIVE_ARB_MIN_PROFIT_BPS` (default 25 bps) | Critical |
 | Liquidity | `LIVE_ARB_MIN_LIQUIDITY_USD` (default $10) | Critical |
-| Platform Skew | `LIVE_ARB_MAX_SKEW_PCT` (default 20%) | Critical |
-| Circuit Breaker | Open after N consecutive failures | Critical |
-
-**Circuit breaker behavior:**
-- Opens after `maxConsecutiveFailures` (default 5)
-- Stays open for `cooldownMs` (default 30s)
-- Automatically resets after cooldown
-- Can be manually tripped via `tripCircuit(reason)`
+| Circuit Breaker | Open after 5 consecutive failures, 30s cooldown | Critical |
 
 ---
 
-## 5. Dry-Fire (Paper Trading) Mode
+## 6. Dry-Fire (Paper Trading) Mode
 
-The dry-fire mode allows the system to run all arbitrage detection, pricing, and risk checks without placing real orders.
+### 6.1 Execution Mode
 
-### 5.1 Execution Mode
-
-Execution mode is stored in KV (`BotConfig.liveExecutionMode`) and managed via `/api/live-arb/execution-mode`:
-
+Stored in KV (`BotConfig.liveExecutionMode`):
 - **DRY_FIRE** (default): Paper trading - detect opportunities but only log them
 - **LIVE**: Execute real trades
 
-### 5.2 Triple-Layer Protection
+### 6.2 Triple-Layer Protection
 
-1. **Wrapper Layer** (`lib/execution-wrapper.ts`):
-   - `executeOpportunityWithMode()` reads `BotConfig.liveExecutionMode` before routing
-   - Routes to `executeOpportunityDryFire()` which never calls platform APIs
-
-2. **Guard Layer**:
-   - `assertNotDryFire()` throws if called in dry-fire mode
-   - Used as additional check in real execution path
-
-3. **Platform Layer** (`lib/markets/*.ts`):
-   - Each `placeBet()` method has its own guard
-   - Returns error if `isDryFireMode()` is true
-
-### 5.3 DryFireTradeLog Schema
-
-```typescript
-interface DryFireTradeLog {
-  id: string;
-  createdAt: string;
-  mode: 'DRY_FIRE';
-  opportunityId: string;
-  opportunityHash: string;
-  legs: DryFireTradeLeg[];
-  expectedProfitUsd: number;
-  expectedProfitBps: number;
-  expectedProfitPct: number;
-  totalInvestment: number;
-  status: 'SIMULATED' | 'REJECTED_BY_SAFETY' | 'REJECTED_BY_RISK' | 'REJECTED_BY_VALIDATION';
-  rejectReasons?: string[];
-  isLiveEvent: boolean;
-  daysToExpiry: number;
-  safetySnapshot?: SafetySnapshot;
-}
-```
+1. **Wrapper Layer** (`lib/execution-wrapper.ts`): Routes based on execution mode
+2. **Guard Layer**: `assertNotDryFire()` throws if called in dry-fire mode
+3. **Platform Layer**: Each `placeBet()` method has its own guard
 
 ---
 
-## 6. Platform Integrations
+## 7. Platform Integrations
 
-### 6.1 Kalshi (`lib/markets/kalshi.ts`, `services/kalshi.ts`)
-- Authenticated requests use RSA-PSS signatures (`generateAuthHeaders`)
-- `getOpenMarkets(maxDays)` fetches tradable markets within window
-- Balance helper consolidates cash + portfolio value
+### 7.1 Kalshi
+- RSA-PSS signature authentication (`generateAuthHeaders`)
+- Live sports discovery via series tickers and `expected_expiration_time`
 - Order placement supports FOK limit orders
 
-### 6.2 Polymarket (`lib/markets/polymarket.ts`, `services/polymarket.ts`)
-- Hybrid Gamma/CLOB client for market ingestion
-- Normalizes outcomes, token IDs, and prices into `Market` objects
-- Order placement signs EIP-712 payloads and posts to CLOB
+### 7.2 Polymarket
+- Gamma API for event/market discovery with `event_date` filtering
+- CLOB for order placement (EIP-712 signed)
+- Live detection via `gameStartTime` and `sportsMarketType`
 
-### 6.3 SX.bet (`lib/markets/sxbet.ts`, `services/sxbet.ts`)
+### 7.3 SX.bet
 - Fetches `/markets/active` with pagination
-- Hydrates odds via `/orders/odds/best` with USDC base token filter
-- Full EIP-712 order signing for order placement
+- Hydrates odds via `/orders/odds/best`
+- Full EIP-712 order signing
 
-All integrations return the shared `Market` interface so arbitrage logic remains platform-agnostic.
+All integrations return the shared `Market` interface for platform-agnostic arbitrage logic.
 
 ---
 
-## 7. Storage & Configuration
+## 8. Storage & Configuration
 
 | Store | Module | Usage |
 |-------|--------|-------|
-| **Upstash KV** | `lib/kv-storage.ts` | Balances, configuration, bets, arbitrage groups, opportunity logs, daily stats, dry-fire logs |
-| **Local JSON** | `data/storage.json`, `data/bot-status.json` | Dev defaults |
-| **Event Groups** | `lib/live-event-groups-store.ts` | Matched event groups persisted to disk for debugging |
+| **Upstash KV** | `lib/kv-storage.ts` | Balances, configuration, bets, dry-fire logs, worker heartbeat, live events snapshot |
+| **Local JSON** | `data/*.json` | Dev defaults |
 
-### 7.1 KV-Backed Runtime Configuration
+### 8.1 Cross-Process KV Storage
 
-All runtime configuration is managed via KV storage (no boolean env flags):
+The system uses a split architecture where the **worker runs on Digital Ocean** and the **API runs on Vercel serverless**. KV storage bridges these processes:
+
+| KV Key | Writer | Reader | Purpose |
+|--------|--------|--------|---------|
+| `algobet:live-arb:worker-heartbeat` | Worker | API (`/status`) | Worker presence, platform connections, circuit breaker |
+| `algobet:live-arb:live-events-snapshot` | Worker | API (`/live-events`) | Registry events, matched groups, watcher stats |
+| `algobet:arbs:YYYY-MM-DD` | Worker | API (`/arb-logs`) | Daily arb opportunity logs with audit fields |
+| `algobet:data` | Both | Both | Config, balances, bets, opportunity logs |
+
+**Key Constants** (exported from `lib/kv-storage.ts`):
+```typescript
+export const WORKER_HEARTBEAT_KEY = 'algobet:live-arb:worker-heartbeat';
+export const LIVE_EVENTS_SNAPSHOT_KEY = 'algobet:live-arb:live-events-snapshot';
+export const STORAGE_KEY = 'algobet:data';
+```
+
+**CRITICAL**: Both the DO worker and Vercel must use the same Upstash instance. If the status API shows `no_heartbeat` while the worker is running, verify that both environments have identical `KV_REST_API_URL` and `KV_REST_API_TOKEN` values.
+
+**LiveEventsSnapshot** (`lib/kv-storage.ts`):
+```typescript
+interface LiveEventsSnapshot {
+  updatedAt: string;
+  registry: {
+    totalEvents: number;
+    events: VendorEvent[];  // Capped at 500
+    countByPlatform: Record<Platform, number>;
+    countByStatus: Record<Status, number>;
+  };
+  matchedGroups: MatchedEventGroup[];  // Capped at 200
+  watchers: WatcherInfo[];  // Capped at 100
+  stats: { liveEvents, preEvents, matchedGroups, arbChecksTotal, ... };
+}
+```
+
+The worker writes this snapshot after each market refresh cycle, enabling the Vercel API to display live event data.
+
+### 8.2 KV-Backed Runtime Configuration
 
 **BotConfig** (`lib/kv-storage.ts`):
 - `maxBetPercentage`, `maxDaysToExpiry`, `minProfitMargin`
-- `balanceThresholds` (per-platform)
-- `emailAlerts` settings
-- `simulationMode`
 - `liveExecutionMode` (DRY_FIRE | LIVE)
-- `marketFilters` (sports-only, categories, etc.)
-- Auto-seeded via `getOrSeedBotConfig()` when missing, which writes a conservative DRY_FIRE configuration (simulation mode on, small bet sizing) into KV so every process has safe defaults without noisy warnings.
+- `marketFilters` (sports-only, categories)
 
 **LiveArbRuntimeConfig** (`/api/live-arb/config`):
 - `liveArbEnabled`: Master switch for WebSocket ingestion + execution
 - `ruleBasedMatcherEnabled`: Controls the rule-based matcher
-- `sportsOnly`: Filters registry inputs to sports markets only
-- `liveEventsOnly`: **Critical for live-only mode**:
-  - When `true`: Only fetches markets expiring within 3 hours
-  - Filters VendorEvents to `status === 'LIVE'` in matcher
-  - Excludes PRE (pre-game) events from matched groups
-  - This is the primary control for running as a pure live-betting engine
-
-🚨 **Operational Lock**: All of the above runtime toggles are now hard-wired to `true` inside KV storage. The dashboard no longer exposes buttons to flip them, ensuring the live arb worker always runs with streaming enabled, the matcher active, and sports/live filters enforced.
+- `sportsOnly`: Filters registry to sports markets only
+- `liveEventsOnly`: **Critical** - triggers Live Sports Discovery for accurate live detection
 
 ---
 
-## 8. API Surface (`pages/api`)
+## 9. API Surface
 
-### 8.1 Live Arb Endpoints
+### 9.1 Live Arb Endpoints
+
+All live-arb endpoints read from **KV storage**, not in-memory state. This enables cross-process visibility between the DO worker and Vercel serverless.
+
+| Endpoint | Data Source | Purpose |
+|----------|-------------|---------|
+| `GET /api/live-arb/status` | KV heartbeat | Worker presence, WS connections, circuit breaker, **KV diagnostics** |
+| `GET/POST /api/live-arb/config` | KV config | Read/write runtime configuration |
+| `GET/POST /api/live-arb/execution-mode` | KV config | Read/write execution mode |
+| `GET /api/live-arb/live-events` | KV snapshot | Registry events, matched groups, watchers, debug info |
+| `GET /api/live-arb/markets` | KV snapshot + heartbeat | Watched markets from active watchers (NOT live prices) |
+| `GET /api/live-arb/dry-fire-stats` | KV logs | Aggregated dry-fire statistics |
+| `GET /api/arb-logs` | KV arb logs | Arb opportunities with audit fields (JSON or CSV) |
+| `GET /api/debug/kv` | KV probe | Debug endpoint for KV connectivity (requires `DEBUG_STATUS=1`) |
+
+### 9.2 Live Markets API (KV-Backed)
+
+The `/api/live-arb/markets` endpoint returns watched markets derived from the KV snapshot.
+
+**IMPORTANT**: This endpoint does NOT return live prices. `LivePriceCache` is in-memory on the DO worker and cannot be accessed from Vercel serverless. Instead, it returns:
+
+- Which markets are being watched by active watchers
+- Platform connection status and staleness indicators
+- Price cache statistics (counts, not actual prices)
+
+```typescript
+interface LiveMarketsResponse {
+  watchedMarkets: WatchedMarketInfo[];  // Markets from matched groups with active watchers
+  totalWatchedMarkets: number;
+  filteredCount: number;
+  platformStats: PlatformStats[];       // Per-platform staleness detection
+  priceCacheStats: {                    // Stats from worker heartbeat
+    totalEntries: number;
+    entriesByPlatform: Record<string, number>;
+    totalPriceUpdates: number;
+  };
+  workerPresent: boolean;
+  snapshotUpdatedAt: string | null;
+  notice?: string;                      // Explanation when no live prices available
+}
+
+interface PlatformStats {
+  platform: string;
+  watchedMarkets: number;
+  connected: boolean;
+  lastMessageAt: string | null;
+  lastMessageAgeMs: number | null;
+  isStale: boolean;                     // True if connected but no message in >60s
+  subscribedMarkets: number;
+}
+```
+
+**Staleness Detection**: A platform is marked "stale" if:
+- `connected === true` (WebSocket reports connected)
+- `lastMessageAgeMs > 60000` (no message received in 60+ seconds)
+
+This indicates the WebSocket may be connected but not receiving updates (subscription drift, network issues, etc.).
+
+**IMPORTANT**: `lastMessageAgeMs` and `isStale` are computed at **read-time** by the Vercel API using `Date.now()`, NOT from the worker's pre-computed values. This ensures consistency - the worker's cached values become stale by the time they're read.
+
+### 9.3 Live Events API Response
+
+The `/api/live-arb/live-events` endpoint returns a comprehensive response for diagnosing matching issues:
+
+```typescript
+interface LiveEventsResponse {
+  enabled: boolean;                    // Rule-based matcher enabled
+  running: boolean;                    // Worker running and matcher enabled
+  workerPresent: boolean;              // Fresh heartbeat from DO worker
+  snapshotAge: number | null;          // Age of snapshot in ms
+  snapshotUpdatedAt: string | null;    // ISO timestamp of last snapshot
+  config: { ... };                     // Matcher configuration
+  registry: {                          // All tracked vendor events
+    totalEvents: number;
+    events: VendorEvent[];             // Capped at 200
+    countByPlatform: Record<Platform, number>;
+    countByStatus: Record<Status, number>;
+  };
+  matcher: {                           // Match statistics
+    totalGroups: number;
+    threeWayMatches: number;
+    twoWayMatches: number;
+    bySport: Record<string, number>;
+  };
+  matchedGroups: MatchedEventGroup[];  // Capped at 100
+  watchers: { active, list, stats };   // Active watchers
+  eventsByPlatform: { sxbet, polymarket, kalshi };
+  stats: { ... };                      // Summary statistics
+  debug: LiveEventsDebugInfo;          // Debug fields for diagnosing issues
+  generatedAt: number;                 // Response generation timestamp
+}
+
+interface LiveEventsDebugInfo {
+  schemaVersion: number;               // Increment when debug shape changes
+  matchupCountsByPlatform: Record<string, number>;  // MATCHUP events per platform
+  matchupKeyMissingByPlatform: Record<string, number>;  // Events missing matchupKey
+  sampleMatchupKeysByPlatform: Record<string, string[]>;  // Sample keys (up to 10)
+  sampleKalshiTitles: string[];        // First 10 Kalshi titles
+  eventFieldPresence: {                // Which fields exist on events
+    hasMarketKind, hasMatchupKey, hasNormalizedTitle, hasHomeTeam, hasAwayTeam
+  };
+  countsBySport: Record<string, number>;  // Events per sport
+  sampleEventsByPlatform: Record<string, EventSample[]>;  // 3 samples per platform
+  matchedGroupEventKeys: string[];     // First 50 matched group keys
+  snapshotAgeWarning: boolean;         // True if snapshot > 60s old
+}
+```
+
+**Diagnosing "0 groups" issues:**
+1. Check `snapshotAge` - should be < 60s if worker is healthy
+2. Check `registry.totalEvents` - should be > 0 if platforms are fetching
+3. Check `debug.matchupCountsByPlatform` - need events on 2+ platforms for matches
+4. Check `debug.matchupKeyMissingByPlatform` - events need matchupKey for matching
+5. Check `debug.sampleKalshiTitles` - verify Kalshi is fetching sports markets
+
+### 9.4 KV Diagnostics & Status API
+
+The `/api/live-arb/status` endpoint now returns explicit KV status information to diagnose environment mismatches:
+
+```typescript
+interface LiveArbStatusResponse {
+  kvStatus: 'ok' | 'misconfigured' | 'no_heartbeat' | 'parse_error' | 'kv_unreachable';
+  kvStatusReason: string;  // Human-readable explanation
+  // ... other fields
+  kvDiagnostics?: KVDiagnostics;  // Only when ?debug=1
+}
+
+interface KVDiagnostics {
+  configured: boolean;       // KV env vars present
+  kvHost: string | null;     // Upstash hostname (no token leaked)
+  kvKeyRead: string;         // Key being read
+  kvReadResult: string;      // ok | null | error | misconfigured | parse_error
+  kvError?: string;          // Sanitized error message
+  kvRawSample?: string;      // First 200 chars if parse failed
+  vercelRegion?: string;     // Vercel region if available
+  isVercel: boolean;         // Running on Vercel
+  rawSxbetFromKv?: object;   // Raw SX.bet status from KV heartbeat
+  heartbeatUpdatedAt?: string; // When heartbeat was last written
+}
+```
+
+**KV Status Values:**
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `ok` | Heartbeat read successfully | None needed |
+| `misconfigured` | Missing `KV_REST_API_URL` or `KV_REST_API_TOKEN` | Set env vars in Vercel |
+| `no_heartbeat` | Key not found in KV | Worker not running, or different KV instance |
+| `parse_error` | Data exists but failed validation | Check worker heartbeat format |
+| `kv_unreachable` | Network/auth error | Check Upstash credentials |
+
+**Debug Endpoint:** `GET /api/debug/kv` (requires `DEBUG_STATUS=1` env var)
+
+Returns detailed KV probe information:
+```typescript
+{
+  enabled: boolean;
+  kv: { configured, kvHost, isVercel, vercelRegion };
+  heartbeat: { key, exists, readResult, updatedAt, ageMs, state, error };
+  snapshot: { key, exists, updatedAt, ageMs, totalEvents };
+  timestamp: string;
+}
+```
+
+**Diagnosing "not_initialized" / missing platform status:**
+1. Call `/api/live-arb/status?debug=1` and check `kvDiagnostics.kvHost`
+2. Compare with the Upstash host the DO worker writes to
+3. If hosts differ, update Vercel env vars to match the worker's KV instance
+4. Use `/api/debug/kv` for a quick connectivity check
+
+**Diagnosing "Disabled (Config)" for SX.bet:**
+1. Call `/api/live-arb/status?debug=1` and check `kvDiagnostics.rawSxbetFromKv`
+2. If `rawSxbetFromKv.connected === true`, the worker is connected but Vercel was incorrectly gating
+3. The status API now trusts the KV heartbeat - Vercel does NOT check its own `SXBET_WS_URL` env var
+4. Platform status is determined solely by the DO worker's heartbeat in KV
+
+**Important:** Vercel serverless does NOT need platform credentials (`SXBET_WS_URL`, `SXBET_API_KEY`, etc). These are only needed on the DO worker. The status API reads platform connection state from the KV heartbeat.
+
+### 9.5 Arb Logs API
+
+The `/api/arb-logs` endpoint provides access to logged arbitrage opportunities with full audit fields.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `date` | `YYYY-MM-DD` | Today | Date to fetch logs for |
+| `limit` | `1-1000` | 100 | Max records to return (JSON only) |
+| `cursor` | `>=0` | 0 | Pagination offset (JSON only) |
+| `format` | `json\|csv` | `json` | Output format |
+
+**JSON Response:**
+```typescript
+interface ArbLogsResponse {
+  logs: ArbOpportunityLog[];
+  total: number;
+  cursor?: number;       // Next cursor for pagination
+  hasMore: boolean;
+  date: string;
+  generatedAt: string;
+}
+
+interface ArbOpportunityLog {
+  detectedAt: string;    // ISO timestamp
+  opportunityId: string;
+  matchupKey: string;
+  marketKind: 'prediction' | 'sportsbook';
+
+  // Leg A
+  platformA: MarketPlatform;
+  marketIdA: string;
+  outcomeA: 'yes' | 'no';
+  sideA: 'yes' | 'no';
+  rawPriceA: number;
+  impliedProbA: number;
+  asOfA: string;         // Price timestamp
+  ageMsA: number;        // Price age at detection
+
+  // Leg B
+  platformB: MarketPlatform;
+  marketIdB: string;
+  outcomeB: 'yes' | 'no';
+  sideB: 'yes' | 'no';
+  rawPriceB: number;
+  impliedProbB: number;
+  asOfB: string;
+  ageMsB: number;
+
+  // Timing
+  timeSkewMs: number;    // |asOfA - asOfB|
+
+  // Financials
+  payoutTarget: number;
+  totalCost: number;
+  profitAbs: number;
+  profitPct: number;
+  feesA: number;
+  feesB: number;
+
+  workerVersion: string;
+}
+```
+
+**CSV Export:**
+- URL: `/api/arb-logs?format=csv&date=YYYY-MM-DD`
+- Headers: `Content-Type: text/csv`, `Content-Disposition: attachment`
+- All responses set `Cache-Control: no-store`
+- Empty KV returns CSV with headers only (no errors)
+
+**Dashboard Integration:**
+- "Recent Arb Logs" panel calls `/api/arb-logs?limit=20`
+- "Download CSV" button links to `/api/arb-logs?format=csv&date=YYYY-MM-DD`
+- Warning badges shown if any row violates thresholds (ageMsA/B > 2000ms or timeSkewMs > 500ms)
+
+### 9.6 Dashboard Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/live-arb/status` | Overall status, WS connections, cache stats, circuit breaker |
-| `GET/POST /api/live-arb/config` | Read/write live-arb runtime configuration |
-| `GET/POST /api/live-arb/execution-mode` | Read/write execution mode (DRY_FIRE/LIVE) |
-| `GET /api/live-arb/live-events` | Registry snapshot, matched groups, watcher stats |
-| `GET /api/live-arb/markets` | Markets with live prices |
-| `GET /api/live-arb/dry-fire-stats` | Aggregated dry-fire statistics |
-| `GET /api/live-arb/dry-fire-export` | CSV export of dry-fire logs |
-
-`/live-arb` UI actions only call these endpoints. The Start/Stop buttons POST to `/api/live-arb/config` to flip `liveArbEnabled`/`ruleBasedMatcherEnabled`, and the dashboard polls `/api/live-arb/status`, which now includes the KV-backed worker heartbeat (`workerPresent`, `workerState`, `runtimeConfig`) so the UI never shells out to legacy `/api/bot/*` routes.
-
-### 8.2 Dashboard Endpoints
-
-| Endpoint | Purpose |
-|----------|---------|
-| `/api/balances`, `/api/balances/refresh` | Serve cached balances + trigger on-demand refresh |
+| `/api/balances`, `/api/balances/refresh` | Cached balances + refresh |
 | `/api/bets`, `/api/opportunity-logs` | Trade and opportunity reporting |
-| `/api/config`, `/api/data` | Read/write bot configuration |
-| `/api/export`, `/api/export-opportunities` | Data exports for dashboard |
-| `/api/health` | Health check endpoint |
+| `/api/config` | Bot configuration |
+| `/api/health` | Health check |
 
 ---
 
-## 9. Dashboard & UI
-
-### 9.1 Main Dashboard (`/dashboard`)
-- Balance overview (total, per-platform)
-- Profit charts and stats
-- Configuration panel
-- Link to Live Betting Control
-
-### 9.2 Live Arb Dashboard (`/live-arb`)
-- **Runtime Config Summary**: Status text only (toggles removed; config is always-on)
-- **Execution Mode Toggle**: DRY_FIRE / LIVE
-- **Start/Stop Controls**: POST to `/api/live-arb/config` to reassert the always-on KV flags; worker presence is derived from `/api/live-arb/status`.
-- **System Status**: WS connections, price cache stats, circuit breaker state
-- **Matched Events Table**: Cross-platform matches with sport, teams, platforms, quality
-- **Dry-Fire Statistics**: Simulated vs rejected trades, potential profit
-- **Watcher Performance**: avg/max check time, checks/sec
-
----
-
-## 10. Live Arb Worker (`workers/live-arb-worker.ts`)
+## 10. Live Arb Worker
 
 The main entry point for live betting. Run via `npm run live-arb-worker`.
 
 **Boot sequence:**
 1. Load `BotConfig` + live-arb runtime config from KV
-2. Exit quickly if `liveArbEnabled=false`
-3. Log execution mode (`BotConfig.liveExecutionMode`, profit thresholds)
-4. Initialize `LiveArbManager` with WS clients
-5. Start `LiveSportsOrchestrator` with platform adapters
-6. Continuously refresh registry by fetching live markets via `LiveMarketFetcher`
+2. Exit if `liveArbEnabled=false`
+3. Initialize `LiveArbManager` with WS clients
+4. Start `LiveSportsOrchestrator`
+5. Begin market refresh loop
 
-**Market Refresh Loop:**
-Each refresh cycle (default every 15s):
-1. Reload `LiveArbRuntimeConfig` to pick up config changes
-2. Build filters from `BotConfig` + `runtimeConfig` (includes `liveOnly`, `sportsOnly`)
-3. Fetch from all platforms with filtering applied
-4. Update registry via `refreshRegistry()`
-5. If `liveEventsOnly=true`, matcher only considers `LIVE` status events
+**Market Refresh Loop (every 15s):**
+1. Reload `LiveArbRuntimeConfig`
+2. Build filters from config
+3. If `liveEventsOnly=true`: Use Live Sports Discovery for accurate live detection
+4. Otherwise: Standard market fetch with expiry-based filtering
+5. Update registry via `refreshRegistry()`
+6. Write `LiveEventsSnapshot` to KV for API visibility
 
-**Heartbeat Reporting:**
-- After startup, each refresh, and shutdown the worker calls `updateWorkerHeartbeat()` (KV), recording `state`, `updatedAt`, and summary metadata so `/api/live-arb/status` can expose `workerPresent`/`workerState` to the dashboard.
-
-**Logging tags:**
-- `[LiveArbWorker]`: Startup, refresh summaries, shutdown
-- `[LiveArbManager]`: Initialization, subscription diffs, circuit-breaker activity
-- `[SXBET-WS]`, `[POLYMARKET-WS]`, `[KALSHI-WS]`: Connection lifecycle
-- `[LivePriceCache]`: Debug stats, fallback notifications
-- `[LiveWatcher]`: Creation/teardown, arb-check triggers, opportunities
-- `[LiveArb]`: Execution-wrapper decisions
+**KV Writes:**
+- **Heartbeat** (`updateWorkerHeartbeat`): Written every 5-10s with worker state, platform connections, circuit breaker
+- **Live Events Snapshot** (`updateLiveEventsSnapshot`): Written after each refresh with registry, matched groups, watchers
 
 ---
 
 ## 11. Environment Variables
 
-**Important**: This system uses **NO boolean environment variables** for feature flags. All runtime toggles are controlled via KV-backed configuration (`BotConfig`, `LiveArbRuntimeConfig`). Environment variables are used **only** for:
-- API credentials (keys, secrets)
-- URLs and endpoints
-- Numeric tuning parameters
-
-This ensures all feature flags can be changed via the UI without redeployment.
+**No boolean env flags for features** - all toggles via KV configuration.
 
 ### Required Credentials
 
 | Variable | Description |
 |----------|-------------|
-| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Upstash Redis credentials |
-| `KALSHI_API_KEY`, `KALSHI_PRIVATE_KEY` | Kalshi API authentication |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Upstash Redis |
+| `KALSHI_API_KEY`, `KALSHI_PRIVATE_KEY` | Kalshi API (RSA-PSS) |
 | `POLYMARKET_API_KEY`, `POLYMARKET_API_SECRET`, `POLYMARKET_PRIVATE_KEY` | Polymarket CLOB |
-| `SXBET_API_KEY`, `SXBET_PRIVATE_KEY`, `SXBET_WALLET_ADDRESS` | SX.bet API + wallet |
+| `SXBET_API_KEY`, `SXBET_PRIVATE_KEY`, `SXBET_WALLET_ADDRESS` | SX.bet |
 
 ### Optional Tuning
 
@@ -374,13 +653,11 @@ This ensures all feature flags can be changed via the UI without redeployment.
 |----------|---------|-------------|
 | `LIVE_ARB_MIN_PROFIT_BPS` | `50` | Minimum profit (basis points) |
 | `LIVE_ARB_MAX_PRICE_AGE_MS` | `2000` | Max acceptable price age |
-| `LIVE_ARB_MAX_LATENCY_MS` | `2000` | Max execution latency |
-| `LIVE_ARB_MAX_SLIPPAGE_BPS` | `100` | Max slippage (basis points) |
-| `LIVE_ARB_LOG_LEVEL` | `info` | Log level (`info` or `debug`) |
 | `LIVE_ARB_WORKER_REFRESH_MS` | `15000` | Market refresh interval |
-| `SXBET_WS_URL` | _(none — configure vendor URL)_ | SX.bet WebSocket URL (set to Ably endpoint; leave blank to disable WS client) |
-| `KALSHI_WS_URL` | `wss://api.elections.kalshi.com/trade-api/ws/v2` | Kalshi WebSocket endpoint override (must match the signed `/trade-api/ws/v2` path) |
+| `KALSHI_WS_URL` | `wss://api.elections.kalshi.com/trade-api/ws/v2` | Kalshi WebSocket |
 | `POLYMARKET_WS_URL` | `wss://ws-subscriptions-clob.polymarket.com/ws/market` | Polymarket WS |
+| `DEBUG_STATUS` | `0` | Set to `1` to enable KV diagnostics in `/api/live-arb/status` and `/api/debug/kv` |
+| `WORKER_HEARTBEAT_STALE_MS` | `60000` | Max age (ms) before heartbeat is considered stale |
 
 ---
 
@@ -388,11 +665,12 @@ This ensures all feature flags can be changed via the UI without redeployment.
 
 | Script | Purpose |
 |--------|---------|
-| `npm run test-live-arb` | Test LivePriceCache, safety checks, configuration |
+| `npm run test-live-arb` | Test LivePriceCache, safety checks |
 | `npm run test-live-events` | Test token normalization, matching, registry |
-| `npm run test-live-ws-connections` | Test WebSocket connections to all platforms |
-| `npm run test-execution-mode` | Test KV-backed execution mode |
-| `npm run test-live-arb-runtime-config` | Test runtime config loading |
+| `npm run test-live-ws-connections` | Test WebSocket connections |
+| `npm run test:kalshi-live` | Test Kalshi live sports discovery |
+| `npm run test:poly-live` | Test Polymarket live sports discovery |
+| `npm run test:live-sports` | Test both platform discoveries |
 
 ---
 
@@ -404,34 +682,31 @@ This ensures all feature flags can be changed via the UI without redeployment.
 # Development
 npm run live-arb-worker
 
-# Production (PM2 or similar)
+# Production (PM2)
 pm2 start npm --name "live-arb-worker" -- run live-arb-worker
 ```
 
 ### Enabling Live Arbitrage
 
-1. Ensure all platform API credentials are configured
+1. Configure platform API credentials
 2. Navigate to `/live-arb` dashboard
-3. Enable "Live Arb Enabled" toggle
-4. Enable "Rule-Based Matcher" toggle
-5. Optionally enable "Sports Only" and/or "Live Events Only"
-6. Start the live-arb-worker process
+3. Enable "Live Arb Enabled" and "Rule-Based Matcher"
+4. Enable "Live Events Only" for pure live-betting mode
+5. Start the live-arb-worker process
 
 ### Going from Paper Trading to Live
 
 1. Monitor dry-fire logs to validate opportunity detection
-2. Review rejection reasons and tune thresholds if needed
-3. When confident, change Execution Mode to "LIVE" via dashboard
-4. Monitor `/api/live-arb/status` for execution results
+2. Review rejection reasons and tune thresholds
+3. Change Execution Mode to "LIVE" via dashboard
+4. Monitor `/api/live-arb/status` for results
 
 ---
 
-## 14. Future Work Hooks
+## 14. Future Work
 
-- **Distributed price cache**: For multi-container deployments, the in-memory `LivePriceCache` could be backed by Redis pub/sub
-- **Additional WS platforms**: The WS client pattern is designed to be extensible
-- **Dry-fire analytics**: Add time-series analysis of paper trades
-- **A/B threshold testing**: Run multiple parameter sets in parallel dry-fire mode
-- **Sport-specific matching rules**: Customize matching logic per sport
-
-This architecture keeps trading logic centralized, provides real-time price streaming, and enables safe paper trading before going live.
+- **Distributed price cache**: Redis pub/sub for multi-container deployments
+- **Additional WS platforms**: Extensible WS client pattern
+- **Dry-fire analytics**: Time-series analysis of paper trades
+- **Sport-specific matching**: Customize matching logic per sport
+- **SX.bet live discovery**: Add live sports detection for SX.bet platform

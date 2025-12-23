@@ -42,6 +42,10 @@ import {
   TokenMatchScore,
 } from './text-normalizer';
 import { liveArbLog } from './live-arb-logger';
+import {
+  recordMatchCandidatesConsidered,
+  recordMatchReject,
+} from './live-events-debug';
 
 const MATCHER_LOG_TAG = 'LiveEvents';
 
@@ -197,11 +201,17 @@ function matchEventsInBucket(
       
       for (const eventA of eventsA) {
         const tokensA = ensureTokens(eventA);
-        if (tokensA.length === 0) continue;
+        if (tokensA.length === 0) {
+          recordMatchReject('no_tokens_eventA');
+          continue;
+        }
         
         for (const eventB of eventsB) {
           const tokensB = ensureTokens(eventB);
-          if (tokensB.length === 0) continue;
+          if (tokensB.length === 0) {
+            recordMatchReject('no_tokens_eventB');
+            continue;
+          }
           
           // Score token overlap
           const score = scoreTokenOverlap(tokensA, tokensB);
@@ -239,11 +249,17 @@ function buildGroupFromComponent(
     if (event) events.push(event);
   }
   
-  if (events.length === 0) return null;
+  if (events.length === 0) {
+    recordMatchReject('empty_component');
+    return null;
+  }
   
   // Get unique platforms
   const platforms = new Set(events.map(e => e.platform));
-  if (platforms.size < 2) return null; // Need at least 2 platforms
+  if (platforms.size < 2) {
+    recordMatchReject('insufficient_platforms');
+    return null; // Need at least 2 platforms
+  }
   
   // Get sport (should be same for all)
   const sport = events[0].sport;
@@ -343,15 +359,19 @@ export function updateMatches(
   
   // Get live and near-live events (or only live if liveOnly is true)
   const activeEvents = registrySnapshot.events.filter(e => {
-    if (e.status === 'LIVE') return true;
-    // If liveOnly is true, skip PRE events
-    if (liveOnly) return false;
-    if (e.status === 'PRE' && e.startTime) {
-      const timeToStart = e.startTime - now;
-      return timeToStart <= config.preGameWindow && timeToStart >= 0;
+    const isLive = e.status === 'LIVE';
+    const hasStartTime = typeof e.startTime === 'number';
+    const timeToStart = hasStartTime ? e.startTime! - now : Number.POSITIVE_INFINITY;
+    const isNearStart = hasStartTime && Math.abs(timeToStart) <= config.preGameWindow;
+
+    if (isLive) return true;
+    if (liveOnly) {
+      // Allow near-start PRE events even when liveOnly is true
+      return isNearStart;
     }
-    return false;
+    return isNearStart && timeToStart >= -config.postGameWindow;
   });
+  recordMatchCandidatesConsidered(activeEvents.length);
   
   // Build event ID map
   const eventMap = new Map<EventId, VendorEvent>();
@@ -424,6 +444,8 @@ export function updateMatches(
     const group = buildGroupFromComponent(component, eventMap, allEdges, now);
     if (group && group.platformCount >= config.minPlatforms) {
       newGroups.set(group.eventKey, group);
+    } else if (group) {
+      recordMatchReject('below_min_platforms');
     }
   }
   

@@ -47,11 +47,25 @@ let inMemoryStats: DryFireStats | null = null;
 
 let config: DryFireConfig | null = null;
 
+// Helper to fix double-quoted env vars (common .env parsing issue)
+function fixEnvQuotes(value: string | undefined): string | undefined {
+  if (!value) return value;
+  // Remove surrounding quotes if present
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+const kvUrl = fixEnvQuotes(process.env.KV_REST_API_URL);
+const kvToken = fixEnvQuotes(process.env.KV_REST_API_TOKEN);
+
 const redisClient =
-  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+  kvUrl && kvToken
     ? new Redis({
-        url: process.env.KV_REST_API_URL,
-        token: process.env.KV_REST_API_TOKEN,
+        url: kvUrl,
+        token: kvToken,
       })
     : null;
 
