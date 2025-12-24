@@ -18,9 +18,9 @@ export interface LiveEventsDebugCounters {
   subscriptionsAttemptedLive: number; // Phase 6
   subscriptionsFailed: Record<string, number>;
   platformFetch: {
-    kalshi: { attempted: number; skipped: number; skipReasons: Record<string, number> };
-    polymarket: { attempted: number; skipped: number; skipReasons: Record<string, number> };
-    sxbet: { attempted: number; skipped: number; skipReasons: Record<string, number> };
+    KALSHI: { attempted: number; skipped: number; skipReasons: Record<string, number> };
+    POLYMARKET: { attempted: number; skipped: number; skipReasons: Record<string, number> };
+    SXBET: { attempted: number; skipped: number; skipReasons: Record<string, number> };
   };
   kalshi: {
     fetchAttempted: number;
@@ -41,11 +41,7 @@ export interface LiveEventsDebugCounters {
       close_time?: string;
       expiration_time?: string;
     }>;
-    queryApplied: undefined | {
-      startTime: string;
-      endTime: string;
-      minLiquidity: number;
-    };
+    queryApplied: undefined | Record<string, unknown>;
     sampleRawItems: Array<{
       ticker?: string;
       title?: string;
@@ -81,11 +77,11 @@ let counters: LiveEventsDebugCounters = {
   subscriptionsAttemptedPre: 0,
   subscriptionsAttemptedLive: 0,
   subscriptionsFailed: {},
-  platformFetch: {
-    kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
-    polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
-    sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
-  },
+    platformFetch: {
+      KALSHI: { attempted: 0, skipped: 0, skipReasons: {} },
+      POLYMARKET: { attempted: 0, skipped: 0, skipReasons: {} },
+      SXBET: { attempted: 0, skipped: 0, skipReasons: {} },
+    },
   kalshi: {
     fetchAttempted: 0,
     fetchFailed: 0,
@@ -125,9 +121,9 @@ export function resetLiveEventsDebug(): void {
     subscriptionsAttemptedLive: 0,
     subscriptionsFailed: {},
     platformFetch: {
-      kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
-      polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
-      sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
+      KALSHI: { attempted: 0, skipped: 0, skipReasons: {} },
+      POLYMARKET: { attempted: 0, skipped: 0, skipReasons: {} },
+      SXBET: { attempted: 0, skipped: 0, skipReasons: {} },
     },
     kalshi: {
       fetchAttempted: 0,
@@ -221,8 +217,18 @@ export function recordSubscriptionFailed(reason: string): void {
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
+export function recordPlatformFetchAttempt(platform: LiveEventPlatform): void {
+  counters.platformFetch[platform].attempted += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
 export function recordPlatformFetchAttempted(platform: LiveEventPlatform): void {
   counters.platformFetch[platform].attempted += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordPlatformFetchError(platform: LiveEventPlatform, error?: string): void {
+  // This could be used to track fetch errors
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
@@ -279,18 +285,22 @@ export function recordKalshiFiltered(reason: string): void {
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordKalshiFilteredToCloseWindow(): void {
-  counters.kalshi.filteredToCloseWindowCount += 1;
+export function recordKalshiFilteredToCloseWindow(count: number = 1): void {
+  counters.kalshi.filteredToCloseWindowCount += count;
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordKalshiFilteredByStatus(): void {
+export function recordKalshiFilteredByStatus(count: number = 1): void {
   counters.kalshi.filteredByStatusCount += 1;
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordKalshiDropped(reason: string, item: Record<string, any>): void {
+export function recordKalshiDropReason(reason: string): void {
   bump(counters.kalshi.dropReasons, reason);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiDroppedItem(item: Record<string, any>): void {
   if (counters.kalshi.sampleDroppedItems.length < 3) {
     counters.kalshi.sampleDroppedItems.push({
       ticker: item.ticker,
@@ -305,13 +315,70 @@ export function recordKalshiDropped(reason: string, item: Record<string, any>): 
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordKalshiQueryApplied(query: {
-  startTime: string;
-  endTime: string;
-  minLiquidity: number;
-}): void {
+export function recordKalshiQueryApplied(query: Record<string, unknown>): void {
   counters.kalshi.queryApplied = query;
   counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiEventsFetch(success: boolean, count?: number, withMarketsCount?: number): void {
+  counters.kalshi.fetchAttempted += 1;
+  if (!success) {
+    counters.kalshi.fetchFailed += 1;
+  }
+  if (count !== undefined) {
+    counters.kalshi.rawItemsCount = count;
+  }
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiEventClassification(status: string): void {
+  // This function seems to be used for general event classification
+  // We can increment a counter for the status
+  bump(counters.kalshi.rawStatusHistogram, status);
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshi429(info?: {
+  retryAfterSec?: number | null;
+  backoffUntilMs?: number;
+  consecutive429?: number;
+  last429AtMs?: number;
+}): void {
+  counters.kalshi.fetchFailed += 1;
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiCacheEvent(event: string, hit: boolean): void {
+  // Track cache events
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiRateLimitState(state: any): void {
+  // Track rate limit state
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordKalshiRawStatusHistogram(histogram: Record<string, number>): void {
+  for (const [status, count] of Object.entries(histogram)) {
+    counters.kalshi.rawStatusHistogram[status] = (counters.kalshi.rawStatusHistogram[status] || 0) + count;
+  }
+  counters.lastUpdatedAt = new Date().toISOString();
+}
+
+export function recordWatcherCreatedByStatus(status: 'LIVE' | 'PRE'): void {
+  if (status === 'LIVE') {
+    recordWatcherCreatedLive();
+  } else {
+    recordWatcherCreatedPre();
+  }
+}
+
+export function recordSubscriptionAttemptByStatus(status: 'LIVE' | 'PRE'): void {
+  if (status === 'LIVE') {
+    recordSubscriptionAttemptLive();
+  } else {
+    recordSubscriptionAttemptPre();
+  }
 }
 
 export function getLiveEventsDebug(): LiveEventsDebugCounters {
@@ -323,17 +390,17 @@ export function getLiveEventsDebug(): LiveEventsDebugCounters {
     watchersSkipped: { ...counters.watchersSkipped },
     subscriptionsFailed: { ...counters.subscriptionsFailed },
     platformFetch: {
-      kalshi: {
-        ...counters.platformFetch.kalshi,
-        skipReasons: { ...counters.platformFetch.kalshi.skipReasons },
+      KALSHI: {
+        ...counters.platformFetch.KALSHI,
+        skipReasons: { ...counters.platformFetch.KALSHI.skipReasons },
       },
-      polymarket: {
-        ...counters.platformFetch.polymarket,
-        skipReasons: { ...counters.platformFetch.polymarket.skipReasons },
+      POLYMARKET: {
+        ...counters.platformFetch.POLYMARKET,
+        skipReasons: { ...counters.platformFetch.POLYMARKET.skipReasons },
       },
-      sxbet: {
-        ...counters.platformFetch.sxbet,
-        skipReasons: { ...counters.platformFetch.sxbet.skipReasons },
+      SXBET: {
+        ...counters.platformFetch.SXBET,
+        skipReasons: { ...counters.platformFetch.SXBET.skipReasons },
       },
     },
     kalshi: {

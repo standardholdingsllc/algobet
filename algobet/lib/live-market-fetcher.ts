@@ -16,7 +16,7 @@
 
 import { Market, MarketPlatform, BotConfig, MarketFilterInput } from '@/types';
 import { LiveArbRuntimeConfig } from '@/types/live-arb';
-import { VendorEvent } from '@/types/live-events';
+import { VendorEvent, toLiveEventPlatform } from '@/types/live-events';
 import {
   KalshiAPI,
   DEFAULT_KALSHI_CLOSE_WINDOW_MINUTES,
@@ -118,7 +118,7 @@ export class LiveMarketFetcher {
   ): Promise<FetchResult> {
     const fetchedAt = new Date().toISOString();
 
-    recordPlatformFetchAttempt(platform);
+    recordPlatformFetchAttempt(toLiveEventPlatform(platform));
 
     try {
       let markets: Market[] = [];
@@ -126,7 +126,7 @@ export class LiveMarketFetcher {
       switch (platform) {
         case 'kalshi':
           if (!this.hasKalshiCredentials()) {
-            recordPlatformFetchSkipped('kalshi', 'missing_kalshi_credentials');
+            recordPlatformFetchSkipped(toLiveEventPlatform('kalshi'), 'missing_kalshi_credentials');
             return {
               platform,
               markets: [],
@@ -157,8 +157,8 @@ export class LiveMarketFetcher {
       return { platform, markets, fetchedAt };
     } catch (error: any) {
       console.error(`[LiveMarketFetcher] Failed to fetch ${platform}:`, error.message);
-      recordPlatformFetchError(platform, error.message || 'unknown_error');
-      recordPlatformFetchSkipped(platform, 'exception');
+      recordPlatformFetchError(toLiveEventPlatform(platform), error.message || 'unknown_error');
+      recordPlatformFetchSkipped(toLiveEventPlatform(platform), 'exception');
       return { 
         platform, 
         markets: [], 
@@ -298,10 +298,7 @@ export class LiveMarketFetcher {
       const vendorEvents = discoveryResultsToVendorEvents(discoveryResult);
       
       console.log(
-        `[LiveMarketFetcher] Discovery complete: ` +
-        `${vendorEvents.length} vendor events ` +
-        `(Polymarket: ${discoveryResult.polymarket.counts.liveMarketsFound}, ` +
-        `Kalshi: ${discoveryResult.kalshi.counts.liveMarketsFound})`
+        `[LiveMarketFetcher] Discovery complete: ${vendorEvents.length} vendor events`
       );
       
       return {
@@ -315,31 +312,15 @@ export class LiveMarketFetcher {
         vendorEvents: [],
         discoveryResult: {
           polymarket: {
-            platform: 'polymarket',
-            discoveredAt: new Date().toISOString(),
-            liveMarkets: [],
-            counts: {
-              requestsMade: 0,
-              eventsFetched: 0,
-              eventsWithStartTimeInPast: 0,
-              marketsInspected: 0,
-              liveMarketsFound: 0,
-            },
+            events: [],
+            error: error.message,
           },
           kalshi: {
-            platform: 'kalshi',
-            discoveredAt: new Date().toISOString(),
-            liveMarkets: [],
-            counts: {
-              requestsMade: 0,
-              eventsFetched: 0,
-              eventsWithStartTimeInPast: 0,
-              marketsInspected: 0,
-              liveMarketsFound: 0,
-            },
+            events: [],
+            error: error.message,
           },
-          totalLiveMarkets: 0,
-          discoveredAt: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
+          duration: 0,
         },
         fetchedAt: new Date().toISOString(),
       };

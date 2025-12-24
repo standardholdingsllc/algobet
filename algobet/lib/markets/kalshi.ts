@@ -466,7 +466,7 @@ export class KalshiAPI {
     }
 
     if (kalshiBackoffState.isActive()) {
-      recordPlatformFetchSkipped('kalshi', 'backoff_active');
+      recordPlatformFetchSkipped('KALSHI', 'backoff_active');
       console.info('[Kalshi] Skipping REST call due to active backoff', {
         backoffUntilMs: kalshiBackoffState.backoffUntilMs,
       });
@@ -509,7 +509,7 @@ export class KalshiAPI {
           consecutive429: kalshiBackoffState.consecutive429,
           last429AtMs: kalshiBackoffState.last429AtMs,
         });
-        recordPlatformFetchSkipped('kalshi', 'backoff_active');
+        recordPlatformFetchSkipped('KALSHI', 'backoff_active');
         recordKalshiRateLimitState(getKalshiRateLimitDebug());
         return { kind: 'skipped', reason: 'backoff_active', status };
       }
@@ -725,7 +725,7 @@ export class KalshiAPI {
     recordKalshiCacheEvent('series', false);
 
     if (kalshiDiscoveryInFlight) {
-      recordPlatformFetchSkipped('kalshi', 'refresh_overlap');
+      recordPlatformFetchSkipped('KALSHI', 'refresh_overlap');
       console.info('[Kalshi] Skipping series discovery because another run is in flight');
       recordKalshiRateLimitState(getKalshiRateLimitDebug());
       return { tickers: [], failedReason: 'discovery_in_flight' };
@@ -969,7 +969,7 @@ export class KalshiAPI {
 
   async getOpenMarkets(options?: GetOpenMarketsOptions): Promise<Market[]> {
     if (kalshiRefreshInFlight) {
-      recordPlatformFetchSkipped('kalshi', 'refresh_overlap');
+      recordPlatformFetchSkipped('KALSHI', 'refresh_overlap');
       console.info('[Kalshi] Skipping Kalshi market refresh due to overlap');
       recordKalshiRateLimitState(getKalshiRateLimitDebug());
       return [];

@@ -626,16 +626,14 @@ class LiveArbWorker {
       this.lastRefreshDurationMs = Date.now() - startTime;
       this.lastTotalMarkets = vendorEvents.length;
 
-      const polyCount = discoveryResult.discoveryResult.polymarket.counts.liveMarketsFound;
-      const kalshiCount = discoveryResult.discoveryResult.kalshi.counts.liveMarketsFound;
+      const polyCount = discoveryResult.discoveryResult.polymarket?.events?.length ?? 0;
+      const kalshiCount = discoveryResult.discoveryResult.kalshi?.events?.length ?? 0;
       
       liveArbLog('info', WORKER_TAG, 'Live sports discovery complete', {
         mode: 'LIVE_DISCOVERY',
         totalVendorEvents: vendorEvents.length,
         polymarketLive: polyCount,
         kalshiLive: kalshiCount,
-        polymarketRequests: discoveryResult.discoveryResult.polymarket.counts.requestsMade,
-        kalshiRequests: discoveryResult.discoveryResult.kalshi.counts.requestsMade,
         durationMs: this.lastRefreshDurationMs,
       });
 
