@@ -192,7 +192,8 @@ export function createArbOpportunityLog(
   const totalCost = amount1 + amount2;
   const payoutTarget = 100; // Standard payout target
   const profitAbs = opportunity.expectedProfit;
-  const profitPct = opportunity.profitMargin * 100;
+  // profitMargin is already a percentage (e.g., 1.25 means 1.25%), so don't multiply by 100
+  const profitPct = opportunity.profitMargin;
 
   return {
     detectedAt: now.toISOString(),
