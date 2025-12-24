@@ -1,4 +1,9 @@
-import { CombinedLiveSportsResult } from '@/types/live-sports-discovery';
+import {
+  CombinedLiveSportsResult,
+  LiveSportsDiscoveryResult,
+  PolymarketLiveMarket,
+  KalshiLiveEvent,
+} from '@/types/live-sports-discovery';
 import { liveArbLog } from './live-arb-logger';
 
 /**
@@ -13,26 +18,44 @@ export function hasKalshiCredentials(): boolean {
 }
 
 /**
+ * Create an empty discovery result for a platform
+ */
+function createEmptyResult<T>(platform: 'polymarket' | 'kalshi'): LiveSportsDiscoveryResult<T> {
+  return {
+    platform,
+    discoveredAt: new Date().toISOString(),
+    liveMarkets: [],
+    counts: {
+      requestsMade: 0,
+      eventsFetched: 0,
+      eventsWithStartTimeInPast: 0,
+      marketsInspected: 0,
+      liveMarketsFound: 0,
+    },
+  };
+}
+
+/**
  * Discover all live sports events from available platforms
  */
 export async function discoverAllLiveSports(): Promise<CombinedLiveSportsResult> {
   const startTime = Date.now();
-  const result: CombinedLiveSportsResult = {
-    timestamp: new Date().toISOString(),
-    duration: 0,
-  };
+  const now = new Date();
 
   // For now, return empty results to avoid build errors
   // TODO: Implement actual discovery logic
-  result.kalshi = {
-    events: [],
+  const polymarketResult = createEmptyResult<PolymarketLiveMarket>('polymarket');
+  const kalshiResult = createEmptyResult<KalshiLiveEvent>('kalshi');
+
+  const result: CombinedLiveSportsResult = {
+    polymarket: polymarketResult,
+    kalshi: kalshiResult,
+    totalLiveMarkets: 0,
+    discoveredAt: now.toISOString(),
+    timestamp: now.toISOString(),
+    duration: Date.now() - startTime,
   };
 
-  result.polymarket = {
-    events: [],
-  };
-
-  result.duration = Date.now() - startTime;
   return result;
 }
 
@@ -43,19 +66,19 @@ export function discoveryResultsToVendorEvents(result: CombinedLiveSportsResult)
   const vendorEvents: any[] = [];
 
   // Convert Kalshi events
-  if (result.kalshi?.events) {
-    vendorEvents.push(...result.kalshi.events.map(event => ({
+  if (result.kalshi?.liveMarkets) {
+    vendorEvents.push(...result.kalshi.liveMarkets.map(event => ({
       ...event,
-      platform: 'kalshi',
+      platform: 'KALSHI',
       source: 'discovery',
     })));
   }
 
   // Convert Polymarket events
-  if (result.polymarket?.events) {
-    vendorEvents.push(...result.polymarket.events.map(event => ({
+  if (result.polymarket?.liveMarkets) {
+    vendorEvents.push(...result.polymarket.liveMarkets.map(event => ({
       ...event,
-      platform: 'polymarket',
+      platform: 'POLYMARKET',
       source: 'discovery',
     })));
   }

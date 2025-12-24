@@ -308,21 +308,38 @@ export class LiveMarketFetcher {
       };
     } catch (error: any) {
       console.error('[LiveMarketFetcher] Live sports discovery failed:', error.message);
+      const now = new Date();
       return {
         vendorEvents: [],
         discoveryResult: {
           polymarket: {
-            events: [],
-            error: error.message,
+            platform: 'polymarket' as const,
+            discoveredAt: now.toISOString(),
+            liveMarkets: [],
+            counts: {
+              requestsMade: 0,
+              eventsFetched: 0,
+              eventsWithStartTimeInPast: 0,
+              marketsInspected: 0,
+              liveMarketsFound: 0,
+            },
           },
           kalshi: {
-            events: [],
-            error: error.message,
+            platform: 'kalshi' as const,
+            discoveredAt: now.toISOString(),
+            liveMarkets: [],
+            counts: {
+              requestsMade: 0,
+              eventsFetched: 0,
+              eventsWithStartTimeInPast: 0,
+              marketsInspected: 0,
+              liveMarketsFound: 0,
+            },
           },
-          timestamp: new Date().toISOString(),
+          timestamp: now.toISOString(),
           duration: 0,
         },
-        fetchedAt: new Date().toISOString(),
+        fetchedAt: now.toISOString(),
       };
     }
   }
