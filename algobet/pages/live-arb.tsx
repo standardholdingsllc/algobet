@@ -242,6 +242,18 @@ interface LiveArbRuntimeConfigData {
   liveEventsOnly: boolean;
 }
 
+// Validation status types
+type ArbValidationStatus =
+  | 'OK'
+  | 'WARN_HIGH_SKEW'
+  | 'WARN_HIGH_PROFIT'
+  | 'WARN_STALE_PRICE'
+  | 'INCOMPLETE_MISSING_PLATFORM_A'
+  | 'INCOMPLETE_MISSING_PLATFORM_B'
+  | 'INCOMPLETE_MISSING_PRICE_A'
+  | 'INCOMPLETE_MISSING_PRICE_B'
+  | 'INCOMPLETE_MISSING_LEGS';
+
 // Arb Opportunity Log type (from API)
 interface ArbOpportunityLog {
   detectedAt: string;
@@ -272,6 +284,15 @@ interface ArbOpportunityLog {
   feesA: number;
   feesB: number;
   workerVersion: string;
+  validationStatus?: ArbValidationStatus;
+}
+
+interface ValidationCounts {
+  total: number;
+  completeCount: number;
+  incompleteCount: number;
+  warnCount: number;
+  okCount: number;
 }
 
 interface OpportunitiesResponse {
@@ -281,6 +302,8 @@ interface OpportunitiesResponse {
   hasMore: boolean;
   date: string;
   generatedAt: string;
+  validationCounts: ValidationCounts;
+  showingValidOnly: boolean;
 }
 
 // Status indicator component
@@ -1251,21 +1274,23 @@ function ExportPanel() {
 }
 
 // Arb Logs Export Panel
-function ArbLogsExportPanel() {
+function ArbLogsExportPanel({ showValidOnly }: { showValidOnly: boolean }) {
   const [isExporting, setIsExporting] = useState(false);
+  const [exportValidOnly, setExportValidOnly] = useState(true);
   const today = new Date().toISOString().split('T')[0];
 
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const response = await fetch(`/api/arb-logs?format=csv&date=${today}`);
+      const validOnlyParam = exportValidOnly ? '&validOnly=true' : '';
+      const response = await fetch(`/api/arb-logs?format=csv&date=${today}${validOnlyParam}`);
       if (!response.ok) throw new Error('Export failed');
 
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `arb-opportunities-${today}.csv`;
+      a.download = `arb-opportunities-${today}${exportValidOnly ? '-valid' : ''}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1286,10 +1311,20 @@ function ArbLogsExportPanel() {
       </h3>
 
       <p className="text-sm text-gray-400 mb-4">
-        Download all arb opportunities detected today with full audit fields (timestamps, skew, leg ages).
+        Download arb opportunities detected today with full audit fields (timestamps, skew, leg ages).
       </p>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={exportValidOnly}
+            onChange={(e) => setExportValidOnly(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500"
+          />
+          Valid records only
+        </label>
+
         <button
           onClick={handleExport}
           disabled={isExporting}
@@ -1308,14 +1343,6 @@ function ArbLogsExportPanel() {
             </>
           )}
         </button>
-
-        <a
-          href={`/api/arb-logs?format=csv&date=${today}`}
-          className="text-sm text-emerald-400 hover:text-emerald-300 underline"
-          download={`arb-opportunities-${today}.csv`}
-        >
-          Direct link
-        </a>
       </div>
     </div>
   );
@@ -1325,14 +1352,101 @@ function ArbLogsExportPanel() {
 const MAX_PRICE_AGE_MS = 2000;
 const MAX_SKEW_MS = 500;
 
-// Check if an opportunity violates any thresholds
-function hasThresholdViolation(opp: ArbOpportunityLog): boolean {
-  return opp.ageMsA > MAX_PRICE_AGE_MS || opp.ageMsB > MAX_PRICE_AGE_MS || opp.timeSkewMs > MAX_SKEW_MS;
+// Helper functions for validation status
+function isIncompleteStatus(status?: ArbValidationStatus): boolean {
+  return status?.startsWith('INCOMPLETE_') ?? false;
+}
+
+function isWarnStatus(status?: ArbValidationStatus): boolean {
+  return status?.startsWith('WARN_') ?? false;
+}
+
+function getWarnReason(status?: ArbValidationStatus): string {
+  switch (status) {
+    case 'WARN_HIGH_SKEW': return 'High time skew between prices';
+    case 'WARN_HIGH_PROFIT': return 'Unusually high profit (>10%)';
+    case 'WARN_STALE_PRICE': return 'Stale price data';
+    default: return 'Unknown warning';
+  }
+}
+
+function getIncompleteReason(status?: ArbValidationStatus): string {
+  switch (status) {
+    case 'INCOMPLETE_MISSING_PLATFORM_A': return 'Missing platform A data';
+    case 'INCOMPLETE_MISSING_PLATFORM_B': return 'Missing platform B data';
+    case 'INCOMPLETE_MISSING_PRICE_A': return 'Missing price A data';
+    case 'INCOMPLETE_MISSING_PRICE_B': return 'Missing price B data';
+    case 'INCOMPLETE_MISSING_LEGS': return 'Missing leg data';
+    default: return 'Incomplete record';
+  }
+}
+
+// Render platform badge or placeholder for incomplete records
+function PlatformBadge({ platform, isIncomplete }: { platform: string | undefined; isIncomplete: boolean }) {
+  if (isIncomplete || !platform) {
+    return (
+      <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700/50 text-gray-500">
+        —
+      </span>
+    );
+  }
+  
+  return (
+    <span className={`px-2 py-1 rounded text-xs font-medium ${
+      platform === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
+      platform === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
+      'bg-blue-900/30 text-blue-300'
+    }`}>
+      {platform.toUpperCase().slice(0, 4)}
+    </span>
+  );
+}
+
+// Status badge component
+function StatusBadge({ status }: { status?: ArbValidationStatus }) {
+  if (isIncompleteStatus(status)) {
+    return (
+      <span 
+        className="px-2 py-1 rounded text-xs font-medium bg-gray-700/50 text-gray-400 flex items-center gap-1"
+        title={getIncompleteReason(status)}
+      >
+        INCOMPLETE
+      </span>
+    );
+  }
+  
+  if (isWarnStatus(status)) {
+    return (
+      <span 
+        className="px-2 py-1 rounded text-xs font-medium bg-yellow-900/30 text-yellow-300 flex items-center gap-1 cursor-help"
+        title={getWarnReason(status)}
+      >
+        <AlertTriangle className="w-3 h-3" />
+        SUSPECT
+      </span>
+    );
+  }
+  
+  return (
+    <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
+      OK
+    </span>
+  );
 }
 
 // Recent Arb Logs Table
-function RecentArbLogsTable({ logs }: { logs: ArbOpportunityLog[] }) {
-  if (logs.length === 0) {
+function RecentArbLogsTable({ 
+  logs, 
+  validationCounts,
+  showValidOnly,
+  onToggleValidOnly,
+}: { 
+  logs: ArbOpportunityLog[];
+  validationCounts?: ValidationCounts;
+  showValidOnly: boolean;
+  onToggleValidOnly: () => void;
+}) {
+  if (logs.length === 0 && validationCounts?.total === 0) {
     return (
       <div className="p-8 text-center text-gray-400">
         No arb opportunities detected yet today.
@@ -1340,118 +1454,160 @@ function RecentArbLogsTable({ logs }: { logs: ArbOpportunityLog[] }) {
     );
   }
 
-  const violationCount = logs.filter(hasThresholdViolation).length;
+  const warnCount = logs.filter(l => isWarnStatus(l.validationStatus)).length;
+  const incompleteCount = validationCounts?.incompleteCount ?? 0;
 
   return (
     <div className="overflow-x-auto">
-      {violationCount > 0 && (
-        <div className="px-4 py-3 bg-red-900/20 border-b border-red-700/30">
-          <div className="flex items-center gap-2 text-sm text-red-300">
+      {/* Summary bar */}
+      <div className="px-4 py-3 bg-gray-900/30 border-b border-gray-700 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-gray-400">
+            <span className="text-white font-medium">{logs.length}</span> shown
+          </span>
+          {incompleteCount > 0 && showValidOnly && (
+            <span className="text-gray-500">
+              • <span className="text-gray-400">{incompleteCount}</span> incomplete hidden
+            </span>
+          )}
+          {warnCount > 0 && (
+            <span className="text-yellow-400/80">
+              • {warnCount} suspect
+            </span>
+          )}
+        </div>
+        
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!showValidOnly}
+            onChange={onToggleValidOnly}
+            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+          />
+          Show incomplete
+        </label>
+      </div>
+
+      {/* Warning banner for incomplete records when shown */}
+      {!showValidOnly && incompleteCount > 0 && (
+        <div className="px-4 py-3 bg-gray-700/30 border-b border-gray-600">
+          <div className="flex items-center gap-2 text-sm text-gray-400">
             <AlertTriangle className="w-4 h-4" />
             <span>
-              {violationCount} opportunit{violationCount === 1 ? 'y' : 'ies'} with threshold violations detected.
-              This should not happen with DO gating enabled.
+              Showing {incompleteCount} incomplete record{incompleteCount === 1 ? '' : 's'} for debugging. 
+              These have missing leg data and should not be treated as real opportunities.
             </span>
           </div>
         </div>
       )}
-      <table className="w-full">
-        <thead className="bg-gray-900/50">
-          <tr>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Detected</th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Matchup</th>
-            <th className="px-3 py-3 text-center text-xs font-medium text-gray-400 uppercase">Platforms</th>
-            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Profit %</th>
-            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Payout</th>
-            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Cost</th>
-            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Skew</th>
-            <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Leg Ages</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-700">
-          {logs.map((opp) => {
-            const hasViolation = hasThresholdViolation(opp);
-            return (
-              <tr 
-                key={opp.opportunityId} 
-                className={`hover:bg-gray-700/30 ${hasViolation ? 'bg-red-900/10' : ''}`}
-              >
-                <td className="px-3 py-3 text-sm">
-                  {hasViolation ? (
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />
-                      WARN
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300">
-                      OK
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-sm text-gray-200">
-                  {formatTimeAgo(opp.detectedAt)}
-                </td>
-                <td className="px-3 py-3 text-sm text-gray-200 max-w-[200px] truncate" title={opp.matchupKey}>
-                  {opp.matchupKey.length > 30 ? opp.matchupKey.slice(0, 30) + '...' : opp.matchupKey}
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <div className="flex justify-center gap-1">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      opp.platformA === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
-                      opp.platformA === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
-                      'bg-blue-900/30 text-blue-300'
-                    }`}>
-                      {(opp.platformA ?? 'N/A').toUpperCase().slice(0, 4)}
-                    </span>
-                    <span className="text-gray-500">/</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      opp.platformB === 'sxbet' ? 'bg-orange-900/30 text-orange-300' :
-                      opp.platformB === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
-                      'bg-blue-900/30 text-blue-300'
-                    }`}>
-                      {(opp.platformB ?? 'N/A').toUpperCase().slice(0, 4)}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-sm text-right">
-                  <span className={`font-medium ${
-                    opp.profitPct >= 1 ? 'text-green-400' :
-                    opp.profitPct >= 0.5 ? 'text-yellow-400' :
-                    'text-gray-400'
-                  }`}>
-                    {opp.profitPct.toFixed(2)}%
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-sm text-right text-gray-300">
-                  ${opp.payoutTarget}
-                </td>
-                <td className="px-3 py-3 text-sm text-right text-gray-300">
-                  ${opp.totalCost.toFixed(2)}
-                </td>
-                <td className="px-3 py-3 text-sm text-right">
-                  <span className={`${
-                    opp.timeSkewMs > MAX_SKEW_MS ? 'text-red-400 font-medium' :
-                    opp.timeSkewMs > 200 ? 'text-yellow-400' :
-                    'text-green-400'
-                  }`}>
-                    {opp.timeSkewMs}ms
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-sm text-right text-gray-400">
-                  <span className={opp.ageMsA > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
-                    {opp.ageMsA}ms
-                  </span>
-                  {' / '}
-                  <span className={opp.ageMsB > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
-                    {opp.ageMsB}ms
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+
+      {logs.length === 0 ? (
+        <div className="p-8 text-center text-gray-400">
+          {showValidOnly 
+            ? 'No valid arb opportunities. Toggle "Show incomplete" to see all records.'
+            : 'No arb opportunities detected yet today.'}
+        </div>
+      ) : (
+        <table className="w-full">
+          <thead className="bg-gray-900/50">
+            <tr>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Detected</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Matchup</th>
+              <th className="px-3 py-3 text-center text-xs font-medium text-gray-400 uppercase">Platforms</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Profit %</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Payout</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Cost</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Skew</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">Leg Ages</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-700">
+            {logs.map((opp) => {
+              const isIncomplete = isIncompleteStatus(opp.validationStatus);
+              const isWarn = isWarnStatus(opp.validationStatus);
+              
+              return (
+                <tr 
+                  key={opp.opportunityId} 
+                  className={`hover:bg-gray-700/30 ${
+                    isIncomplete ? 'bg-gray-800/50 opacity-60' : 
+                    isWarn ? 'bg-yellow-900/10' : ''
+                  }`}
+                >
+                  <td className="px-3 py-3 text-sm">
+                    <StatusBadge status={opp.validationStatus} />
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-200">
+                    {formatTimeAgo(opp.detectedAt)}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-200 max-w-[200px] truncate" title={opp.matchupKey}>
+                    {opp.matchupKey?.length > 30 ? opp.matchupKey.slice(0, 30) + '...' : opp.matchupKey || '—'}
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    {isIncomplete ? (
+                      <span className="text-xs text-gray-500 italic">missing leg data</span>
+                    ) : (
+                      <div className="flex justify-center gap-1">
+                        <PlatformBadge platform={opp.platformA} isIncomplete={isIncomplete} />
+                        <span className="text-gray-500">/</span>
+                        <PlatformBadge platform={opp.platformB} isIncomplete={isIncomplete} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-right">
+                    {isIncomplete ? (
+                      <span className="text-gray-500">—</span>
+                    ) : (
+                      <span className={`font-medium ${
+                        opp.profitPct >= 1 ? 'text-green-400' :
+                        opp.profitPct >= 0.5 ? 'text-yellow-400' :
+                        'text-gray-400'
+                      }`}>
+                        {opp.profitPct?.toFixed(2) ?? '—'}%
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-right text-gray-300">
+                    {isIncomplete ? '—' : `$${opp.payoutTarget}`}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-right text-gray-300">
+                    {isIncomplete ? '—' : `$${opp.totalCost?.toFixed(2) ?? '—'}`}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-right">
+                    {isIncomplete ? (
+                      <span className="text-gray-500">—</span>
+                    ) : (
+                      <span className={`${
+                        opp.timeSkewMs > MAX_SKEW_MS ? 'text-red-400 font-medium' :
+                        opp.timeSkewMs > 200 ? 'text-yellow-400' :
+                        'text-green-400'
+                      }`}>
+                        {opp.timeSkewMs}ms
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-right text-gray-400">
+                    {isIncomplete ? (
+                      <span className="text-gray-500">—</span>
+                    ) : (
+                      <>
+                        <span className={opp.ageMsA > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
+                          {opp.ageMsA}ms
+                        </span>
+                        {' / '}
+                        <span className={opp.ageMsB > MAX_PRICE_AGE_MS ? 'text-red-400 font-medium' : ''}>
+                          {opp.ageMsB}ms
+                        </span>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -1466,6 +1622,8 @@ export default function LiveArbPage() {
   const [runtimeConfig, setRuntimeConfig] = useState<LiveArbRuntimeConfigData | null>(null);
   const [recentOpportunities, setRecentOpportunities] = useState<ArbOpportunityLog[]>([]);
   const [opportunitiesTotal, setOpportunitiesTotal] = useState(0);
+  const [validationCounts, setValidationCounts] = useState<ValidationCounts | undefined>(undefined);
+  const [showValidOnly, setShowValidOnly] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -1548,17 +1706,19 @@ export default function LiveArbPage() {
   };
 
   // Fetch recent arb logs
-  const fetchRecentOpportunities = async () => {
+  const fetchRecentOpportunities = useCallback(async () => {
     try {
-      const res = await fetch('/api/arb-logs?limit=20');
+      const validOnlyParam = showValidOnly ? 'true' : 'false';
+      const res = await fetch(`/api/arb-logs?limit=20&validOnly=${validOnlyParam}`);
       if (!res.ok) throw new Error('Failed to fetch arb logs');
       const data: OpportunitiesResponse = await res.json();
       setRecentOpportunities(data.logs);
       setOpportunitiesTotal(data.total);
+      setValidationCounts(data.validationCounts);
     } catch (err: any) {
       console.error('Failed to fetch arb logs:', err);
     }
-  };
+  }, [showValidOnly]);
 
   const updateLiveArbConfig = useCallback(
     async (patch: Partial<LiveArbRuntimeConfigData>) => {
@@ -1645,7 +1805,7 @@ export default function LiveArbPage() {
   };
 
   // Refresh all
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setIsLoading(true);
     await Promise.all([
       fetchLiveArbStatus(), 
@@ -1658,7 +1818,12 @@ export default function LiveArbPage() {
     ]);
     setLastRefresh(new Date());
     setIsLoading(false);
-  };
+  }, [fetchLiveArbStatus, fetchRecentOpportunities]);
+
+  // Toggle valid only filter
+  const toggleValidOnly = useCallback(() => {
+    setShowValidOnly(prev => !prev);
+  }, []);
 
   // Initial load and auto-refresh
   useEffect(() => {
@@ -1667,7 +1832,7 @@ export default function LiveArbPage() {
     // Auto-refresh every 5 seconds
     const interval = setInterval(refresh, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refresh]);
 
   const liveArbEnabledFlag =
     runtimeConfig?.liveArbEnabled ??
@@ -1745,7 +1910,7 @@ export default function LiveArbPage() {
             onStop={stopBot}
             isLoading={botActionLoading}
           />
-          <ArbLogsExportPanel />
+          <ArbLogsExportPanel showValidOnly={showValidOnly} />
         </div>
 
         {/* Recent Arb Logs Table */}
@@ -1758,12 +1923,39 @@ export default function LiveArbPage() {
                   Recent Arb Logs
                 </h2>
                 <p className="text-sm text-gray-400">
-                  Last 20 opportunities detected today ({opportunitiesTotal} total)
+                  {showValidOnly ? 'Valid opportunities' : 'All records'} detected today
+                  {validationCounts && (
+                    <span className="ml-1">
+                      ({validationCounts.completeCount} complete, {validationCounts.incompleteCount} incomplete)
+                    </span>
+                  )}
                 </p>
               </div>
+              {validationCounts && (
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="px-2 py-1 rounded bg-green-900/30 text-green-300">
+                    {validationCounts.okCount} OK
+                  </span>
+                  {validationCounts.warnCount > 0 && (
+                    <span className="px-2 py-1 rounded bg-yellow-900/30 text-yellow-300">
+                      {validationCounts.warnCount} Suspect
+                    </span>
+                  )}
+                  {validationCounts.incompleteCount > 0 && (
+                    <span className="px-2 py-1 rounded bg-gray-700 text-gray-400">
+                      {validationCounts.incompleteCount} Incomplete
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-          <RecentArbLogsTable logs={recentOpportunities} />
+          <RecentArbLogsTable 
+            logs={recentOpportunities} 
+            validationCounts={validationCounts}
+            showValidOnly={showValidOnly}
+            onToggleValidOnly={toggleValidOnly}
+          />
         </div>
 
         {/* Dry-Fire Export + Stats Row */}

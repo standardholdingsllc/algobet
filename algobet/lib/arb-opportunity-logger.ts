@@ -30,6 +30,23 @@ const WORKER_VERSION = process.env.WORKER_VERSION || '1.0.0';
 // ============================================================================
 
 /**
+ * Validation status for arb opportunity logs
+ * - OK: Record is complete and valid
+ * - WARN_*: Record is complete but has suspicious values
+ * - INCOMPLETE_*: Record is missing required leg data
+ */
+export type ArbValidationStatus =
+  | 'OK'
+  | 'WARN_HIGH_SKEW'
+  | 'WARN_HIGH_PROFIT'
+  | 'WARN_STALE_PRICE'
+  | 'INCOMPLETE_MISSING_PLATFORM_A'
+  | 'INCOMPLETE_MISSING_PLATFORM_B'
+  | 'INCOMPLETE_MISSING_PRICE_A'
+  | 'INCOMPLETE_MISSING_PRICE_B'
+  | 'INCOMPLETE_MISSING_LEGS';
+
+/**
  * A logged arb opportunity with all audit fields
  */
 export interface ArbOpportunityLog {
@@ -76,6 +93,9 @@ export interface ArbOpportunityLog {
 
   // Metadata
   workerVersion: string;
+
+  // Validation (computed at query time, not stored)
+  validationStatus?: ArbValidationStatus;
 }
 
 // ============================================================================
@@ -387,6 +407,7 @@ export async function getAllArbLogsForDate(
 const CSV_COLUMNS = [
   'detectedAt',
   'opportunityId',
+  'validationStatus',
   'matchupKey',
   'marketKind',
   'platformA',
@@ -442,4 +463,122 @@ export function exportArbLogsToCSV(logs: ArbOpportunityLog[]): string {
   });
 
   return [headers, ...rows].join('\n');
+}
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+// Thresholds for validation warnings
+const VALIDATION_THRESHOLDS = {
+  MAX_PRICE_AGE_MS: 2000,
+  MAX_SKEW_MS: 500,
+  HIGH_PROFIT_PCT: 10, // Profit > 10% is suspicious
+};
+
+/**
+ * Validate an arb opportunity log and return its status
+ */
+export function validateArbLog(log: ArbOpportunityLog): ArbValidationStatus {
+  // Check for missing leg data (incomplete records)
+  if (!log.platformA && !log.platformB) {
+    return 'INCOMPLETE_MISSING_LEGS';
+  }
+  if (!log.platformA) {
+    return 'INCOMPLETE_MISSING_PLATFORM_A';
+  }
+  if (!log.platformB) {
+    return 'INCOMPLETE_MISSING_PLATFORM_B';
+  }
+  if (log.rawPriceA === null || log.rawPriceA === undefined || isNaN(log.rawPriceA)) {
+    return 'INCOMPLETE_MISSING_PRICE_A';
+  }
+  if (log.rawPriceB === null || log.rawPriceB === undefined || isNaN(log.rawPriceB)) {
+    return 'INCOMPLETE_MISSING_PRICE_B';
+  }
+
+  // Check for warning conditions (complete but suspicious)
+  if (log.profitPct > VALIDATION_THRESHOLDS.HIGH_PROFIT_PCT) {
+    return 'WARN_HIGH_PROFIT';
+  }
+  if (log.timeSkewMs > VALIDATION_THRESHOLDS.MAX_SKEW_MS) {
+    return 'WARN_HIGH_SKEW';
+  }
+  if (log.ageMsA > VALIDATION_THRESHOLDS.MAX_PRICE_AGE_MS || 
+      log.ageMsB > VALIDATION_THRESHOLDS.MAX_PRICE_AGE_MS) {
+    return 'WARN_STALE_PRICE';
+  }
+
+  return 'OK';
+}
+
+/**
+ * Check if a validation status indicates an incomplete record
+ */
+export function isIncompleteStatus(status: ArbValidationStatus): boolean {
+  return status.startsWith('INCOMPLETE_');
+}
+
+/**
+ * Check if a validation status indicates a warning
+ */
+export function isWarnStatus(status: ArbValidationStatus): boolean {
+  return status.startsWith('WARN_');
+}
+
+/**
+ * Add validation status to logs
+ */
+export function addValidationToLogs(logs: ArbOpportunityLog[]): ArbOpportunityLog[] {
+  return logs.map(log => ({
+    ...log,
+    validationStatus: validateArbLog(log),
+  }));
+}
+
+/**
+ * Filter logs to only include complete (valid) records
+ */
+export function filterValidLogs(logs: ArbOpportunityLog[]): ArbOpportunityLog[] {
+  return logs.filter(log => {
+    const status = log.validationStatus || validateArbLog(log);
+    return !isIncompleteStatus(status);
+  });
+}
+
+/**
+ * Get validation counts for a set of logs
+ */
+export interface ValidationCounts {
+  total: number;
+  completeCount: number;
+  incompleteCount: number;
+  warnCount: number;
+  okCount: number;
+}
+
+export function getValidationCounts(logs: ArbOpportunityLog[]): ValidationCounts {
+  const counts: ValidationCounts = {
+    total: logs.length,
+    completeCount: 0,
+    incompleteCount: 0,
+    warnCount: 0,
+    okCount: 0,
+  };
+
+  for (const log of logs) {
+    const status = log.validationStatus || validateArbLog(log);
+    if (isIncompleteStatus(status)) {
+      counts.incompleteCount++;
+    } else {
+      counts.completeCount++;
+      if (isWarnStatus(status)) {
+        counts.warnCount++;
+      } else {
+        counts.okCount++;
+      }
+    }
+  }
+
+  return counts;
 }

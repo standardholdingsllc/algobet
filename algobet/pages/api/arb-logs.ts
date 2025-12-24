@@ -9,15 +9,18 @@
  * - limit: Maximum number of records to return (default 100, ignored for CSV)
  * - cursor: Pagination cursor (start index, ignored for CSV)
  * - format: 'json' (default) or 'csv'
+ * - validOnly: 'true' to filter out incomplete records (default for JSON)
  *
  * Response (JSON):
- * - logs: Array of ArbOpportunityLog objects
- * - total: Total count of logs for the date
+ * - logs: Array of ArbOpportunityLog objects with validationStatus
+ * - total: Total count of logs for the date (before filtering)
  * - cursor: Next cursor for pagination (if more records exist)
  * - hasMore: Boolean indicating if more records exist
+ * - validationCounts: Object with completeCount, incompleteCount, warnCount, okCount
  *
  * Response (CSV):
- * - CSV file download with all opportunities for the specified date
+ * - CSV file download with opportunities for the specified date
+ * - Respects validOnly filter
  */
 
 import { NextApiRequest, NextApiResponse } from 'next';
@@ -28,11 +31,17 @@ import {
   getTodayDateString,
   ArbOpportunityLog,
   GetArbLogsResult,
+  addValidationToLogs,
+  filterValidLogs,
+  getValidationCounts,
+  ValidationCounts,
 } from '@/lib/arb-opportunity-logger';
 
 interface ArbLogsResponse extends GetArbLogsResult {
   date: string;
   generatedAt: string;
+  validationCounts: ValidationCounts;
+  showingValidOnly: boolean;
 }
 
 export default async function handler(
@@ -48,7 +57,7 @@ export default async function handler(
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
 
   try {
-    const { date, limit, cursor, format } = req.query;
+    const { date, limit, cursor, format, validOnly } = req.query;
 
     // Validate date format
     let dateStr: string;
@@ -63,12 +72,24 @@ export default async function handler(
       dateStr = getTodayDateString();
     }
 
+    // Parse validOnly flag (defaults to true for JSON, respects param for CSV)
+    const showValidOnly = validOnly === 'true' || (validOnly !== 'false' && format !== 'csv');
+
     // Handle CSV format
     if (format === 'csv') {
-      const logs = await getAllArbLogsForDate(dateStr);
+      let logs = await getAllArbLogsForDate(dateStr);
+      
+      // Add validation status to all logs
+      logs = addValidationToLogs(logs);
+      
+      // Filter if validOnly is requested
+      if (validOnly === 'true') {
+        logs = filterValidLogs(logs);
+      }
+      
       const csv = exportArbLogsToCSV(logs);
 
-      const filename = `arb-opportunities-${dateStr}.csv`;
+      const filename = `arb-opportunities-${dateStr}${validOnly === 'true' ? '-valid' : ''}.csv`;
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
@@ -106,10 +127,28 @@ export default async function handler(
       cursor: cursorNum,
     });
 
+    // Add validation status to all logs
+    let logsWithValidation = addValidationToLogs(result.logs);
+    
+    // Get validation counts from ALL logs before filtering
+    const allLogs = await getAllArbLogsForDate(dateStr);
+    const allLogsWithValidation = addValidationToLogs(allLogs);
+    const validationCounts = getValidationCounts(allLogsWithValidation);
+
+    // Filter if validOnly is requested (default true for JSON)
+    if (showValidOnly) {
+      logsWithValidation = filterValidLogs(logsWithValidation);
+    }
+
     const response: ArbLogsResponse = {
-      ...result,
+      logs: logsWithValidation,
+      total: result.total,
+      cursor: result.cursor,
+      hasMore: result.hasMore,
       date: dateStr,
       generatedAt: new Date().toISOString(),
+      validationCounts,
+      showingValidOnly: showValidOnly,
     };
 
     res.status(200).json(response);
