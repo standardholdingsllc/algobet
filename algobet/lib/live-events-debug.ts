@@ -18,9 +18,9 @@ export interface LiveEventsDebugCounters {
   subscriptionsAttemptedLive: number; // Phase 6
   subscriptionsFailed: Record<string, number>;
   platformFetch: {
-    KALSHI: { attempted: number; skipped: number; skipReasons: Record<string, number> };
-    POLYMARKET: { attempted: number; skipped: number; skipReasons: Record<string, number> };
-    SXBET: { attempted: number; skipped: number; skipReasons: Record<string, number> };
+    kalshi: { attempted: number; skipped: number; skipReasons: Record<string, number> };
+    polymarket: { attempted: number; skipped: number; skipReasons: Record<string, number> };
+    sxbet: { attempted: number; skipped: number; skipReasons: Record<string, number> };
   };
   kalshi: {
     fetchAttempted: number;
@@ -78,9 +78,9 @@ let counters: LiveEventsDebugCounters = {
   subscriptionsAttemptedLive: 0,
   subscriptionsFailed: {},
     platformFetch: {
-      KALSHI: { attempted: 0, skipped: 0, skipReasons: {} },
-      POLYMARKET: { attempted: 0, skipped: 0, skipReasons: {} },
-      SXBET: { attempted: 0, skipped: 0, skipReasons: {} },
+      kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+      polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
+      sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
     },
   kalshi: {
     fetchAttempted: 0,
@@ -121,9 +121,9 @@ export function resetLiveEventsDebug(): void {
     subscriptionsAttemptedLive: 0,
     subscriptionsFailed: {},
     platformFetch: {
-      KALSHI: { attempted: 0, skipped: 0, skipReasons: {} },
-      POLYMARKET: { attempted: 0, skipped: 0, skipReasons: {} },
-      SXBET: { attempted: 0, skipped: 0, skipReasons: {} },
+      kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+      polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
+      sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
     },
     kalshi: {
       fetchAttempted: 0,
@@ -217,22 +217,22 @@ export function recordSubscriptionFailed(reason: string): void {
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordPlatformFetchAttempt(platform: LiveEventPlatform): void {
+export function recordPlatformFetchAttempt(platform: 'kalshi' | 'polymarket' | 'sxbet'): void {
   counters.platformFetch[platform].attempted += 1;
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordPlatformFetchAttempted(platform: LiveEventPlatform): void {
+export function recordPlatformFetchAttempted(platform: 'kalshi' | 'polymarket' | 'sxbet'): void {
   counters.platformFetch[platform].attempted += 1;
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordPlatformFetchError(platform: LiveEventPlatform, error?: string): void {
+export function recordPlatformFetchError(platform: 'kalshi' | 'polymarket' | 'sxbet', error?: string): void {
   // This could be used to track fetch errors
   counters.lastUpdatedAt = new Date().toISOString();
 }
 
-export function recordPlatformFetchSkipped(platform: LiveEventPlatform, reason: string): void {
+export function recordPlatformFetchSkipped(platform: 'kalshi' | 'polymarket' | 'sxbet', reason: string): void {
   counters.platformFetch[platform].skipped += 1;
   bump(counters.platformFetch[platform].skipReasons, reason);
   counters.lastUpdatedAt = new Date().toISOString();
@@ -390,17 +390,17 @@ export function getLiveEventsDebug(): LiveEventsDebugCounters {
     watchersSkipped: { ...counters.watchersSkipped },
     subscriptionsFailed: { ...counters.subscriptionsFailed },
     platformFetch: {
-      KALSHI: {
-        ...counters.platformFetch.KALSHI,
-        skipReasons: { ...counters.platformFetch.KALSHI.skipReasons },
+      kalshi: {
+        ...counters.platformFetch.kalshi,
+        skipReasons: { ...counters.platformFetch.kalshi.skipReasons },
       },
-      POLYMARKET: {
-        ...counters.platformFetch.POLYMARKET,
-        skipReasons: { ...counters.platformFetch.POLYMARKET.skipReasons },
+      polymarket: {
+        ...counters.platformFetch.polymarket,
+        skipReasons: { ...counters.platformFetch.polymarket.skipReasons },
       },
-      SXBET: {
-        ...counters.platformFetch.SXBET,
-        skipReasons: { ...counters.platformFetch.SXBET.skipReasons },
+      sxbet: {
+        ...counters.platformFetch.sxbet,
+        skipReasons: { ...counters.platformFetch.sxbet.skipReasons },
       },
     },
     kalshi: {

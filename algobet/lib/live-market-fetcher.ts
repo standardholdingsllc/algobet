@@ -118,7 +118,7 @@ export class LiveMarketFetcher {
   ): Promise<FetchResult> {
     const fetchedAt = new Date().toISOString();
 
-    recordPlatformFetchAttempt(toLiveEventPlatform(platform));
+    recordPlatformFetchAttempt(platform);
 
     try {
       let markets: Market[] = [];
@@ -126,7 +126,7 @@ export class LiveMarketFetcher {
       switch (platform) {
         case 'kalshi':
           if (!this.hasKalshiCredentials()) {
-            recordPlatformFetchSkipped(toLiveEventPlatform('kalshi'), 'missing_kalshi_credentials');
+            recordPlatformFetchSkipped('kalshi', 'missing_kalshi_credentials');
             return {
               platform,
               markets: [],
@@ -157,8 +157,8 @@ export class LiveMarketFetcher {
       return { platform, markets, fetchedAt };
     } catch (error: any) {
       console.error(`[LiveMarketFetcher] Failed to fetch ${platform}:`, error.message);
-      recordPlatformFetchError(toLiveEventPlatform(platform), error.message || 'unknown_error');
-      recordPlatformFetchSkipped(toLiveEventPlatform(platform), 'exception');
+      recordPlatformFetchError(platform, error.message || 'unknown_error');
+      recordPlatformFetchSkipped(platform, 'exception');
       return { 
         platform, 
         markets: [], 
@@ -336,8 +336,8 @@ export class LiveMarketFetcher {
               liveMarketsFound: 0,
             },
           },
-          timestamp: now.toISOString(),
-          duration: 0,
+          totalLiveMarkets: 0,
+          discoveredAt: now.toISOString(),
         },
         fetchedAt: now.toISOString(),
       };

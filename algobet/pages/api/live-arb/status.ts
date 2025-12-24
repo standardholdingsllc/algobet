@@ -286,9 +286,9 @@ export default async function handler(
       subscriptionsAttemptedLive: 0, // Phase 6
       subscriptionsFailed: {},
       platformFetch: {
-        KALSHI: { attempted: 0, skipped: 0, skipReasons: {} },
-        POLYMARKET: { attempted: 0, skipped: 0, skipReasons: {} },
-        SXBET: { attempted: 0, skipped: 0, skipReasons: {} },
+        kalshi: { attempted: 0, skipped: 0, skipReasons: {} },
+        polymarket: { attempted: 0, skipped: 0, skipReasons: {} },
+        sxbet: { attempted: 0, skipped: 0, skipReasons: {} },
       },
       kalshi: {
         fetchAttempted: 0,

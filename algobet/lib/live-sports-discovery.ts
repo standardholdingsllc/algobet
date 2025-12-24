@@ -39,7 +39,6 @@ function createEmptyResult<T>(platform: 'polymarket' | 'kalshi'): LiveSportsDisc
  * Discover all live sports events from available platforms
  */
 export async function discoverAllLiveSports(): Promise<CombinedLiveSportsResult> {
-  const startTime = Date.now();
   const now = new Date();
 
   // For now, return empty results to avoid build errors
@@ -52,8 +51,6 @@ export async function discoverAllLiveSports(): Promise<CombinedLiveSportsResult>
     kalshi: kalshiResult,
     totalLiveMarkets: 0,
     discoveredAt: now.toISOString(),
-    timestamp: now.toISOString(),
-    duration: Date.now() - startTime,
   };
 
   return result;

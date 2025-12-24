@@ -254,12 +254,10 @@ export interface LiveSportsDiscoveryResult<T> {
  * Combined result from all platforms
  */
 export interface CombinedLiveSportsResult {
-  polymarket?: LiveSportsDiscoveryResult<PolymarketLiveMarket>;
-  kalshi?: LiveSportsDiscoveryResult<KalshiLiveEvent>;
-  totalLiveMarkets?: number;
-  discoveredAt?: string;
-  timestamp?: string;
-  duration?: number;
+  polymarket: LiveSportsDiscoveryResult<PolymarketLiveMarket>;
+  kalshi: LiveSportsDiscoveryResult<KalshiLiveEvent>;
+  totalLiveMarkets: number;
+  discoveredAt: string;
 }
 
 // ============================================================================
