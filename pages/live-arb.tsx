@@ -1402,7 +1402,7 @@ function RecentArbLogsTable({ logs }: { logs: ArbOpportunityLog[] }) {
                       opp.platformA === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
                       'bg-blue-900/30 text-blue-300'
                     }`}>
-                      {opp.platformA.toUpperCase().slice(0, 4)}
+                      {(opp.platformA ?? 'N/A').toUpperCase().slice(0, 4)}
                     </span>
                     <span className="text-gray-500">/</span>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -1410,7 +1410,7 @@ function RecentArbLogsTable({ logs }: { logs: ArbOpportunityLog[] }) {
                       opp.platformB === 'polymarket' ? 'bg-purple-900/30 text-purple-300' :
                       'bg-blue-900/30 text-blue-300'
                     }`}>
-                      {opp.platformB.toUpperCase().slice(0, 4)}
+                      {(opp.platformB ?? 'N/A').toUpperCase().slice(0, 4)}
                     </span>
                   </div>
                 </td>
